@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --background-alt: 0 0% 96%;
+    --foreground: 220 13% 18%;
+    --foreground-muted: 220 9% 46%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+
+    --primary: 232 65% 30%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 232 65% 95%;
+
+    --secondary: 43 95% 56%;
+    --secondary-foreground: 220 13% 18%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 232 65% 95%;
+    --accent-foreground: 232 65% 30%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 160 64% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 232 65% 30%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 232 65% 30%;
+    --sidebar-foreground: 232 30% 90%;
+    --sidebar-primary: 43 95% 56%;
+    --sidebar-primary-foreground: 220 13% 18%;
+    --sidebar-accent: 232 50% 38%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 232 50% 38%;
+    --sidebar-ring: 43 95% 56%;
+    --sidebar-muted: 232 40% 45%;
+
+    --gradient-hero: linear-gradient(135deg, hsl(232 65% 30%), hsl(232 50% 45%));
+    --gradient-gold: linear-gradient(135deg, hsl(43 95% 56%), hsl(35 95% 50%));
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-elevated: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --background-alt: 222 47% 10%;
+    --foreground: 210 40% 98%;
+    --foreground-muted: 215 20% 65%;
+
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 232 65% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 232 40% 18%;
+
+    --secondary: 43 95% 56%;
+    --secondary-foreground: 220 13% 18%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 232 40% 18%;
+    --accent-foreground: 232 65% 75%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 160 64% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 232 65% 55%;
+
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 43 95% 56%;
+    --sidebar-primary-foreground: 220 13% 18%;
+    --sidebar-accent: 222 47% 14%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 47% 14%;
+    --sidebar-ring: 43 95% 56%;
+    --sidebar-muted: 222 30% 30%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition-all duration-200;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground px-6 py-3 rounded-lg font-semibold transition-all duration-200;
+  }
+
+  .card-elevated {
+    @apply bg-card rounded-lg shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-card-hover)] transition-shadow duration-300 p-6;
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-gold {
+    background: var(--gradient-gold);
+  }
+
+  .stat-card {
+    @apply bg-card rounded-xl p-6 border border-border shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200;
+  }
+
+  .habit-day {
+    @apply w-8 h-8 rounded-md border border-border flex items-center justify-center text-xs cursor-pointer transition-all duration-200;
+  }
+
+  .habit-day-complete {
+    @apply bg-success text-success-foreground border-success;
+  }
+
+  .habit-day-incomplete {
+    @apply bg-muted hover:bg-accent;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-hero);
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-gold);
+  }
+}

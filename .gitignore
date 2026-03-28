@@ -1,0 +1,5 @@
+node_modules/
+skill-spark/node_modules/
+.env
+dist/
+build/
