@@ -82,20 +82,33 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-// mongoose
-//   .connect(process.env.MONGO_URI)
-//   .then(() => {
-//     console.log("✅ MongoDB connected");
-//     app.listen(PORT, () => {
-//       console.log(`🚀 Server running on http://localhost:${PORT}`);
-//       console.log(`🌐 Origins: ${allowedOrigins.join(", ")}`);
-//     });
-//   })
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  // .catch(err => console.log("Mongo Error:", err));
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌐 Allowed Origins: ${allowedOrigins.join(", ")}`);
+    });
+  })
   .catch((err) => {
     console.error("❌ MongoDB error:", err.message);
-    process.exit(1);
+    process.exit(1); // Exit process if DB fails
   });
+// // mongoose
+// //   .connect(process.env.MONGO_URI)
+// //   .then(() => {
+// //     console.log("✅ MongoDB connected");
+// //     app.listen(PORT, () => {
+// //       console.log(`🚀 Server running on http://localhost:${PORT}`);
+// //       console.log(`🌐 Origins: ${allowedOrigins.join(", ")}`);
+// //     });
+// //   })
+// mongoose
+//   .connect(process.env.MONGO_URI)
+//   .then(() => console.log("MongoDB Connected"))
+//   // .catch(err => console.log("Mongo Error:", err));
+//   .catch((err) => {
+//     console.error("❌ MongoDB error:", err.message);
+//     process.exit(1);
+//   });
