@@ -2,7 +2,12 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-require("dotenv").config();
+
+// Only load .env in development (local machine)
+// On Render, env vars come from the dashboard, not .env
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 const { passport, initializePassport } = require("./utils/passport");
 initializePassport();
@@ -71,17 +76,32 @@ app.use("/api/frame-of-mind", frameOfMindRoutes);
 app.get("/api/health", (req, res) =>
   res.json({ success: true, message: "SkillSpark API 🚀" }),
 );
+
 app.use((req, res) =>
   res
     .status(404)
     .json({ success: false, message: `Route ${req.originalUrl} not found` }),
 );
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ success: false, message: "Server error" });
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Validate required environment variables
+if (!process.env.MONGO_URI) {
+  console.error("❌ ERROR: MONGO_URI environment variable is not set!");
+  console.error(
+    "   → Add it in Render Dashboard: Settings → Environment → Add Variable",
+  );
+  console.error(
+    "   → Format: mongodb+srv://username:password@cluster.xxxxx.mongodb.net/dbname",
+  );
+  process.exit(1);
+}
+
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
@@ -93,22 +113,5 @@ mongoose
   })
   .catch((err) => {
     console.error("❌ MongoDB error:", err.message);
-    process.exit(1); // Exit process if DB fails
+    process.exit(1);
   });
-// // mongoose
-// //   .connect(process.env.MONGO_URI)
-// //   .then(() => {
-// //     console.log("✅ MongoDB connected");
-// //     app.listen(PORT, () => {
-// //       console.log(`🚀 Server running on http://localhost:${PORT}`);
-// //       console.log(`🌐 Origins: ${allowedOrigins.join(", ")}`);
-// //     });
-// //   })
-// mongoose
-//   .connect(process.env.MONGO_URI)
-//   .then(() => console.log("MongoDB Connected"))
-//   // .catch(err => console.log("Mongo Error:", err));
-//   .catch((err) => {
-//     console.error("❌ MongoDB error:", err.message);
-//     process.exit(1);
-//   });
