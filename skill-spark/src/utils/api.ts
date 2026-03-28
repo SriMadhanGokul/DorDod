@@ -1,9 +1,9 @@
-import axios from 'axios';
+import axios from "axios";
 
 export const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: "https://dordod.onrender.com",
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 // Mock mode - set to true for frontend-only development
