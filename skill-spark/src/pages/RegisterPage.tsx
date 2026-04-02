@@ -103,9 +103,9 @@ export default function RegisterPage() {
     }, 1000);
   };
 
-    const handleGoogle = () => {
+  const handleGoogle = () => {
     const backendUrl =
-      process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      process.env.REACT_APP_BACKEND_URL || "https://dordod-1.onrender.com";
     window.location.href = `${backendUrl}/auth/google`;
   };
 
