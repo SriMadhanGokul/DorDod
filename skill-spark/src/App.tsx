@@ -79,7 +79,7 @@ const App = () => (
         />
         <BrowserRouter>
           <Routes>
-            {/* <Route path="/" element={<LandingPage />} /> */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
