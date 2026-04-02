@@ -103,8 +103,10 @@ export default function RegisterPage() {
     }, 1000);
   };
 
-  const handleGoogle = () => {
-    window.location.href = "http://localhost:5000/api/auth/google";
+    const handleGoogle = () => {
+    const backendUrl =
+      process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+    window.location.href = `${backendUrl}/auth/google`;
   };
 
   const steps = [
