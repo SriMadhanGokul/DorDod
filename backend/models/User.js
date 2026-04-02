@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema(
       enum: ["Free", "Pro", "Enterprise"],
       default: "Free",
     },
+    role: { type: String, enum: ["user", "admin"], default: "user" },
+    suspended: { type: Boolean, default: false },
+    suspendedReason: { type: String, default: "" },
+    lastLogin: { type: Date },
 
     // ─── Notifications ─────────────────────────────────────────────────────
     notifications: {
@@ -68,7 +72,8 @@ const userSchema = new mongoose.Schema(
 );
 
 // Auto-compute display name
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
+  // Auto-compute display name
   if (
     this.isModified("firstName") ||
     this.isModified("lastName") ||
@@ -79,12 +84,15 @@ userSchema.pre("save", async function (next) {
       `${this.firstName} ${this.lastName}`.trim() ||
       this.name;
   }
-  if (!this.isModified("password") || !this.password) return next();
+
+  // Skip password hashing if not modified or empty
+  if (!this.isModified("password") || !this.password) {
+    return;
+  }
+
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
-  // Mark hasPassword true whenever password is set
   this.hasPassword = true;
-  next();
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword) {

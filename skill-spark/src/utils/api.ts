@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export const api = axios.create({
-  baseURL: "https://dordod-1.onrender.com",
+  baseURL: "https://dordod-1.onrender.com/api",
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });

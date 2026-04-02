@@ -18,6 +18,7 @@ interface User {
   subscription?: string;
   hasPassword?: boolean;
   isGoogleUser?: boolean;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -34,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session on load
   useEffect(() => {
     api
       .get("/auth/me")

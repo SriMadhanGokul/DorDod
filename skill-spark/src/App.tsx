@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 import LandingPage from "./pages/LandingPage";
@@ -12,6 +12,8 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SetupPasswordPage from "./pages/SetupPasswordPage";
 import PricingPage from "./pages/PricingPage";
+import NotFound from "./pages/NotFound";
+
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
 import GoalsPage from "./pages/GoalsPage";
@@ -26,12 +28,40 @@ import AchievementsPage from "./pages/AchievementsPage";
 import ActivitiesPage from "./pages/ActivitiesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import FrameOfMindPage from "./pages/FrameOfMindPage";
-import NotFound from "./pages/NotFound";
+
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UsersPage from "./pages/admin/UsersPage";
+import UserDetailsPage from "./pages/admin/UserDetailsPage";
+import GoalsManagement from "./pages/admin/GoalsManagement";
+import HabitsManagement from "./pages/admin/HabitsManagement";
+import CoursesManagement from "./pages/admin/CoursesManagement";
+import CommunityModeration from "./pages/admin/CommunityModeration";
+import AchievementsManagement from "./pages/admin/AchievementsManagement";
+import NotificationsPage from "./pages/admin/NotificationsPage";
+import SettingsPage from "./pages/admin/SettingsPage";
+import PendingCoursesPage from "./pages/admin/PendingCoursesPage";
+import UserSkillsPage from "./pages/admin/UserSkillsPage";
 
 const queryClient = new QueryClient();
+
 const Protected = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>{children}</ProtectedRoute>
 );
+
+// ✅ Fixed: !== not ! ==
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  if (!user) return <Navigate to="/login" replace />;
+  if ((user as any).role !== "admin")
+    return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -49,15 +79,12 @@ const App = () => (
         />
         <BrowserRouter>
           <Routes>
-            {/* Public */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/pricing" element={<PricingPage />} />
-
-            {/* Semi-protected (needs JWT but not full auth check) */}
             <Route
               path="/setup-password"
               element={
@@ -66,8 +93,6 @@ const App = () => (
                 </Protected>
               }
             />
-
-            {/* Protected */}
             <Route
               path="/dashboard"
               element={
@@ -178,6 +203,102 @@ const App = () => (
                 <Protected>
                   <FrameOfMindPage />
                 </Protected>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <AdminRoute>
+                  <UsersPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/users/:id"
+              element={
+                <AdminRoute>
+                  <UserDetailsPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/goals"
+              element={
+                <AdminRoute>
+                  <GoalsManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/habits"
+              element={
+                <AdminRoute>
+                  <HabitsManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/courses"
+              element={
+                <AdminRoute>
+                  <CoursesManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/community"
+              element={
+                <AdminRoute>
+                  <CommunityModeration />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/achievements"
+              element={
+                <AdminRoute>
+                  <AchievementsManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications"
+              element={
+                <AdminRoute>
+                  <NotificationsPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <AdminRoute>
+                  <SettingsPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/pending-courses"
+              element={
+                <AdminRoute>
+                  <PendingCoursesPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/user-skills"
+              element={
+                <AdminRoute>
+                  <UserSkillsPage />
+                </AdminRoute>
               }
             />
             <Route path="*" element={<NotFound />} />

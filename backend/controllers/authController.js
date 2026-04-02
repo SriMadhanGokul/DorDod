@@ -453,6 +453,8 @@ const sanitizeUser = (user) => ({
   notifications: user.notifications,
   hasPassword: user.hasPassword,
   isGoogleUser: user.isGoogleUser,
+  role: user.role || "user",
+  suspended: user.suspended || false,
 });
 
 module.exports = {

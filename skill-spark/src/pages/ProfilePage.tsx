@@ -11,7 +11,9 @@ import {
   FaChevronUp,
   FaPlus,
   FaTrash,
+  FaShieldAlt,
 } from "react-icons/fa";
+
 import { useNavigate } from "react-router-dom";
 
 const PROFICIENCY = ["", "Beginner", "Intermediate", "Advanced", "Native"];
@@ -496,6 +498,14 @@ export default function ProfilePage() {
             >
               <FaSignOutAlt /> Log Out
             </button>
+            {/* {(user as any).role === "admin" && (
+              <button
+                onClick={() => navigate("/admin")}
+                className="flex items-center gap-2 text-yellow-600 font-medium hover:underline"
+              >
+                <FaShieldAlt /> Go to Admin Panel
+              </button>
+            )} */}
           </div>
         )}
 

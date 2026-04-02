@@ -2,11 +2,39 @@ const mongoose = require("mongoose");
 
 const courseSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
     category: { type: String, required: true },
     duration: { type: String, required: true },
     instructor: { type: String, required: true },
-    skillTag: { type: String, default: "" }, // links course to a skill name
+    skillTag: { type: String, default: "" },
+    skillLevel: {
+      type: String,
+      enum: ["Beginner", "Intermediate", "Advanced"],
+      default: "Beginner",
+    },
+    videoUrl: { type: String, default: "" },
+    thumbnail: { type: String, default: "" },
+
+    // Approval system
+    status: {
+      type: String,
+      enum: ["approved", "pending", "rejected"],
+      default: "approved",
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    isAdminCourse: { type: Boolean, default: true },
+    rejectionReason: { type: String, default: "" },
+    approvedAt: { type: Date },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true },
 );

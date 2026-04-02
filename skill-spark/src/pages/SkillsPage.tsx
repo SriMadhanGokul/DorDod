@@ -13,6 +13,9 @@ import {
   FaChevronUp,
   FaArrowLeft,
   FaPlay,
+  FaTimes,
+  FaTrash,
+  FaStar,
 } from "react-icons/fa";
 
 interface CareerPath {
@@ -44,6 +47,15 @@ interface UserSkill {
 interface SkillPath {
   careerPath: string;
   skills: UserSkill[];
+}
+interface CustomSkill {
+  _id: string;
+  skillName: string;
+  alreadyKnows: string;
+  wantsToLearn: string;
+  description: string;
+  category: string;
+  status: string;
 }
 
 const STATUS_CONFIG = {
@@ -83,13 +95,28 @@ export default function SkillsPage() {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
+  // Custom skills state
+  const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [savingCustom, setSavingCustom] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    skillName: "",
+    alreadyKnows: "",
+    wantsToLearn: "",
+    description: "",
+    category: "Other",
+    status: "current",
+  });
+
   useEffect(() => {
     const load = async () => {
       try {
-        const [cRes, spRes] = await Promise.all([
+        const [cRes, spRes, csRes] = await Promise.all([
           api.get("/skill-path/careers"),
           api.get("/skill-path"),
+          api.get("/custom-skills"),
         ]);
+        setCustomSkills(csRes.data.data || []);
         setCareers(cRes.data.data);
         if (spRes.data.data) {
           setSkillPath(spRes.data.data);
@@ -163,6 +190,40 @@ export default function SkillsPage() {
           : 0,
       }
     : { learned: 0, learning: 0, total: 0, pct: 0 };
+
+  const addCustomSkill = async () => {
+    if (!customForm.skillName.trim())
+      return toast.error("Skill name is required");
+    setSavingCustom(true);
+    try {
+      const res = await api.post("/custom-skills", customForm);
+      setCustomSkills((p) => [res.data.data, ...p]);
+      setCustomForm({
+        skillName: "",
+        alreadyKnows: "",
+        wantsToLearn: "",
+        description: "",
+        category: "Other",
+        status: "current",
+      });
+      setShowCustomModal(false);
+      toast.success("Custom skill added!");
+    } catch {
+      toast.error("Failed to add skill");
+    } finally {
+      setSavingCustom(false);
+    }
+  };
+
+  const deleteCustomSkill = async (id: string) => {
+    try {
+      await api.delete(`/custom-skills/${id}`);
+      setCustomSkills((p) => p.filter((s) => s._id !== id));
+      toast.success("Skill deleted!");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
 
   const grouped = (() => {
     if (!skillPath) return {};
@@ -559,7 +620,243 @@ export default function SkillsPage() {
                 </div>
               )}
             </div>
+
+            {/* ─── Custom Skills Section ───────────────────────────────────── */}
+            <div className="card-elevated">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <FaStar className="text-secondary" /> My Other Skills
+                  </h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    Skills outside your career path
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCustomModal(true)}
+                  className="btn-secondary text-sm flex items-center gap-2 py-2"
+                >
+                  <FaPlus className="w-3 h-3" /> Add Other Skill
+                </button>
+              </div>
+
+              {customSkills.length === 0 ? (
+                <div className="text-center py-8 text-foreground-muted border-2 border-dashed border-border rounded-xl">
+                  <FaStar className="text-3xl mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-medium">No custom skills yet</p>
+                  <p className="text-xs mt-1">
+                    Add skills that aren't in your career path
+                  </p>
+                  <button
+                    onClick={() => setShowCustomModal(true)}
+                    className="btn-primary text-sm mt-3 py-2"
+                  >
+                    <FaPlus className="w-3 h-3 inline mr-1" /> Add Other Skill
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customSkills.map((s) => {
+                    const statusCfg =
+                      s.status === "completed"
+                        ? "bg-success/20 text-success border-success/40"
+                        : s.status === "current"
+                          ? "bg-primary/20 text-primary border-primary/40"
+                          : "bg-muted text-foreground-muted border-border";
+                    return (
+                      <div
+                        key={s._id}
+                        className={`p-4 rounded-xl border transition-all ${statusCfg}`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <h3 className="font-semibold text-sm">
+                                {s.skillName}
+                              </h3>
+                              <span className="text-xs bg-card px-2 py-0.5 rounded-full capitalize opacity-80">
+                                {s.status === "current"
+                                  ? "📖 Learning"
+                                  : s.status === "completed"
+                                    ? "✅ Done"
+                                    : "⏳ Planned"}
+                              </span>
+                              <span className="text-xs bg-card px-2 py-0.5 rounded-full opacity-70">
+                                {s.category}
+                              </span>
+                            </div>
+                            {s.description && (
+                              <p className="text-xs opacity-80 mb-2 line-clamp-2">
+                                {s.description}
+                              </p>
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                              {s.alreadyKnows && (
+                                <div>
+                                  <p className="text-xs font-medium opacity-70 mb-0.5">
+                                    Already know:
+                                  </p>
+                                  <p className="text-xs opacity-60">
+                                    {s.alreadyKnows}
+                                  </p>
+                                </div>
+                              )}
+                              {s.wantsToLearn && (
+                                <div>
+                                  <p className="text-xs font-medium opacity-70 mb-0.5">
+                                    Want to learn:
+                                  </p>
+                                  <p className="text-xs opacity-60">
+                                    {s.wantsToLearn}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 ml-3 shrink-0">
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/learning?skill=${encodeURIComponent(s.skillName)}`,
+                                )
+                              }
+                              className="text-xs border border-current px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                            >
+                              <FaPlay className="w-2 h-2" /> Learn
+                            </button>
+                            <button
+                              onClick={() => deleteCustomSkill(s._id)}
+                              className="text-foreground-muted hover:text-destructive p-1"
+                            >
+                              <FaTrash className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
+        )}
+
+        {/* ─── Add Custom Skill Modal ─────────────────────────────────────── */}
+        {showCustomModal && (
+          <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-card rounded-2xl p-6 w-full max-w-md animate-fade-in my-auto">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <FaStar className="text-secondary" /> Add Other Skill
+                  </h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    Track a skill outside your career path
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCustomModal(false)}
+                  className="text-foreground-muted hover:text-foreground p-1"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <input
+                  placeholder="Skill name *"
+                  value={customForm.skillName}
+                  onChange={(e) =>
+                    setCustomForm((p) => ({ ...p, skillName: e.target.value }))
+                  }
+                  className="input-field"
+                />
+                <textarea
+                  placeholder="What do you already know about this skill?"
+                  value={customForm.alreadyKnows}
+                  onChange={(e) =>
+                    setCustomForm((p) => ({
+                      ...p,
+                      alreadyKnows: e.target.value,
+                    }))
+                  }
+                  className="input-field min-h-[60px]"
+                />
+                <textarea
+                  placeholder="What do you want to learn?"
+                  value={customForm.wantsToLearn}
+                  onChange={(e) =>
+                    setCustomForm((p) => ({
+                      ...p,
+                      wantsToLearn: e.target.value,
+                    }))
+                  }
+                  className="input-field min-h-[60px]"
+                />
+                <textarea
+                  placeholder="Description (optional)"
+                  value={customForm.description}
+                  onChange={(e) =>
+                    setCustomForm((p) => ({
+                      ...p,
+                      description: e.target.value,
+                    }))
+                  }
+                  className="input-field min-h-[50px]"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-foreground-muted">
+                      Category
+                    </label>
+                    <select
+                      value={customForm.category}
+                      onChange={(e) =>
+                        setCustomForm((p) => ({
+                          ...p,
+                          category: e.target.value,
+                        }))
+                      }
+                      className="input-field"
+                    >
+                      {[
+                        "Technical",
+                        "Leadership",
+                        "Soft Skills",
+                        "Creative",
+                        "Language",
+                        "Other",
+                      ].map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-foreground-muted">
+                      Status
+                    </label>
+                    <select
+                      value={customForm.status}
+                      onChange={(e) =>
+                        setCustomForm((p) => ({ ...p, status: e.target.value }))
+                      }
+                      className="input-field"
+                    >
+                      <option value="planned">⏳ Planned</option>
+                      <option value="current">📖 Currently Learning</option>
+                      <option value="completed">✅ Completed</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  onClick={addCustomSkill}
+                  disabled={savingCustom}
+                  className="btn-primary w-full disabled:opacity-50"
+                >
+                  {savingCustom ? "Adding..." : "Add Custom Skill"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

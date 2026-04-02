@@ -11,7 +11,7 @@ if (process.env.NODE_ENV !== "production") {
 
 const { passport, initializePassport } = require("./utils/passport");
 initializePassport();
-
+const adminRoutes = require("./routes/adminRoutes");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const goalRoutes = require("./routes/goalRoutes");
@@ -28,6 +28,9 @@ const achievementRoutes = require("./routes/achievementRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
+const customSkillRoutes = require("./routes/customSkillRoutes");
+const adminCourseRoutes = require("./routes/adminCourseRoutes");
+
 
 const app = express();
 
@@ -56,7 +59,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
-
+app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/goals", goalRoutes);
@@ -73,6 +76,9 @@ app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/frame-of-mind", frameOfMindRoutes);
+app.use("/api/custom-skills", customSkillRoutes);
+app.use("/api/admin", adminCourseRoutes);
+
 
 app.get("/api/health", (req, res) =>
   res.json({ success: true, message: "SkillSpark API 🚀" }),
@@ -116,3 +122,5 @@ mongoose
     console.error("❌ MongoDB error:", err.message);
     process.exit(1);
   });
+//
+//MONGO_URI=mongodb+srv://skillspark_user:Zens0Q6It7Vjy42v@cluster0.6p49ojn.mongodb.net/?appName=Cluster0

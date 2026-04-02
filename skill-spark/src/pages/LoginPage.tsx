@@ -8,7 +8,7 @@ import { FcGoogle } from "react-icons/fc";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, loading } = useAuth();
+  const { login, loading, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -17,11 +17,22 @@ export default function LoginPage() {
       toast.error("Google sign-in failed. Please try again.");
   }, [searchParams]);
 
+  // ✅ Role-based redirect after login
+  useEffect(() => {
+    if (user) {
+      if ((user as any).role === "admin") {
+        navigate("/admin", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
-      navigate("/dashboard");
+      // Navigation handled by useEffect above
     } catch {}
   };
 
@@ -42,7 +53,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Google */}
         <button
           onClick={handleGoogle}
           className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-3 px-4 text-sm font-medium hover:bg-muted transition-all mb-4"
@@ -81,8 +91,6 @@ export default function LoginPage() {
               className="input-field pl-11"
             />
           </div>
-
-          {/* Forgot password */}
           <div className="text-right">
             <Link
               to="/forgot-password"
@@ -91,7 +99,6 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-
           <button
             type="submit"
             disabled={loading}
