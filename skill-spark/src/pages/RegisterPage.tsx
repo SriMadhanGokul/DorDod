@@ -20,11 +20,9 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // ─── Step 1: Send OTP ───────────────────────────────────────────────────────
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast.error("Please enter your name");
-    if (!email.trim()) return toast.error("Please enter your email");
     setLoading(true);
     try {
       await api.post("/auth/send-otp", { name, email });
@@ -32,19 +30,12 @@ export default function RegisterPage() {
       setStep("otp");
       startResendTimer();
     } catch (err: any) {
-      const msg = err.response?.data?.message || "Failed to send OTP";
-      // If email already exists, offer to login instead
-      if (err.response?.data?.alreadyExists) {
-        toast.error(msg, { duration: 4000 });
-      } else {
-        toast.error(msg);
-      }
+      toast.error(err.response?.data?.message || "Failed to send OTP");
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Step 2: Verify OTP ─────────────────────────────────────────────────────
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length !== 6) return toast.error("Enter the 6-digit OTP");
@@ -60,7 +51,6 @@ export default function RegisterPage() {
     }
   };
 
-  // ─── Step 3: Set Password ───────────────────────────────────────────────────
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6)
@@ -78,7 +68,6 @@ export default function RegisterPage() {
     }
   };
 
-  // ─── Resend OTP ─────────────────────────────────────────────────────────────
   const handleResend = async () => {
     if (resendTimer > 0) return;
     try {
@@ -103,10 +92,11 @@ export default function RegisterPage() {
     }, 1000);
   };
 
+  // ✅ FIX: Use VITE_API_URL env variable
   const handleGoogle = () => {
     const backendUrl =
-      process.env.REACT_APP_BACKEND_URL || "https://dordod-1.onrender.com";
-    window.location.href = `${backendUrl}/auth/google`;
+      (import.meta as any).env?.VITE_API_URL || "http://localhost:5000";
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   const steps = [
@@ -128,7 +118,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Step indicators */}
+        {/* Steps */}
         <div className="flex items-center justify-center gap-2 mb-6">
           {steps.map((s, i) => (
             <div key={s.id} className="flex items-center gap-2">
@@ -153,7 +143,6 @@ export default function RegisterPage() {
           ))}
         </div>
 
-        {/* ─── Step 1: Details ──────────────────────────────────────────────── */}
         {step === "details" && (
           <>
             <button
@@ -200,7 +189,6 @@ export default function RegisterPage() {
                 {loading ? "Sending OTP..." : "Send Verification OTP"}
               </button>
             </form>
-            {/* Already have account */}
             <p className="text-center text-sm text-foreground-muted mt-4">
               Already have an account?{" "}
               <Link
@@ -213,13 +201,12 @@ export default function RegisterPage() {
           </>
         )}
 
-        {/* ─── Step 2: OTP Verification ─────────────────────────────────────── */}
         {step === "otp" && (
           <div className="space-y-4">
             <div className="text-center mb-2">
               <FaShieldAlt className="text-4xl text-primary mx-auto mb-2" />
               <p className="text-sm text-foreground-muted">
-                We sent a 6-digit OTP to <strong>{email}</strong>
+                OTP sent to <strong>{email}</strong>
               </p>
               <p className="text-xs text-foreground-muted mt-1">
                 Check your inbox and spam folder
@@ -249,11 +236,9 @@ export default function RegisterPage() {
               <button
                 onClick={handleResend}
                 disabled={resendTimer > 0}
-                className={`text-sm transition-colors ${resendTimer > 0 ? "text-foreground-muted" : "text-primary hover:underline"}`}
+                className={`text-sm ${resendTimer > 0 ? "text-foreground-muted" : "text-primary hover:underline"}`}
               >
-                {resendTimer > 0
-                  ? `Resend OTP in ${resendTimer}s`
-                  : "Resend OTP"}
+                {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend OTP"}
               </button>
               <br />
               <button
@@ -261,7 +246,7 @@ export default function RegisterPage() {
                   setStep("details");
                   setOtp("");
                 }}
-                className="text-sm text-foreground-muted hover:text-foreground"
+                className="text-xs text-foreground-muted hover:text-foreground"
               >
                 ← Change email
               </button>
@@ -269,7 +254,6 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* ─── Step 3: Set Password ─────────────────────────────────────────── */}
         {step === "password" && (
           <form onSubmit={handleSetPassword} className="space-y-4">
             <div className="text-center mb-2">
@@ -277,7 +261,7 @@ export default function RegisterPage() {
                 <span className="text-success text-2xl">✓</span>
               </div>
               <p className="text-sm text-foreground-muted">
-                Email verified! Now set your password.
+                Email verified! Set your password.
               </p>
             </div>
             <div className="relative">
@@ -303,8 +287,6 @@ export default function RegisterPage() {
                 className="input-field pl-11"
               />
             </div>
-
-            {/* Match indicator */}
             {confirm.length > 0 && (
               <p
                 className={`text-xs ${password === confirm ? "text-success" : "text-destructive"}`}
@@ -314,40 +296,6 @@ export default function RegisterPage() {
                   : "✗ Passwords do not match"}
               </p>
             )}
-
-            {/* Strength bar */}
-            {password.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 h-1.5 rounded-full transition-all ${
-                        password.length >= i * 3
-                          ? i <= 1
-                            ? "bg-destructive"
-                            : i <= 2
-                              ? "bg-secondary"
-                              : i <= 3
-                                ? "bg-blue-400"
-                                : "bg-success"
-                          : "bg-muted"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs text-foreground-muted">
-                  {password.length < 6
-                    ? "Too short"
-                    : password.length < 9
-                      ? "Weak"
-                      : password.length < 12
-                        ? "Good"
-                        : "Strong"}
-                </p>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={loading}

@@ -8,38 +8,39 @@ import { FcGoogle } from "react-icons/fc";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login, loading, user } = useAuth();
+  const { login, loading, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (searchParams.get("error") === "google_auth_failed")
       toast.error("Google sign-in failed. Please try again.");
-  }, [searchParams]);
+  }, []);
 
-  // ✅ Role-based redirect after login
+  // ✅ FIX: Only redirect when auth is confirmed AND user has role
   useEffect(() => {
-    if (user) {
-      if ((user as any).role === "admin") {
+    if (!loading && isAuthenticated && user) {
+      const role = (user as any).role;
+      if (role === "admin") {
         navigate("/admin", { replace: true });
       } else {
         navigate("/dashboard", { replace: true });
       }
     }
-  }, [user]);
+  }, [isAuthenticated, user, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
-      // Navigation handled by useEffect above
     } catch {}
   };
 
+  // ✅ FIX: Use VITE_API_URL env variable - not window.location
   const handleGoogle = () => {
     const backendUrl =
-      process.env.REACT_APP_BACKEND_URL || "https://dordod-1.onrender.com";
-    window.location.href = `${backendUrl}/auth/google`;
+      (import.meta as any).env?.VITE_API_URL || "http://localhost:5000";
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   return (

@@ -1,13 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
   FaCheck,
-  FaBookOpen,
-  FaClock,
-  FaFire,
   FaPlus,
   FaChevronDown,
   FaChevronUp,
@@ -16,8 +13,10 @@ import {
   FaTimes,
   FaTrash,
   FaStar,
+  FaTag,
 } from "react-icons/fa";
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 interface CareerPath {
   id: string;
   title: string;
@@ -51,31 +50,83 @@ interface SkillPath {
 interface CustomSkill {
   _id: string;
   skillName: string;
-  alreadyKnows: string;
-  wantsToLearn: string;
+  alreadyKnows: string[];
+  wantsToLearn: string[];
   description: string;
   category: string;
   status: string;
 }
 
-const STATUS_CONFIG = {
-  learned: {
-    label: "Learned",
-    color: "bg-success/20 text-success border-success/40",
-    dot: "bg-success",
-  },
-  learning: {
-    label: "Learning",
-    color: "bg-primary/20 text-primary border-primary/40",
-    dot: "bg-primary",
-  },
-  "to-learn": {
-    label: "To Learn",
-    color: "bg-muted text-foreground-muted border-border",
-    dot: "bg-foreground-muted",
-  },
-};
+// ─── Tag Input Component ──────────────────────────────────────────────────────
+function TagInput({
+  tags,
+  onChange,
+  placeholder,
+}: {
+  tags: string[];
+  onChange: (t: string[]) => void;
+  placeholder: string;
+}) {
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  const addTag = (val: string) => {
+    const trimmed = val.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    onChange([...tags, trimmed]);
+    setInput("");
+  };
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(input);
+    }
+    if (e.key === "Backspace" && !input && tags.length > 0)
+      onChange(tags.slice(0, -1));
+  };
+
+  const removeTag = (i: number) => onChange(tags.filter((_, idx) => idx !== i));
+
+  return (
+    <div
+      className="flex flex-wrap gap-1.5 p-2 border border-border rounded-xl bg-card min-h-[44px] cursor-text"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {tags.map((tag, i) => (
+        <span
+          key={i}
+          className="flex items-center gap-1 bg-primary/15 text-primary text-xs px-2 py-1 rounded-lg"
+        >
+          {tag}
+          <button
+            type="button"
+            onClick={() => removeTag(i)}
+            className="hover:text-destructive ml-0.5"
+          >
+            <FaTimes className="w-2.5 h-2.5" />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKey}
+        onBlur={() => addTag(input)}
+        placeholder={tags.length === 0 ? placeholder : "Add more..."}
+        className="flex-1 min-w-[120px] outline-none text-sm bg-transparent placeholder:text-foreground-muted/60"
+      />
+      {input && (
+        <span className="text-xs text-foreground-muted self-center">
+          Press Enter or comma to add
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Demand color config ──────────────────────────────────────────────────────
 const DEMAND_COLOR: Record<string, string> = {
   "Very High": "bg-red-100 text-red-600",
   Exploding: "bg-purple-100 text-purple-600",
@@ -83,6 +134,28 @@ const DEMAND_COLOR: Record<string, string> = {
   "Increasing Fast": "bg-orange-100 text-orange-600",
 };
 
+const STATUS_CONFIG = {
+  learned: {
+    color: "bg-success/20 text-success border-success/40",
+    dot: "bg-success",
+  },
+  learning: {
+    color: "bg-primary/20 text-primary border-primary/40",
+    dot: "bg-primary",
+  },
+  "to-learn": {
+    color: "bg-muted text-foreground-muted border-border",
+    dot: "bg-foreground-muted",
+  },
+};
+
+const CUSTOM_STATUS_COLOR: Record<string, string> = {
+  completed: "bg-success/20 text-success border-success/40",
+  current: "bg-primary/20 text-primary border-primary/40",
+  planned: "bg-muted text-foreground-muted border-border",
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function SkillsPage() {
   const [view, setView] = useState<"select" | "detail" | "track">("select");
   const [careers, setCareers] = useState<CareerPath[]>([]);
@@ -95,16 +168,16 @@ export default function SkillsPage() {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
-  // Custom skills state
+  // Custom skills
   const [customSkills, setCustomSkills] = useState<CustomSkill[]>([]);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [savingCustom, setSavingCustom] = useState(false);
   const [customForm, setCustomForm] = useState({
     skillName: "",
-    alreadyKnows: "",
-    wantsToLearn: "",
+    alreadyKnows: [] as string[],
+    wantsToLearn: [] as string[],
     description: "",
-    category: "Other",
+    category: "Technical",
     status: "current",
   });
 
@@ -116,12 +189,28 @@ export default function SkillsPage() {
           api.get("/skill-path"),
           api.get("/custom-skills"),
         ]);
-        setCustomSkills(csRes.data.data || []);
         setCareers(cRes.data.data);
         if (spRes.data.data) {
           setSkillPath(spRes.data.data);
           setView("track");
         }
+        // Parse stored custom skills — alreadyKnows may be string or array
+        const cs = (csRes.data.data || []).map((s: any) => ({
+          ...s,
+          alreadyKnows: Array.isArray(s.alreadyKnows)
+            ? s.alreadyKnows
+            : (s.alreadyKnows || "")
+                .split(",")
+                .map((x: string) => x.trim())
+                .filter(Boolean),
+          wantsToLearn: Array.isArray(s.wantsToLearn)
+            ? s.wantsToLearn
+            : (s.wantsToLearn || "")
+                .split(",")
+                .map((x: string) => x.trim())
+                .filter(Boolean),
+        }));
+        setCustomSkills(cs);
       } catch {
         toast.error("Failed to load");
       } finally {
@@ -175,35 +264,29 @@ export default function SkillsPage() {
     }
   };
 
-  const stats = skillPath
-    ? {
-        learned: skillPath.skills.filter((s) => s.status === "learned").length,
-        learning: skillPath.skills.filter((s) => s.status === "learning")
-          .length,
-        total: skillPath.skills.length,
-        pct: skillPath.skills.length
-          ? Math.round(
-              (skillPath.skills.filter((s) => s.status === "learned").length /
-                skillPath.skills.length) *
-                100,
-            )
-          : 0,
-      }
-    : { learned: 0, learning: 0, total: 0, pct: 0 };
-
   const addCustomSkill = async () => {
     if (!customForm.skillName.trim())
       return toast.error("Skill name is required");
     setSavingCustom(true);
     try {
-      const res = await api.post("/custom-skills", customForm);
-      setCustomSkills((p) => [res.data.data, ...p]);
+      const payload = {
+        ...customForm,
+        alreadyKnows: customForm.alreadyKnows.join(", "),
+        wantsToLearn: customForm.wantsToLearn.join(", "),
+      };
+      const res = await api.post("/custom-skills", payload);
+      const newSkill = {
+        ...res.data.data,
+        alreadyKnows: customForm.alreadyKnows,
+        wantsToLearn: customForm.wantsToLearn,
+      };
+      setCustomSkills((p) => [newSkill, ...p]);
       setCustomForm({
         skillName: "",
-        alreadyKnows: "",
-        wantsToLearn: "",
+        alreadyKnows: [],
+        wantsToLearn: [],
         description: "",
-        category: "Other",
+        category: "Technical",
         status: "current",
       });
       setShowCustomModal(false);
@@ -224,6 +307,22 @@ export default function SkillsPage() {
       toast.error("Failed to delete");
     }
   };
+
+  const stats = skillPath
+    ? {
+        learned: skillPath.skills.filter((s) => s.status === "learned").length,
+        learning: skillPath.skills.filter((s) => s.status === "learning")
+          .length,
+        total: skillPath.skills.length,
+        pct: skillPath.skills.length
+          ? Math.round(
+              (skillPath.skills.filter((s) => s.status === "learned").length /
+                skillPath.skills.length) *
+                100,
+            )
+          : 0,
+      }
+    : { learned: 0, learning: 0, total: 0, pct: 0 };
 
   const grouped = (() => {
     if (!skillPath) return {};
@@ -256,7 +355,7 @@ export default function SkillsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* ─── SELECT CAREER PATH ────────────────────────────────────────────── */}
+        {/* ─── SELECT CAREER PATH ──────────────────────────────────────────── */}
         {view === "select" && (
           <>
             <div>
@@ -310,7 +409,7 @@ export default function SkillsPage() {
           </>
         )}
 
-        {/* ─── CAREER DETAIL ─────────────────────────────────────────────────── */}
+        {/* ─── CAREER DETAIL ───────────────────────────────────────────────── */}
         {view === "detail" && careerDetail && (
           <>
             <div className="flex items-center gap-3">
@@ -334,7 +433,6 @@ export default function SkillsPage() {
                 🔥 {careerDetail.demand} Demand
               </span>
             </div>
-
             <div className="card-elevated border-l-4 border-l-destructive">
               <h3 className="font-semibold mb-3 text-destructive">
                 ❌ What most people are missing
@@ -351,7 +449,6 @@ export default function SkillsPage() {
                 ))}
               </ul>
             </div>
-
             <div>
               <h2 className="font-semibold mb-3">
                 ✅ Skills you need to master
@@ -376,7 +473,6 @@ export default function SkillsPage() {
                 ))}
               </div>
             </div>
-
             <button
               onClick={() => handleSelectPath(careerDetail.id)}
               disabled={selecting}
@@ -389,7 +485,7 @@ export default function SkillsPage() {
           </>
         )}
 
-        {/* ─── TRACK SKILLS ──────────────────────────────────────────────────── */}
+        {/* ─── TRACK SKILLS ────────────────────────────────────────────────── */}
         {view === "track" && skillPath && (
           <>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -483,27 +579,7 @@ export default function SkillsPage() {
               </div>
             </div>
 
-            {/* Legend */}
-            <div className="flex gap-4 text-xs text-foreground-muted flex-wrap">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-success inline-block" />
-                Learned
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary inline-block" />
-                Learning
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground inline-block" />
-                To Learn
-              </span>
-              <span className="flex items-center gap-1">
-                <FaCheck className="text-success" />
-                Added to Goals
-              </span>
-            </div>
-
-            {/* Skills by category */}
+            {/* Skill categories */}
             <div className="space-y-3">
               {Object.entries(grouped).map(([category, skills]) => {
                 const learnedCount = skills.filter(
@@ -548,7 +624,6 @@ export default function SkillsPage() {
                         )}
                       </div>
                     </button>
-
                     {expandedCat === category && (
                       <div className="mt-4 space-y-2">
                         {skills.map((skill) => {
@@ -559,13 +634,16 @@ export default function SkillsPage() {
                               className={`flex items-center justify-between p-3 rounded-xl border transition-all ${cfg.color}`}
                             >
                               <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div
+                                  className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`}
+                                />
                                 <span className="text-sm font-medium truncate">
                                   {skill.name}
                                 </span>
                                 {skill.addedToGoal && (
                                   <span className="text-xs bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
                                     <FaCheck className="text-success w-2.5 h-2.5" />{" "}
-                                    Goal Added
+                                    Goal
                                   </span>
                                 )}
                               </div>
@@ -584,14 +662,12 @@ export default function SkillsPage() {
                                   <option value="learning">📖 Learning</option>
                                   <option value="learned">✅ Learned</option>
                                 </select>
-                                {/* Start Learning button */}
                                 <button
                                   onClick={() =>
                                     navigate(
                                       `/learning?skill=${encodeURIComponent(skill.name)}`,
                                     )
                                   }
-                                  title="Go to Learning page for this skill"
                                   className="text-xs border border-primary text-primary hover:bg-primary hover:text-primary-foreground px-2 py-1 rounded-lg transition-all flex items-center gap-1"
                                 >
                                   <FaPlay className="w-2 h-2" /> Learn
@@ -599,10 +675,9 @@ export default function SkillsPage() {
                                 {!skill.addedToGoal && (
                                   <button
                                     onClick={() => handleAddToGoal(skill._id)}
-                                    title="Add as a Goal"
                                     className="text-xs border border-border text-foreground-muted hover:text-secondary hover:border-secondary px-2 py-1 rounded-lg transition-all flex items-center gap-1 bg-card"
                                   >
-                                    <FaPlus className="w-2.5 h-2.5" /> + Goal
+                                    <FaPlus className="w-2.5 h-2.5" /> Goal
                                   </button>
                                 )}
                               </div>
@@ -620,138 +695,146 @@ export default function SkillsPage() {
                 </div>
               )}
             </div>
-
-            {/* ─── Custom Skills Section ───────────────────────────────────── */}
-            <div className="card-elevated">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="font-semibold flex items-center gap-2">
-                    <FaStar className="text-secondary" /> My Other Skills
-                  </h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Skills outside your career path
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowCustomModal(true)}
-                  className="btn-secondary text-sm flex items-center gap-2 py-2"
-                >
-                  <FaPlus className="w-3 h-3" /> Add Other Skill
-                </button>
-              </div>
-
-              {customSkills.length === 0 ? (
-                <div className="text-center py-8 text-foreground-muted border-2 border-dashed border-border rounded-xl">
-                  <FaStar className="text-3xl mx-auto mb-2 opacity-20" />
-                  <p className="text-sm font-medium">No custom skills yet</p>
-                  <p className="text-xs mt-1">
-                    Add skills that aren't in your career path
-                  </p>
-                  <button
-                    onClick={() => setShowCustomModal(true)}
-                    className="btn-primary text-sm mt-3 py-2"
-                  >
-                    <FaPlus className="w-3 h-3 inline mr-1" /> Add Other Skill
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {customSkills.map((s) => {
-                    const statusCfg =
-                      s.status === "completed"
-                        ? "bg-success/20 text-success border-success/40"
-                        : s.status === "current"
-                          ? "bg-primary/20 text-primary border-primary/40"
-                          : "bg-muted text-foreground-muted border-border";
-                    return (
-                      <div
-                        key={s._id}
-                        className={`p-4 rounded-xl border transition-all ${statusCfg}`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <h3 className="font-semibold text-sm">
-                                {s.skillName}
-                              </h3>
-                              <span className="text-xs bg-card px-2 py-0.5 rounded-full capitalize opacity-80">
-                                {s.status === "current"
-                                  ? "📖 Learning"
-                                  : s.status === "completed"
-                                    ? "✅ Done"
-                                    : "⏳ Planned"}
-                              </span>
-                              <span className="text-xs bg-card px-2 py-0.5 rounded-full opacity-70">
-                                {s.category}
-                              </span>
-                            </div>
-                            {s.description && (
-                              <p className="text-xs opacity-80 mb-2 line-clamp-2">
-                                {s.description}
-                              </p>
-                            )}
-                            <div className="grid grid-cols-2 gap-3">
-                              {s.alreadyKnows && (
-                                <div>
-                                  <p className="text-xs font-medium opacity-70 mb-0.5">
-                                    Already know:
-                                  </p>
-                                  <p className="text-xs opacity-60">
-                                    {s.alreadyKnows}
-                                  </p>
-                                </div>
-                              )}
-                              {s.wantsToLearn && (
-                                <div>
-                                  <p className="text-xs font-medium opacity-70 mb-0.5">
-                                    Want to learn:
-                                  </p>
-                                  <p className="text-xs opacity-60">
-                                    {s.wantsToLearn}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 ml-3 shrink-0">
-                            <button
-                              onClick={() =>
-                                navigate(
-                                  `/learning?skill=${encodeURIComponent(s.skillName)}`,
-                                )
-                              }
-                              className="text-xs border border-current px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
-                            >
-                              <FaPlay className="w-2 h-2" /> Learn
-                            </button>
-                            <button
-                              onClick={() => deleteCustomSkill(s._id)}
-                              className="text-foreground-muted hover:text-destructive p-1"
-                            >
-                              <FaTrash className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </>
         )}
 
-        {/* ─── Add Custom Skill Modal ─────────────────────────────────────── */}
+        {/* ─── MY OTHER SKILLS (always visible when career selected or not) ─── */}
+        {(view === "track" || view === "select") && (
+          <div className="card-elevated border-2 border-dashed border-primary/20">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="font-semibold text-lg flex items-center gap-2">
+                  <FaStar className="text-secondary" /> My Other Skills
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Skills outside your career path — add anything you're learning
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCustomModal(true)}
+                className="btn-primary flex items-center gap-2 text-sm py-2.5 px-4"
+              >
+                <FaPlus className="w-3 h-3" /> Add Other Skill
+              </button>
+            </div>
+
+            {customSkills.length === 0 ? (
+              <div className="text-center py-10 text-foreground-muted">
+                <FaStar className="text-4xl mx-auto mb-3 opacity-20" />
+                <p className="font-medium">No other skills added yet</p>
+                <p className="text-sm mt-1">
+                  Track skills outside your main career path here
+                </p>
+                <button
+                  onClick={() => setShowCustomModal(true)}
+                  className="btn-secondary text-sm mt-4 flex items-center gap-2 mx-auto"
+                >
+                  <FaPlus className="w-3 h-3" /> Add Your First Skill
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customSkills.map((s) => (
+                  <div
+                    key={s._id}
+                    className={`p-4 rounded-xl border transition-all ${CUSTOM_STATUS_COLOR[s.status] || CUSTOM_STATUS_COLOR.planned}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <h3 className="font-semibold text-sm">
+                            {s.skillName}
+                          </h3>
+                          <span className="text-xs bg-card/70 px-2 py-0.5 rounded-full capitalize">
+                            {s.status === "current"
+                              ? "📖 Learning"
+                              : s.status === "completed"
+                                ? "✅ Done"
+                                : "⏳ Planned"}
+                          </span>
+                          <span className="text-xs bg-card/70 px-2 py-0.5 rounded-full">
+                            {s.category}
+                          </span>
+                        </div>
+                        {s.description && (
+                          <p className="text-xs opacity-80 mb-2 line-clamp-1">
+                            {s.description}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-3">
+                          {s.alreadyKnows?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium opacity-70 mb-1">
+                                Already know:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {s.alreadyKnows.map((t, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {s.wantsToLearn?.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium opacity-70 mb-1">
+                                Want to learn:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {s.wantsToLearn.map((t, i) => (
+                                  <span
+                                    key={i}
+                                    className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() =>
+                            navigate(
+                              `/learning?skill=${encodeURIComponent(s.skillName)}`,
+                            )
+                          }
+                          className="text-xs border border-current px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                        >
+                          <FaPlay className="w-2 h-2" /> Learn
+                        </button>
+                        <button
+                          onClick={() => deleteCustomSkill(s._id)}
+                          className="text-foreground-muted hover:text-destructive p-1"
+                        >
+                          <FaTrash className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── ADD CUSTOM SKILL MODAL ──────────────────────────────────────── */}
         {showCustomModal && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-md animate-fade-in my-auto">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-5">
                 <div>
                   <h2 className="text-lg font-bold flex items-center gap-2">
                     <FaStar className="text-secondary" /> Add Other Skill
                   </h2>
                   <p className="text-xs text-foreground-muted mt-0.5">
-                    Track a skill outside your career path
+                    Track any skill outside your career path
                   </p>
                 </div>
                 <button
@@ -761,51 +844,82 @@ export default function SkillsPage() {
                   <FaTimes />
                 </button>
               </div>
-              <div className="space-y-3">
-                <input
-                  placeholder="Skill name *"
-                  value={customForm.skillName}
-                  onChange={(e) =>
-                    setCustomForm((p) => ({ ...p, skillName: e.target.value }))
-                  }
-                  className="input-field"
-                />
-                <textarea
-                  placeholder="What do you already know about this skill?"
-                  value={customForm.alreadyKnows}
-                  onChange={(e) =>
-                    setCustomForm((p) => ({
-                      ...p,
-                      alreadyKnows: e.target.value,
-                    }))
-                  }
-                  className="input-field min-h-[60px]"
-                />
-                <textarea
-                  placeholder="What do you want to learn?"
-                  value={customForm.wantsToLearn}
-                  onChange={(e) =>
-                    setCustomForm((p) => ({
-                      ...p,
-                      wantsToLearn: e.target.value,
-                    }))
-                  }
-                  className="input-field min-h-[60px]"
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={customForm.description}
-                  onChange={(e) =>
-                    setCustomForm((p) => ({
-                      ...p,
-                      description: e.target.value,
-                    }))
-                  }
-                  className="input-field min-h-[50px]"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-foreground-muted mb-1 block">
+                    Skill Name *
+                  </label>
+                  <input
+                    placeholder="e.g. Video Editing, Public Speaking, Figma"
+                    value={customForm.skillName}
+                    onChange={(e) =>
+                      setCustomForm((p) => ({
+                        ...p,
+                        skillName: e.target.value,
+                      }))
+                    }
+                    className="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground-muted mb-1 flex items-center gap-1">
+                    <FaTag className="w-3 h-3" /> What I already know
+                    <span className="text-foreground-muted font-normal ml-1">
+                      (type & press Enter)
+                    </span>
+                  </label>
+                  <TagInput
+                    tags={customForm.alreadyKnows}
+                    onChange={(tags) =>
+                      setCustomForm((p) => ({ ...p, alreadyKnows: tags }))
+                    }
+                    placeholder="e.g. React, Node.js, Express.js"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Press Enter or comma after each skill
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground-muted mb-1 flex items-center gap-1">
+                    <FaTag className="w-3 h-3" /> What I want to learn
+                    <span className="text-foreground-muted font-normal ml-1">
+                      (type & press Enter)
+                    </span>
+                  </label>
+                  <TagInput
+                    tags={customForm.wantsToLearn}
+                    onChange={(tags) =>
+                      setCustomForm((p) => ({ ...p, wantsToLearn: tags }))
+                    }
+                    placeholder="e.g. TypeScript, GraphQL, Docker"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Press Enter or comma after each skill
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-foreground-muted mb-1 block">
+                    Description (optional)
+                  </label>
+                  <textarea
+                    placeholder="Why are you learning this? Any context..."
+                    value={customForm.description}
+                    onChange={(e) =>
+                      setCustomForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                    className="input-field min-h-[60px]"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-foreground-muted">
+                    <label className="text-xs font-medium text-foreground-muted mb-1 block">
                       Category
                     </label>
                     <select
@@ -824,6 +938,8 @@ export default function SkillsPage() {
                         "Soft Skills",
                         "Creative",
                         "Language",
+                        "Design",
+                        "Business",
                         "Other",
                       ].map((c) => (
                         <option key={c}>{c}</option>
@@ -831,8 +947,8 @@ export default function SkillsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-foreground-muted">
-                      Status
+                    <label className="text-xs font-medium text-foreground-muted mb-1 block">
+                      Current Status
                     </label>
                     <select
                       value={customForm.status}
@@ -847,12 +963,13 @@ export default function SkillsPage() {
                     </select>
                   </div>
                 </div>
+
                 <button
                   onClick={addCustomSkill}
-                  disabled={savingCustom}
-                  className="btn-primary w-full disabled:opacity-50"
+                  disabled={savingCustom || !customForm.skillName.trim()}
+                  className="btn-primary w-full disabled:opacity-50 py-3"
                 >
-                  {savingCustom ? "Adding..." : "Add Custom Skill"}
+                  {savingCustom ? "Adding..." : "+ Add Custom Skill"}
                 </button>
               </div>
             </div>
