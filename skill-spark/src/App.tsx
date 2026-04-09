@@ -41,6 +41,7 @@ import NotificationsPage from "./pages/admin/NotificationsPage";
 import SettingsPage from "./pages/admin/SettingsPage";
 import PendingCoursesPage from "./pages/admin/PendingCoursesPage";
 import UserSkillsPage from "./pages/admin/UserSkillsPage";
+import OnboardingPage from "./pages/OnboardingPage";
 
 const queryClient = new QueryClient();
 
@@ -299,6 +300,14 @@ const App = () => (
                 <AdminRoute>
                   <UserSkillsPage />
                 </AdminRoute>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <Protected>
+                  <OnboardingPage />
+                </Protected>
               }
             />
             <Route path="*" element={<NotFound />} />

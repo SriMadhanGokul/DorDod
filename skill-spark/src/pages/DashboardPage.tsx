@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/utils/api";
@@ -8,6 +9,11 @@ import {
   FaLightbulb,
   FaCalendarCheck,
   FaTrophy,
+  FaSmile,
+  FaFire,
+  FaBook,
+  FaPlus,
+  FaTimes,
 } from "react-icons/fa";
 import {
   RadarChart,
@@ -37,8 +43,23 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showHabitModal, setShowHabitModal] = useState(false);
+  const [goalTitle, setGoalTitle] = useState("");
+  const [habitName, setHabitName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Onboarding check
+  useEffect(() => {
+    const onboarded = localStorage.getItem("onboarded");
+    if (!onboarded) {
+      navigate("/onboarding");
+    }
+  }, []);
 
   useEffect(() => {
     api
@@ -47,6 +68,46 @@ export default function DashboardPage() {
       .catch(() => toast.error("Failed to load dashboard"))
       .finally(() => setLoading(false));
   }, []);
+
+  const quickAddGoal = async () => {
+    if (!goalTitle.trim()) return toast.error("Enter a goal title");
+    setSaving(true);
+    try {
+      await api.post("/goals", {
+        title: goalTitle,
+        category: "Career",
+        goalType: "Professional",
+        priority: "Medium",
+        status: "Not Started",
+        progress: 0,
+      });
+      toast.success("Goal created!");
+      setGoalTitle("");
+      setShowGoalModal(false);
+    } catch {
+      toast.error("Failed to create goal");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const quickAddHabit = async () => {
+    if (!habitName.trim()) return toast.error("Enter a habit name");
+    setSaving(true);
+    try {
+      await api.post("/habits", {
+        name: habitName,
+        days: Array(21).fill(false),
+      });
+      toast.success("Habit started!");
+      setHabitName("");
+      setShowHabitModal(false);
+    } catch {
+      toast.error("Failed to create habit");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const stats = data
     ? [
@@ -77,6 +138,36 @@ export default function DashboardPage() {
       ]
     : [];
 
+  const quickActions = [
+    {
+      icon: FaBullseye,
+      label: "+ Add Goal",
+      color:
+        "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground",
+      onClick: () => setShowGoalModal(true),
+    },
+    {
+      icon: FaSmile,
+      label: "+ Log Mood",
+      color:
+        "bg-secondary/10 text-secondary hover:bg-secondary hover:text-secondary-foreground",
+      onClick: () => navigate("/frame-of-mind"),
+    },
+    {
+      icon: FaFire,
+      label: "+ Start Habit",
+      color:
+        "bg-destructive/10 text-destructive hover:bg-destructive hover:text-white",
+      onClick: () => setShowHabitModal(true),
+    },
+    {
+      icon: FaBook,
+      label: "+ Find Course",
+      color: "bg-success/10 text-success hover:bg-success hover:text-white",
+      onClick: () => navigate("/learning"),
+    },
+  ];
+
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-fade-in">
@@ -90,149 +181,214 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Loading */}
+        {/* Loading spinner */}
         {loading && (
-          <div className="flex justify-center py-16">
+          <div className="flex justify-center py-12">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         )}
 
-        {!loading && data && (
+        {!loading && (
           <>
             {/* Stat cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {stats.map((s, i) => (
-                <div key={i} className="stat-card flex items-center gap-4">
+                <div key={i} className="stat-card">
                   <div
-                    className={`w-12 h-12 rounded-xl ${s.color} flex items-center justify-center`}
+                    className={`w-10 h-10 rounded-xl ${s.color} flex items-center justify-center mb-3`}
                   >
                     <s.icon className="text-lg" />
                   </div>
-                  <div>
-                    <p className="text-2xl font-bold">{s.value}</p>
-                    <p className="text-xs text-foreground-muted">{s.label}</p>
-                  </div>
+                  <p className="text-2xl font-bold">{s.value}</p>
+                  <p className="text-sm text-foreground-muted">{s.label}</p>
                 </div>
               ))}
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Skill Radar */}
-              <div className="card-elevated">
-                <h2 className="text-lg font-semibold mb-4">Skill Overview</h2>
-                {data.radarData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <RadarChart data={data.radarData}>
-                      <PolarGrid stroke="hsl(var(--border))" />
-                      <PolarAngleAxis
-                        dataKey="skill"
-                        tick={{
-                          fill: "hsl(var(--foreground-muted))",
-                          fontSize: 12,
-                        }}
-                      />
-                      <PolarRadiusAxis
-                        angle={30}
-                        domain={[0, 5]}
-                        tick={{
-                          fill: "hsl(var(--foreground-muted))",
-                          fontSize: 10,
-                        }}
-                      />
-                      <Radar
-                        name="Current"
-                        dataKey="current"
-                        stroke="hsl(var(--primary))"
-                        fill="hsl(var(--primary))"
-                        fillOpacity={0.3}
-                      />
-                      <Radar
-                        name="Desired"
-                        dataKey="desired"
-                        stroke="hsl(var(--secondary))"
-                        fill="hsl(var(--secondary))"
-                        fillOpacity={0.2}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[280px] text-foreground-muted text-sm">
-                    Complete your skill assessment to see the radar chart
-                  </div>
-                )}
-              </div>
-
-              {/* Active Goals */}
-              <div className="card-elevated">
-                <h2 className="text-lg font-semibold mb-4">Active Goals</h2>
-                {data.activeGoals.length > 0 ? (
-                  <div className="space-y-4">
-                    {data.activeGoals.map((g) => (
-                      <div key={g._id}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium">{g.title}</span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              g.priority === "High"
-                                ? "bg-destructive/10 text-destructive"
-                                : g.priority === "Medium"
-                                  ? "bg-secondary/20 text-secondary-foreground"
-                                  : "bg-muted text-foreground-muted"
-                            }`}
-                          >
-                            {g.priority}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary rounded-full h-2 transition-all"
-                            style={{ width: `${g.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-foreground-muted">
-                          {g.progress}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-[200px] text-foreground-muted text-sm">
-                    No active goals yet — create one in Goals!
-                  </div>
-                )}
+            {/* Quick Actions */}
+            <div>
+              <h2 className="font-semibold text-sm text-foreground-muted mb-3 uppercase tracking-wide">
+                Quick Actions
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {quickActions.map((a, i) => (
+                  <button
+                    key={i}
+                    onClick={a.onClick}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-xl font-medium text-sm transition-all ${a.color}`}
+                  >
+                    <a.icon className="text-xl" />
+                    <span>{a.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Habit Grid */}
-            {data.habit ? (
+            {/* Active Goals */}
+            {data?.activeGoals && data.activeGoals.length > 0 && (
               <div className="card-elevated">
-                <h2 className="text-lg font-semibold mb-4">
-                  21-Day Habit: {data.habit.name}
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {data.habit.days.map((done, i) => (
-                    <div
-                      key={i}
-                      className={`habit-day ${done ? "habit-day-complete" : "habit-day-incomplete"}`}
-                    >
-                      {i + 1}
+                <h2 className="font-semibold mb-4">Active Goals</h2>
+                <div className="space-y-3">
+                  {data.activeGoals.slice(0, 4).map((goal) => (
+                    <div key={goal._id}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">
+                          {goal.title}
+                        </span>
+                        <span className="text-xs text-foreground-muted">
+                          {goal.progress}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${goal.progress === 100 ? "bg-success" : "bg-primary"}`}
+                          style={{ width: `${goal.progress}%` }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-foreground-muted mt-3">
-                  🔥 Current streak: {data.habit.streak} day
-                  {data.habit.streak !== 1 ? "s" : ""}
-                </p>
+                <button
+                  onClick={() => navigate("/goals")}
+                  className="text-sm text-primary hover:underline mt-3 block"
+                >
+                  View all goals →
+                </button>
               </div>
-            ) : (
-              <div className="card-elevated text-center py-8 text-foreground-muted">
-                <p className="font-medium">No habits tracked yet</p>
-                <p className="text-sm mt-1">
-                  Start a 21-day habit challenge in the Habits section!
-                </p>
+            )}
+
+            {/* Radar Chart */}
+            {data?.radarData && data.radarData.length > 0 && (
+              <div className="card-elevated">
+                <h2 className="font-semibold mb-4">Skill Overview</h2>
+                <ResponsiveContainer width="100%" height={280}>
+                  <RadarChart data={data.radarData}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="skill" tick={{ fontSize: 12 }} />
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[0, 5]}
+                      tick={{ fontSize: 10 }}
+                    />
+                    <Radar
+                      name="Current"
+                      dataKey="current"
+                      stroke="hsl(var(--primary))"
+                      fill="hsl(var(--primary))"
+                      fillOpacity={0.3}
+                    />
+                    <Radar
+                      name="Desired"
+                      dataKey="desired"
+                      stroke="hsl(var(--secondary))"
+                      fill="hsl(var(--secondary))"
+                      fillOpacity={0.1}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
               </div>
             )}
           </>
+        )}
+
+        {/* Quick Add Goal Modal */}
+        {showGoalModal && (
+          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold flex items-center gap-2">
+                  <FaBullseye className="text-primary" /> Quick Add Goal
+                </h2>
+                <button onClick={() => setShowGoalModal(false)}>
+                  <FaTimes />
+                </button>
+              </div>
+              <input
+                placeholder="What do you want to achieve?"
+                value={goalTitle}
+                onChange={(e) => setGoalTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && quickAddGoal()}
+                className="input-field mb-3"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={quickAddGoal}
+                  disabled={saving || !goalTitle.trim()}
+                  className="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {saving ? "Adding..." : "Add Goal"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowGoalModal(false);
+                    navigate("/goals");
+                  }}
+                  className="btn-secondary text-sm px-4"
+                >
+                  Full Form →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Add Habit Modal */}
+        {showHabitModal && (
+          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold flex items-center gap-2">
+                  <FaFire className="text-destructive" /> Quick Start Habit
+                </h2>
+                <button onClick={() => setShowHabitModal(false)}>
+                  <FaTimes />
+                </button>
+              </div>
+              <input
+                placeholder="e.g. Practice coding for 1 hour"
+                value={habitName}
+                onChange={(e) => setHabitName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && quickAddHabit()}
+                className="input-field mb-3"
+                autoFocus
+              />
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {[
+                  "Practice coding daily",
+                  "Read 30 minutes",
+                  "Exercise for 20 mins",
+                  "Learn 5 new things",
+                ].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setHabitName(s)}
+                    className="text-xs bg-muted hover:bg-accent px-3 py-2 rounded-lg text-left transition-all"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={quickAddHabit}
+                  disabled={saving || !habitName.trim()}
+                  className="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {saving ? "Starting..." : "Start Habit"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowHabitModal(false);
+                    navigate("/habits");
+                  }}
+                  className="btn-secondary text-sm px-4"
+                >
+                  Full Page →
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

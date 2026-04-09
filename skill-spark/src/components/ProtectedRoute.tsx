@@ -8,18 +8,21 @@ export default function ProtectedRoute({
 }) {
   const { isAuthenticated, loading } = useAuth();
 
-  // Wait for session check to complete before redirecting
+  // ✅ Always wait for session check before making any redirect decision
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-foreground-muted">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-foreground-muted animate-pulse">
+            Loading your session...
+          </p>
         </div>
       </div>
     );
   }
 
+  // ✅ Only redirect to login if truly not authenticated (after loading completes)
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

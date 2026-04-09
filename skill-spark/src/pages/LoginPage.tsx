@@ -17,26 +17,23 @@ export default function LoginPage() {
       toast.error("Google sign-in failed. Please try again.");
   }, []);
 
-  // ✅ FIX: Only redirect when auth is confirmed AND user has role
+  // ✅ If already authenticated, redirect to correct page
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
       const role = (user as any).role;
-      if (role === "admin") {
-        navigate("/admin", { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
+      navigate(role === "admin" ? "/admin" : "/dashboard", { replace: true });
     }
-  }, [isAuthenticated, user, loading]);
+  }, [loading, isAuthenticated, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
+      // useEffect above handles redirect after user state updates
     } catch {}
   };
 
-  // ✅ FIX: Use VITE_API_URL env variable - not window.location
+  // ✅ Use backend URL from env — not window.location (that's the frontend port)
   const handleGoogle = () => {
     const backendUrl =
       (import.meta as any).env?.VITE_API_URL || "http://localhost:5000";

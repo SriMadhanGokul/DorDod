@@ -1,6 +1,10 @@
 const { Course } = require("../models/Course");
+const User = require("../models/User");
+const {
+  sendCourseApprovedEmail,
+  sendCourseRejectedEmail,
+} = require("../utils/emailService");
 
-// GET /api/admin/courses/pending
 const getPendingCourses = async (req, res) => {
   try {
     const courses = await Course.find({ status: "pending" })
@@ -14,7 +18,6 @@ const getPendingCourses = async (req, res) => {
   }
 };
 
-// PATCH /api/admin/courses/:id/approve
 const approveCourse = async (req, res) => {
   try {
     const course = await Course.findByIdAndUpdate(
@@ -27,11 +30,21 @@ const approveCourse = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Course not found" });
+
+    // Send approval email to uploader
+    if (course.uploadedBy?.email) {
+      await sendCourseApprovedEmail(
+        course.uploadedBy.email,
+        course.uploadedBy.name,
+        course.title,
+      ).catch((err) => console.error("Email send failed:", err.message));
+    }
+
     res
       .status(200)
       .json({
         success: true,
-        message: `✅ "${course.title}" approved and published!`,
+        message: `✅ "${course.title}" approved!`,
         data: course,
       });
   } catch (err) {
@@ -41,7 +54,6 @@ const approveCourse = async (req, res) => {
   }
 };
 
-// PATCH /api/admin/courses/:id/reject
 const rejectCourse = async (req, res) => {
   try {
     const { reason } = req.body;
@@ -58,6 +70,17 @@ const rejectCourse = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Course not found" });
+
+    // Send rejection email to uploader
+    if (course.uploadedBy?.email) {
+      await sendCourseRejectedEmail(
+        course.uploadedBy.email,
+        course.uploadedBy.name,
+        course.title,
+        reason || "Does not meet quality standards",
+      ).catch((err) => console.error("Email send failed:", err.message));
+    }
+
     res
       .status(200)
       .json({
@@ -72,13 +95,11 @@ const rejectCourse = async (req, res) => {
   }
 };
 
-// GET /api/admin/courses — all courses with filters
 const getAllCourses = async (req, res) => {
   try {
     const { status } = req.query;
     const filter = {};
     if (status && status !== "all") filter.status = status;
-
     const courses = await Course.find(filter)
       .populate("uploadedBy", "name email")
       .sort({ createdAt: -1 });
@@ -90,7 +111,6 @@ const getAllCourses = async (req, res) => {
   }
 };
 
-// POST /api/admin/courses — admin creates course (auto-approved)
 const createCourse = async (req, res) => {
   try {
     const {
@@ -107,7 +127,6 @@ const createCourse = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Required fields missing" });
-
     const course = await Course.create({
       title,
       category,
@@ -117,7 +136,7 @@ const createCourse = async (req, res) => {
       skillLevel: skillLevel || "Beginner",
       description: description || "",
       videoUrl: videoUrl || "",
-      status: "approved", // ✅ Admin courses auto-approved
+      status: "approved",
       isAdminCourse: true,
       approvedAt: new Date(),
       approvedBy: req.user.id,
@@ -136,7 +155,6 @@ const createCourse = async (req, res) => {
   }
 };
 
-// PUT /api/admin/courses/:id
 const updateCourse = async (req, res) => {
   try {
     const course = await Course.findByIdAndUpdate(req.params.id, req.body, {
@@ -156,7 +174,6 @@ const updateCourse = async (req, res) => {
   }
 };
 
-// DELETE /api/admin/courses/:id
 const deleteCourse = async (req, res) => {
   try {
     await Course.findByIdAndDelete(req.params.id);
@@ -168,7 +185,6 @@ const deleteCourse = async (req, res) => {
   }
 };
 
-// GET /api/admin/skills/user-submitted — view all user custom skills
 const getUserSubmittedSkills = async (req, res) => {
   try {
     const CustomSkill = require("../models/CustomSkill");

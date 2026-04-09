@@ -60,7 +60,7 @@ export default function RegisterPage() {
     try {
       await api.post("/auth/set-password", { email, password });
       await login(email, password);
-      navigate("/dashboard");
+      navigate("/onboarding");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to create account");
     } finally {

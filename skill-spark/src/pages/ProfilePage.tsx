@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
@@ -11,9 +11,10 @@ import {
   FaChevronUp,
   FaPlus,
   FaTrash,
-  FaShieldAlt,
+  FaLock,
+  FaEye,
+  FaEyeSlash,
 } from "react-icons/fa";
-
 import { useNavigate } from "react-router-dom";
 
 const PROFICIENCY = ["", "Beginner", "Intermediate", "Advanced", "Native"];
@@ -21,7 +22,16 @@ const PROFICIENCY = ["", "Beginner", "Intermediate", "Advanced", "Native"];
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"personal" | "professional">("personal");
+  const [tab, setTab] = useState<"personal" | "professional" | "security">(
+    "personal",
+  );
+  const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
+  const [showPw, setShowPw] = useState({
+    curr: false,
+    new_: false,
+    conf: false,
+  });
+  const [savingPw, setSavingPw] = useState(false);
 
   // ─── Personal state ───────────────────────────────────────────────────────
   const [personal, setPersonal] = useState({
@@ -222,6 +232,7 @@ export default function ProfilePage() {
               icon: FaBriefcase,
               label: "Professional Profile",
             },
+            { id: "security", icon: FaLock, label: "Security" },
           ].map((t) => (
             <button
               key={t.id}
@@ -498,14 +509,6 @@ export default function ProfilePage() {
             >
               <FaSignOutAlt /> Log Out
             </button>
-            {/* {(user as any).role === "admin" && (
-              <button
-                onClick={() => navigate("/admin")}
-                className="flex items-center gap-2 text-yellow-600 font-medium hover:underline"
-              >
-                <FaShieldAlt /> Go to Admin Panel
-              </button>
-            )} */}
           </div>
         )}
 
@@ -1082,6 +1085,170 @@ export default function ProfilePage() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* ─── Security Tab ──────────────────────────────────────────────────── */}
+        {tab === "security" && (
+          <div className="space-y-4">
+            <div className="card-elevated">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <FaLock className="text-primary" /> Change Password
+              </h3>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (pwForm.newPw.length < 6)
+                    return toast.error(
+                      "Password must be at least 6 characters",
+                    );
+                  if (pwForm.newPw !== pwForm.confirm)
+                    return toast.error("Passwords do not match");
+                  setSavingPw(true);
+                  try {
+                    const res = await api.patch("/auth/change-password", {
+                      currentPassword: pwForm.current,
+                      newPassword: pwForm.newPw,
+                    });
+                    toast.success(res.data.message);
+                    setPwForm({ current: "", newPw: "", confirm: "" });
+                  } catch (e: any) {
+                    toast.error(
+                      e.response?.data?.message || "Failed to change password",
+                    );
+                  } finally {
+                    setSavingPw(false);
+                  }
+                }}
+                className="space-y-3"
+              >
+                {[
+                  {
+                    key: "current",
+                    label: "Current Password",
+                    showKey: "curr" as const,
+                  },
+                  {
+                    key: "newPw",
+                    label: "New Password",
+                    showKey: "new_" as const,
+                  },
+                  {
+                    key: "confirm",
+                    label: "Confirm New Password",
+                    showKey: "conf" as const,
+                  },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <label className="text-xs text-foreground-muted font-medium">
+                      {field.label}
+                    </label>
+                    <div className="relative mt-1">
+                      <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-muted w-3.5 h-3.5" />
+                      <input
+                        type={showPw[field.showKey] ? "text" : "password"}
+                        value={(pwForm as any)[field.key]}
+                        onChange={(e) =>
+                          setPwForm((p) => ({
+                            ...p,
+                            [field.key]: e.target.value,
+                          }))
+                        }
+                        className="input-field pl-11 pr-11"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPw((p) => ({
+                            ...p,
+                            [field.showKey]: !p[field.showKey],
+                          }))
+                        }
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+                      >
+                        {showPw[field.showKey] ? (
+                          <FaEyeSlash className="w-3.5 h-3.5" />
+                        ) : (
+                          <FaEye className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {pwForm.newPw.length > 0 && (
+                  <div>
+                    <div className="flex gap-1 mb-1">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className={`flex-1 h-1.5 rounded-full transition-all ${
+                            pwForm.newPw.length >= i * 3
+                              ? i <= 1
+                                ? "bg-destructive"
+                                : i <= 2
+                                  ? "bg-secondary"
+                                  : i <= 3
+                                    ? "bg-blue-400"
+                                    : "bg-success"
+                              : "bg-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-foreground-muted">
+                      {pwForm.newPw.length < 6
+                        ? "Too short"
+                        : pwForm.newPw.length < 9
+                          ? "Weak"
+                          : pwForm.newPw.length < 12
+                            ? "Good"
+                            : "Strong"}
+                    </p>
+                  </div>
+                )}
+                {pwForm.confirm.length > 0 && (
+                  <p
+                    className={`text-xs ${pwForm.newPw === pwForm.confirm ? "text-success" : "text-destructive"}`}
+                  >
+                    {pwForm.newPw === pwForm.confirm
+                      ? "✓ Passwords match"
+                      : "✗ Passwords do not match"}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={savingPw}
+                  className="btn-primary w-full disabled:opacity-50"
+                >
+                  {savingPw ? "Updating..." : "Change Password"}
+                </button>
+              </form>
+            </div>
+
+            <div className="card-elevated border-l-4 border-l-destructive">
+              <h3 className="font-semibold text-destructive mb-2">
+                Danger Zone
+              </h3>
+              <p className="text-sm text-foreground-muted mb-3">
+                These actions are permanent and cannot be undone.
+              </p>
+              <button
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      "Are you sure you want to log out from all devices?",
+                    )
+                  )
+                    return;
+                  logout();
+                  navigate("/login");
+                }}
+                className="text-sm text-destructive border border-destructive px-4 py-2 rounded-lg hover:bg-destructive/10 transition-all"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         )}
       </div>

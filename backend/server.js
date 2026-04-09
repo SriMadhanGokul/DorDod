@@ -2,16 +2,12 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-
-// Only load .env in development (local machine)
-// On Render, env vars come from the dashboard, not .env
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
+require("dotenv").config();
 
 const { passport, initializePassport } = require("./utils/passport");
 initializePassport();
-const adminRoutes = require("./routes/adminRoutes");
+
+// ── Existing routes ────────────────────────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const goalRoutes = require("./routes/goalRoutes");
@@ -28,9 +24,18 @@ const achievementRoutes = require("./routes/achievementRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const customSkillRoutes = require("./routes/customSkillRoutes");
-const adminCourseRoutes = require("./routes/adminCourseRoutes");
 
+// ── New routes ─────────────────────────────────────────────────────────────────
+const searchRoutes = require("./routes/searchRoutes");
+const notifUserRoutes = require("./routes/notificationUserRoutes");
+
+// ── Controllers for inline routes ─────────────────────────────────────────────
+const { changePassword } = require("./controllers/changePasswordController");
+const { sendWeeklyEmails } = require("./controllers/weeklyEmailController");
+const protect = require("./utils/protect");
+const adminProtect = require("./middleware/adminMiddleware");
 
 const app = express();
 
@@ -38,7 +43,6 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
   "http://localhost:3000",
-  "https://dor-dod.vercel.app",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
@@ -59,7 +63,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
-app.use("/api/admin", adminRoutes);
+
+// ── Register all routes ────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/goals", goalRoutes);
@@ -76,45 +81,37 @@ app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/frame-of-mind", frameOfMindRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
-app.use("/api/admin", adminCourseRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/notifications", notifUserRoutes);
 
+// ── Inline routes ──────────────────────────────────────────────────────────────
+app.patch("/api/auth/change-password", protect, changePassword);
+app.post("/api/admin/send-weekly-emails", adminProtect, sendWeeklyEmails);
 
+// ── Health + error handling ────────────────────────────────────────────────────
 app.get("/api/health", (req, res) =>
-  res.json({ success: true, message: "SkillSpark API 🚀" }),
+  res.json({ success: true, message: "DoR-DoD API 🚀" }),
 );
-
 app.use((req, res) =>
   res
     .status(404)
     .json({ success: false, message: `Route ${req.originalUrl} not found` }),
 );
-
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ success: false, message: "Server error" });
 });
 
+// ── Connect & start ────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-
-// Validate required environment variables
-if (!process.env.MONGO_URI) {
-  console.error("❌ ERROR: MONGO_URI environment variable is not set!");
-  console.error(
-    "   → Add it in Render Dashboard: Settings → Environment → Add Variable",
-  );
-  console.error(
-    "   → Format: mongodb+srv://username:password@cluster.xxxxx.mongodb.net/dbname",
-  );
-  process.exit(1);
-}
-
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("✅ MongoDB Connected");
+    console.log("✅ MongoDB connected");
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`🌐 Allowed Origins: ${allowedOrigins.join(", ")}`);
     });
   })
@@ -122,5 +119,3 @@ mongoose
     console.error("❌ MongoDB error:", err.message);
     process.exit(1);
   });
-//
-//MONGO_URI=mongodb+srv://skillspark_user:Zens0Q6It7Vjy42v@cluster0.6p49ojn.mongodb.net/?appName=Cluster0

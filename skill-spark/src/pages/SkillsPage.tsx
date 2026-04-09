@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -55,6 +55,7 @@ interface CustomSkill {
   description: string;
   category: string;
   status: string;
+  addedToGoal: boolean;
 }
 
 // ─── Tag Input Component ──────────────────────────────────────────────────────
@@ -269,18 +270,9 @@ export default function SkillsPage() {
       return toast.error("Skill name is required");
     setSavingCustom(true);
     try {
-      const payload = {
-        ...customForm,
-        alreadyKnows: customForm.alreadyKnows.join(", "),
-        wantsToLearn: customForm.wantsToLearn.join(", "),
-      };
-      const res = await api.post("/custom-skills", payload);
-      const newSkill = {
-        ...res.data.data,
-        alreadyKnows: customForm.alreadyKnows,
-        wantsToLearn: customForm.wantsToLearn,
-      };
-      setCustomSkills((p) => [newSkill, ...p]);
+      // Send arrays directly — backend normalises them
+      const res = await api.post("/custom-skills", customForm);
+      setCustomSkills((p) => [res.data.data, ...p]);
       setCustomForm({
         skillName: "",
         alreadyKnows: [],
@@ -305,6 +297,45 @@ export default function SkillsPage() {
       toast.success("Skill deleted!");
     } catch {
       toast.error("Failed to delete");
+    }
+  };
+
+  // Add a single "want to learn" tag as a Goal
+  const addTagToGoal = async (
+    skillId: string,
+    tagId: string,
+    tagName: string,
+  ) => {
+    try {
+      await api.post(`/custom-skills/${skillId}/tags/${tagId}/add-goal`);
+      // Update local state — mark that tag as added
+      setCustomSkills((prev) =>
+        prev.map((s) =>
+          s._id === skillId
+            ? {
+                ...s,
+                wantsToLearn: s.wantsToLearn.map((t: any) =>
+                  t._id === tagId ? { ...t, addedToGoal: true } : t,
+                ),
+              }
+            : s,
+        ),
+      );
+      toast.success(`🎯 "Learn ${tagName}" added to Goals!`);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed to add goal");
+    }
+  };
+
+  const addCustomSkillToGoal = async (id: string, skillName: string) => {
+    try {
+      const res = await api.post(`/custom-skills/${id}/add-goal`);
+      setCustomSkills((p) =>
+        p.map((s) => (s._id === id ? { ...s, addedToGoal: true } : s)),
+      );
+      toast.success(res.data.message);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed to add to goal");
     }
   };
 
@@ -733,19 +764,43 @@ export default function SkillsPage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {customSkills.map((s) => (
-                  <div
-                    key={s._id}
-                    className={`p-4 rounded-xl border transition-all ${CUSTOM_STATUS_COLOR[s.status] || CUSTOM_STATUS_COLOR.planned}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="space-y-4">
+                {customSkills.map((s) => {
+                  // Safely normalize tags — DB may store strings or objects
+                  const knowTags: string[] = (s.alreadyKnows || [])
+                    .map((t: any) =>
+                      typeof t === "string" ? t : t?.name || "",
+                    )
+                    .filter(Boolean);
+
+                  const learnTags: {
+                    name: string;
+                    _id?: string;
+                    addedToGoal: boolean;
+                  }[] = (s.wantsToLearn || [])
+                    .map((t: any) =>
+                      typeof t === "string"
+                        ? { name: t, _id: undefined, addedToGoal: false }
+                        : {
+                            name: t?.name || "",
+                            _id: t?._id,
+                            addedToGoal: !!t?.addedToGoal,
+                          },
+                    )
+                    .filter((x) => x.name);
+
+                  return (
+                    <div
+                      key={s._id}
+                      className={`p-4 rounded-xl border transition-all ${CUSTOM_STATUS_COLOR[s.status] || CUSTOM_STATUS_COLOR.planned}`}
+                    >
+                      {/* ── Card header ── */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-sm">
                             {s.skillName}
                           </h3>
-                          <span className="text-xs bg-card/70 px-2 py-0.5 rounded-full capitalize">
+                          <span className="text-xs bg-card/70 px-2 py-0.5 rounded-full">
                             {s.status === "current"
                               ? "📖 Learning"
                               : s.status === "completed"
@@ -756,69 +811,92 @@ export default function SkillsPage() {
                             {s.category}
                           </span>
                         </div>
-                        {s.description && (
-                          <p className="text-xs opacity-80 mb-2 line-clamp-1">
-                            {s.description}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-3">
-                          {s.alreadyKnows?.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium opacity-70 mb-1">
-                                Already know:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {s.alreadyKnows.map((t, i) => (
-                                  <span
-                                    key={i}
-                                    className="text-xs bg-success/20 text-success px-2 py-0.5 rounded-full"
-                                  >
-                                    {t}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {s.wantsToLearn?.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium opacity-70 mb-1">
-                                Want to learn:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {s.wantsToLearn.map((t, i) => (
-                                  <span
-                                    key={i}
-                                    className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full"
-                                  >
-                                    {t}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() =>
+                              navigate(
+                                `/learning?skill=${encodeURIComponent(s.skillName)}`,
+                              )
+                            }
+                            className="text-xs border border-current px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                          >
+                            <FaPlay className="w-2 h-2" /> Learn
+                          </button>
+                          <button
+                            onClick={() => deleteCustomSkill(s._id)}
+                            className="text-foreground-muted hover:text-destructive p-1"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() =>
-                            navigate(
-                              `/learning?skill=${encodeURIComponent(s.skillName)}`,
-                            )
-                          }
-                          className="text-xs border border-current px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
-                        >
-                          <FaPlay className="w-2 h-2" /> Learn
-                        </button>
-                        <button
-                          onClick={() => deleteCustomSkill(s._id)}
-                          className="text-foreground-muted hover:text-destructive p-1"
-                        >
-                          <FaTrash className="w-3 h-3" />
-                        </button>
-                      </div>
+
+                      {s.description && (
+                        <p className="text-xs opacity-70 mb-3 italic">
+                          {s.description}
+                        </p>
+                      )}
+
+                      {/* ── Already know — plain chips ── */}
+                      {knowTags.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs font-semibold opacity-70 mb-1.5">
+                            ✅ Already know:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {knowTags.map((tag, i) => (
+                              <span
+                                key={i}
+                                className="text-xs bg-success/20 text-success border border-success/30 px-2.5 py-1 rounded-full font-medium"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Want to learn — each tag with its own + Goal button ── */}
+                      {learnTags.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold opacity-70 mb-1.5">
+                            🎯 Want to learn — add each as a Goal:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {learnTags.map((tag, i) => (
+                              <div
+                                key={tag._id || i}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                                  tag.addedToGoal
+                                    ? "bg-success/15 border-success/40 text-success"
+                                    : "bg-primary/10 border-primary/30 text-primary"
+                                }`}
+                              >
+                                <span className="text-xs font-medium">
+                                  {tag.name}
+                                </span>
+                                {tag.addedToGoal ? (
+                                  <span className="text-xs flex items-center gap-0.5 ml-1 opacity-80">
+                                    <FaCheck className="w-2.5 h-2.5" /> Added
+                                  </span>
+                                ) : tag._id ? (
+                                  <button
+                                    onClick={() =>
+                                      addTagToGoal(s._id, tag._id!, tag.name)
+                                    }
+                                    className="flex items-center gap-0.5 text-xs bg-primary text-primary-foreground hover:bg-primary/80 px-1.5 py-0.5 rounded-lg transition-all ml-1"
+                                  >
+                                    <FaPlus className="w-2 h-2" /> Goal
+                                  </button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

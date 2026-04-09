@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useContext,
   useState,
@@ -19,6 +19,7 @@ interface User {
   hasPassword?: boolean;
   isGoogleUser?: boolean;
   role?: string;
+  suspended?: boolean;
 }
 
 interface AuthContextType {
@@ -27,34 +28,29 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  // ✅ Starts true — we are checking session cookie on mount
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check if user has a valid cookie session
     api
       .get("/auth/me")
       .then((r) => setUser(r.data.user))
-      .catch(() => setUser(null))
+      .catch(() => setUser(null)) // no session = null, not an error
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      const res = await api.post("/auth/login", { email, password });
-      setUser(res.data.user);
-      toast.success(res.data.message || "Welcome back!");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Login failed");
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    const res = await api.post("/auth/login", { email, password });
+    setUser(res.data.user);
+    toast.success(res.data.message || "Welcome back!");
   }, []);
 
   const logout = useCallback(async () => {
@@ -62,12 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api.post("/auth/logout");
     } catch {}
     setUser(null);
-    toast.success("Logged out successfully");
+    toast.success("Logged out!");
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, loading, login, logout }}
+      value={{ user, isAuthenticated: !!user, loading, login, logout, setUser }}
     >
       {children}
     </AuthContext.Provider>

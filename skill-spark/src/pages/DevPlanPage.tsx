@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
