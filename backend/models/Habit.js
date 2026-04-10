@@ -1,29 +1,24 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const habitSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    name: {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    name: { type: String, required: true, trim: true },
+    days: { type: [Boolean], default: Array(21).fill(false) },
+    reminderTime: { type: String, default: null }, // "08:00"
+    frequency: {
       type: String,
-      required: [true, 'Habit name is required'],
-      trim: true,
-      maxlength: [100, 'Name cannot exceed 100 characters'],
+      enum: ["daily", "weekdays", "weekends"],
+      default: "daily",
     },
-    // 21 booleans representing each day
-    days: {
-      type: [Boolean],
-      default: Array(21).fill(false),
-      validate: {
-        validator: (arr) => arr.length === 21,
-        message: 'Days must have exactly 21 entries',
-      },
+    fromActivity: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Activity",
+      default: null,
     },
+    fromGoal: { type: String, default: "" },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model('Habit', habitSchema);
+module.exports = mongoose.model("Habit", habitSchema);

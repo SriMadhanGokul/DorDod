@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import { useState, useEffect, useRef } from "react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
@@ -14,6 +14,7 @@ import {
   FaLock,
   FaEye,
   FaEyeSlash,
+  FaCamera,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -32,6 +33,9 @@ export default function ProfilePage() {
     conf: false,
   });
   const [savingPw, setSavingPw] = useState(false);
+  const [avatar, setAvatar] = useState<string>("");
+  const [uploadingPic, setUploadingPic] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Personal state ───────────────────────────────────────────────────────
   const [personal, setPersonal] = useState({
@@ -98,6 +102,11 @@ export default function ProfilePage() {
     institution: "",
     issueDate: "",
   });
+
+  useEffect(() => {
+    // Load avatar from auth user
+    setAvatar((user as any)?.avatar || "");
+  }, [user]);
 
   useEffect(() => {
     const load = async () => {
@@ -200,6 +209,33 @@ export default function ProfilePage() {
     </button>
   );
 
+  const handlePictureUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/"))
+      return toast.error("Please select an image file");
+    if (file.size > 2 * 1024 * 1024)
+      return toast.error("Image must be smaller than 2MB");
+
+    setUploadingPic(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await api.patch("/profile/picture", { avatar: base64 });
+        setAvatar(res.data.data.avatar);
+        toast.success("Profile picture updated!");
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error("Failed to upload picture");
+    } finally {
+      setUploadingPic(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -207,9 +243,36 @@ export default function ProfilePage() {
 
         {/* User card */}
         <div className="card-elevated flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full gradient-hero flex items-center justify-center text-primary-foreground text-xl font-bold">
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {avatar ? (
+              <img
+                src={avatar}
+                alt="Profile"
+                className="w-16 h-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full gradient-hero flex items-center justify-center text-primary-foreground text-xl font-bold">
+                {user?.name?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+              {uploadingPic ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <FaCamera className="text-white text-lg" />
+              )}
+            </div>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePictureUpload}
+          />
           <div>
             <h2 className="text-lg font-semibold">
               {user?.name ||

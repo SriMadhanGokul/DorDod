@@ -12,6 +12,7 @@ router.use(protect);
 
 router.route("/").get(getHabits).post(createHabit);
 router.route("/:id").delete(deleteHabit);
-router.patch("/:id/toggle/:dayIndex", toggleDay);
+router.patch("/:id/toggle/:dayIndex", toggleDay); // dayIndex in URL
+router.patch("/:id/toggle", toggleDay); // dayIndex in body
 
 module.exports = router;

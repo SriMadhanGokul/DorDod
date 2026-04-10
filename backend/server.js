@@ -27,12 +27,16 @@ const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customSkillRoutes = require("./routes/customSkillRoutes");
 
+
 // ── New routes ─────────────────────────────────────────────────────────────────
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
+const {
+  updateProfilePicture,
+} = require("./controllers/profilePictureController");
 const { sendWeeklyEmails } = require("./controllers/weeklyEmailController");
 const protect = require("./utils/protect");
 const adminProtect = require("./middleware/adminMiddleware");
@@ -83,11 +87,13 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/frame-of-mind", frameOfMindRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
+app.use("/api/activities", activityRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/notifications", notifUserRoutes);
 
 // ── Inline routes ──────────────────────────────────────────────────────────────
 app.patch("/api/auth/change-password", protect, changePassword);
+app.patch("/api/profile/picture", protect, updateProfilePicture);
 app.post("/api/admin/send-weekly-emails", adminProtect, sendWeeklyEmails);
 
 // ── Health + error handling ────────────────────────────────────────────────────
