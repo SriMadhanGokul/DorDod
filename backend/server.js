@@ -27,7 +27,6 @@ const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customSkillRoutes = require("./routes/customSkillRoutes");
 
-
 // ── New routes ─────────────────────────────────────────────────────────────────
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
@@ -47,6 +46,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
   "http://localhost:3000",
+  "https://dordod-2.onrender.com",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
