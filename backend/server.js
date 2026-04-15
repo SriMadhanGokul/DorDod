@@ -30,6 +30,8 @@ const customSkillRoutes = require("./routes/customSkillRoutes");
 // ── New routes ─────────────────────────────────────────────────────────────────
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
+const xpRoutes = require("./routes/xpRoutes");
+const friendsRoutes = require("./routes/friendsRoutes");
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -80,6 +82,8 @@ app.use("/api/learning", learningRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/community", communityRoutes);
+app.use("/api/xp", xpRoutes);
+app.use("/api/friends", friendsRoutes);
 app.use("/api/scorecard", scoreCardRoutes);
 app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);

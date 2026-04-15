@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/utils/api";
 import {
@@ -23,70 +23,61 @@ import {
   FaSearch,
   FaSun,
   FaMoon,
+  FaMedal,
 } from "react-icons/fa";
 
-const navItems = [
+const NAV = [
   { to: "/dashboard", icon: FaChartBar, label: "Dashboard" },
-  { to: "/skills", icon: FaLightbulb, label: "Skills" },
+  { to: "/frame-of-mind", icon: FaSmile, label: "Frame of Mind" },
   { to: "/goals", icon: FaBullseye, label: "Goals" },
+  { to: "/skills", icon: FaLightbulb, label: "Skills" },
   { to: "/development-plan", icon: FaRocket, label: "Dev Plan" },
   { to: "/habits", icon: FaCalendarCheck, label: "Habits" },
   { to: "/learning", icon: FaBook, label: "Learning" },
-  { to: "/analytics", icon: FaChartLine, label: "Analytics" },
-  { to: "/achievements", icon: FaTrophy, label: "Achievements" },
-  { to: "/community", icon: FaUsers, label: "Community" },
   { to: "/activities", icon: FaTasks, label: "Activities" },
+  { to: "/achievements", icon: FaTrophy, label: "Achievements" },
+  { to: "/analytics", icon: FaChartLine, label: "Analytics" },
+  { to: "/community", icon: FaUsers, label: "Community" },
+  { to: "/leaderboard", icon: FaMedal, label: "Leaderboard 🏆" },
   { to: "/documents", icon: FaFileAlt, label: "Documents" },
-  { to: "/frame-of-mind", icon: FaSmile, label: "Frame of Mind" },
   { to: "/profile", icon: FaUserCircle, label: "Profile" },
 ];
 
-// ─── Dark Mode Hook ────────────────────────────────────────────────────────────
 function useDarkMode() {
-  const [dark, setDark] = useState<boolean>(() => {
-    const saved = localStorage.getItem("dordod-theme");
-    if (saved) return saved === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const [dark, setDark] = useState(() => {
+    const s = localStorage.getItem("dordod-theme");
+    return s
+      ? s === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
-
   useEffect(() => {
-    const root = document.documentElement;
-    if (dark) {
-      root.classList.add("dark");
-      localStorage.setItem("dordod-theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      localStorage.setItem("dordod-theme", "light");
-    }
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("dordod-theme", dark ? "dark" : "light");
   }, [dark]);
-
   return { dark, toggleDark: () => setDark((d) => !d) };
 }
 
-// ─── Notification Bell ────────────────────────────────────────────────────────
 function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifs, setNotifs] = useState<any[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-
   const unread = notifs.filter((n) => !n.read).length;
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const h = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node))
         setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
   }, []);
 
   useEffect(() => {
-    if (open) {
+    if (open)
       api
         .get("/notifications")
         .then((r) => setNotifs(r.data.data || []))
         .catch(() => {});
-    }
   }, [open]);
 
   useEffect(() => {
@@ -100,25 +91,26 @@ function NotificationBell() {
     return () => clearInterval(id);
   }, []);
 
-  const markRead = async (id: string) => {
-    try {
-      await api.patch(`/notifications/${id}/read`);
-      setNotifs((p) => p.map((n) => (n._id === id ? { ...n, read: true } : n)));
-    } catch {}
+  const markRead = (id: string) => {
+    api.patch(`/notifications/${id}/read`).catch(() => {});
+    setNotifs((p) => p.map((n) => (n._id === id ? { ...n, read: true } : n)));
+  };
+  const markAll = () => {
+    api.patch("/notifications/read-all").catch(() => {});
+    setNotifs((p) => p.map((n) => ({ ...n, read: true })));
   };
 
-  const markAll = async () => {
-    try {
-      await api.patch("/notifications/read-all");
-      setNotifs((p) => p.map((n) => ({ ...n, read: true })));
-    } catch {}
+  const TYPE_BORDER: Record<string, string> = {
+    info: "border-l-blue-400",
+    success: "border-l-green-500",
+    warning: "border-l-yellow-400",
+    error: "border-l-red-400",
   };
-
-  const TYPE_STYLE: Record<string, string> = {
-    info: "border-l-blue-400 bg-blue-50",
-    success: "border-l-green-400 bg-green-50",
-    warning: "border-l-yellow-400 bg-yellow-50",
-    error: "border-l-red-400 bg-red-50",
+  const TYPE_BG: Record<string, string> = {
+    info: "bg-blue-50 dark:bg-blue-950/30",
+    success: "bg-green-50 dark:bg-green-950/30",
+    warning: "bg-yellow-50 dark:bg-yellow-950/30",
+    error: "bg-red-50 dark:bg-red-950/30",
   };
 
   return (
@@ -129,14 +121,14 @@ function NotificationBell() {
       >
         <FaBell className="text-lg" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+        <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="font-semibold text-sm">Notifications</h3>
             {unread > 0 && (
               <button
@@ -147,25 +139,30 @@ function NotificationBell() {
               </button>
             )}
           </div>
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             {notifs.length === 0 ? (
               <div className="text-center py-8 text-foreground-muted text-sm">
-                No notifications
+                No notifications yet
               </div>
             ) : (
-              notifs.slice(0, 10).map((n) => (
+              notifs.slice(0, 15).map((n) => (
                 <div
                   key={n._id}
                   onClick={() => markRead(n._id)}
-                  className={`border-l-4 px-4 py-3 cursor-pointer hover:brightness-95 transition-all ${TYPE_STYLE[n.type] || TYPE_STYLE.info} ${!n.read ? "font-medium" : "opacity-70"}`}
+                  className={`border-l-4 px-4 py-3 cursor-pointer transition-all ${TYPE_BORDER[n.type] || "border-l-border"} ${TYPE_BG[n.type] || ""} ${!n.read ? "font-medium" : "opacity-70"}`}
                 >
-                  <p className="text-sm">{n.title}</p>
+                  <p className="text-sm leading-snug">{n.title}</p>
                   <p className="text-xs text-foreground-muted mt-0.5 line-clamp-2">
                     {n.message}
                   </p>
-                  <p className="text-xs text-foreground-muted mt-1">
-                    {new Date(n.createdAt).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs text-foreground-muted">
+                      {new Date(n.createdAt).toLocaleDateString()}
+                    </p>
+                    {!n.read && (
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -176,7 +173,6 @@ function NotificationBell() {
   );
 }
 
-// ─── Global Search ────────────────────────────────────────────────────────────
 function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -184,9 +180,9 @@ function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  console.log("🔥 DashboardLayout loaded");
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         setOpen(true);
@@ -197,8 +193,8 @@ function GlobalSearch() {
         setResults(null);
       }
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
   }, []);
 
   useEffect(() => {
@@ -210,17 +206,17 @@ function GlobalSearch() {
       setResults(null);
       return;
     }
-    const timer = setTimeout(async () => {
+    const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/search?q=${encodeURIComponent(query)}`);
-        setResults(res.data.data);
+        const r = await api.get(`/search?q=${encodeURIComponent(query)}`);
+        setResults(r.data.data);
       } catch {
       } finally {
         setLoading(false);
       }
     }, 350);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [query]);
 
   const ROUTES: Record<string, string> = {
@@ -230,18 +226,17 @@ function GlobalSearch() {
     custom_skill: "/skills",
     post: "/community",
   };
-
   const allItems = results
     ? [
-        ...results.goals,
-        ...results.courses,
-        ...results.skills,
-        ...results.customSkills,
-        ...results.posts,
+        ...(results.goals || []),
+        ...(results.courses || []),
+        ...(results.skills || []),
+        ...(results.customSkills || []),
+        ...(results.posts || []),
       ]
     : [];
 
-  if (!open) {
+  if (!open)
     return (
       <button
         onClick={() => setOpen(true)}
@@ -254,13 +249,12 @@ function GlobalSearch() {
         </span>
       </button>
     );
-  }
 
   return (
     <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 pt-20 p-4">
       <div className="bg-card w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <FaSearch className="text-foreground-muted" />
+          <FaSearch className="text-foreground-muted shrink-0" />
           <input
             ref={inputRef}
             value={query}
@@ -268,13 +262,23 @@ function GlobalSearch() {
             placeholder="Search goals, courses, skills, posts..."
             className="flex-1 bg-transparent text-foreground outline-none text-sm placeholder:text-foreground-muted"
           />
+          {query && (
+            <button
+              onClick={() => {
+                setQuery("");
+                setResults(null);
+              }}
+            >
+              <FaTimes className="text-foreground-muted" />
+            </button>
+          )}
           <button
             onClick={() => {
               setOpen(false);
               setQuery("");
               setResults(null);
             }}
-            className="text-xs text-foreground-muted border border-border px-2 py-1 rounded hover:bg-muted"
+            className="text-xs border border-border px-2 py-1 rounded hover:bg-muted text-foreground-muted"
           >
             Esc
           </button>
@@ -287,7 +291,7 @@ function GlobalSearch() {
           )}
           {!loading && query.length < 2 && (
             <p className="text-center text-sm text-foreground-muted py-8">
-              Type to search across the platform
+              Type at least 2 characters to search
             </p>
           )}
           {!loading && results && allItems.length === 0 && (
@@ -311,7 +315,7 @@ function GlobalSearch() {
                   <p className="text-sm font-medium truncate">
                     {item.title || item.name || item.skillName || item.content}
                   </p>
-                  <p className="text-xs text-foreground-muted">
+                  <p className="text-xs text-foreground-muted capitalize">
                     {item.type?.replace("_", " ")} ·{" "}
                     {item.category || item.status || ""}
                   </p>
@@ -325,7 +329,6 @@ function GlobalSearch() {
   );
 }
 
-// ─── Main Layout ──────────────────────────────────────────────────────────────
 export default function DashboardLayout({
   children,
 }: {
@@ -334,8 +337,15 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const { dark, toggleDark } = useDarkMode();
+  const [xp, setXp] = useState<any>(null);
+
+  useEffect(() => {
+    api
+      .get("/xp/me")
+      .then((r) => setXp(r.data.data))
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -364,9 +374,41 @@ export default function DashboardLayout({
           </button>
         </div>
 
+        {/* XP widget in sidebar */}
+        {xp && (
+          <div className="mx-3 mt-3 p-3 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl border border-primary/20">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold">{xp.levelName}</span>
+              <span className="text-xs text-destructive font-bold">
+                {xp.streak} 🔥
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5 mb-1">
+              {(() => {
+                const T = [0, 500, 1500, 3500, 7500, 99999];
+                const next = T[xp.level] || 99999;
+                const prev = T[xp.level - 1] || 0;
+                const pct = Math.min(
+                  100,
+                  Math.round(((xp.totalXP - prev) / (next - prev)) * 100),
+                );
+                return (
+                  <div
+                    className="bg-primary rounded-full h-1.5 transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                );
+              })()}
+            </div>
+            <p className="text-xs text-foreground-muted">
+              {xp.totalXP.toLocaleString()} XP total
+            </p>
+          </div>
+        )}
+
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto mt-1">
+          {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -388,9 +430,17 @@ export default function DashboardLayout({
         {/* User */}
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm">
-              {user?.name?.charAt(0).toUpperCase() || "U"}
-            </div>
+            {(user as any)?.avatar ? (
+              <img
+                src={(user as any).avatar}
+                className="w-8 h-8 rounded-full object-cover shrink-0"
+                alt=""
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {user?.name?.charAt(0).toUpperCase() || "U"}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium truncate">
                 {user?.name || "User"}
@@ -409,7 +459,6 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Backdrop */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
@@ -419,7 +468,7 @@ export default function DashboardLayout({
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top navbar */}
+        {/* Topbar */}
         <header className="bg-card border-b border-border px-4 md:px-6 py-3 flex items-center gap-3 sticky top-0 z-20">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -427,13 +476,9 @@ export default function DashboardLayout({
           >
             <FaBars className="text-xl" />
           </button>
-
-          {/* Search */}
           <div className="flex-1">
             <GlobalSearch />
           </div>
-
-          {/* Right side */}
           <div className="flex items-center gap-2">
             {/* Dark mode toggle */}
             <button
@@ -443,8 +488,11 @@ export default function DashboardLayout({
               title={dark ? "Light mode" : "Dark mode"}
             >
               <div
-                className={`absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm ${dark ? "left-5.5 bg-yellow-300" : "left-0.5 bg-white"}`}
-                style={{ left: dark ? "22px" : "2px" }}
+                className="absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm"
+                style={{
+                  left: dark ? "22px" : "2px",
+                  background: dark ? "#FDD835" : "#FFFFFF",
+                }}
               >
                 {dark ? (
                   <FaMoon className="w-2.5 h-2.5 text-blue-800" />
@@ -453,21 +501,24 @@ export default function DashboardLayout({
                 )}
               </div>
             </button>
-
-            {/* Notification bell */}
             <NotificationBell />
-
-            {/* Avatar */}
             <div
-              className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm cursor-pointer"
+              className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm cursor-pointer overflow-hidden"
               onClick={() => navigate("/profile")}
             >
-              {user?.name?.charAt(0).toUpperCase() || "U"}
+              {(user as any)?.avatar ? (
+                <img
+                  src={(user as any).avatar}
+                  className="w-full h-full object-cover"
+                  alt=""
+                />
+              ) : (
+                user?.name?.charAt(0).toUpperCase() || "U"
+              )}
             </div>
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
       </div>
     </div>

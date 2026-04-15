@@ -1,4 +1,5 @@
 const Habit = require("../models/Habit");
+const { awardXP } = require("./xpController");
 
 const getHabits = async (req, res) => {
   try {
@@ -31,9 +32,6 @@ const createHabit = async (req, res) => {
   }
 };
 
-// Supports both:
-//   PATCH /api/habits/:id/toggle/:dayIndex  (dayIndex in URL)
-//   PATCH /api/habits/:id/toggle            (dayIndex in body)
 const toggleDay = async (req, res) => {
   try {
     const { id, dayIndex: paramIdx } = req.params;
@@ -54,6 +52,11 @@ const toggleDay = async (req, res) => {
     habit.days[idx] = !habit.days[idx];
     habit.markModified("days");
     await habit.save();
+
+    // Award XP when marking day as done
+    if (habit.days[idx]) {
+      awardXP(req.user.id, "habit_day").catch(console.error);
+    }
 
     res
       .status(200)
@@ -80,3 +83,4 @@ const deleteHabit = async (req, res) => {
 };
 
 module.exports = { getHabits, createHabit, toggleDay, deleteHabit };
+ 

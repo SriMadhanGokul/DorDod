@@ -42,6 +42,9 @@ import SettingsPage from "./pages/admin/SettingsPage";
 import PendingCoursesPage from "./pages/admin/PendingCoursesPage";
 import UserSkillsPage from "./pages/admin/UserSkillsPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import XPHistoryPage from "./pages/XPHistoryPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import XPManagement from "./pages/admin/XPManagement";
 
 const queryClient = new QueryClient();
 
@@ -303,10 +306,34 @@ const App = () => (
               }
             />
             <Route
+              path="/xp-history"
+              element={
+                <Protected>
+                  <XPHistoryPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/xp"
+              element={
+                <AdminRoute>
+                  <XPManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
               path="/onboarding"
               element={
                 <Protected>
                   <OnboardingPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <Protected>
+                  <LeaderboardPage />
                 </Protected>
               }
             />

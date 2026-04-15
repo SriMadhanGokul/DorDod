@@ -33,6 +33,7 @@ const {
   sendNotification,
   getNotifications,
 } = require("../controllers/adminContentController");
+const { adminXPOverview } = require("../controllers/xpController");
 
 router.use(adminProtect); // All admin routes protected
 
@@ -78,5 +79,7 @@ router.delete("/devplan/:userId/recommendation/:recId", removeDevPlanRec);
 // ─── Notifications ─────────────────────────────────────────────────────────
 router.get("/notifications", getNotifications);
 router.post("/notifications", sendNotification);
+
+router.get("/xp-overview", adminProtect, adminXPOverview);
 
 module.exports = router;
