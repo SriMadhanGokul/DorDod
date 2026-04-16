@@ -1,9 +1,9 @@
 const DevPlan = require("../models/DevPlan");
 const Goal = require("../models/Goal");
 const SkillPath = require("../models/SkillPath");
-const { Enrollment } = require("../models/Course");
+const { Enrollment, Course } = require("../models/Course");
 
-// Build a personalized dev plan based on user's actual data
+// ── Build personalized plan ────────────────────────────────────────────────────
 const buildPersonalizedPlan = async (userId) => {
   const [goals, skillPath, enrollments] = await Promise.all([
     Goal.find({ user: userId }),
@@ -26,11 +26,9 @@ const buildPersonalizedPlan = async (userId) => {
     .filter((e) => e.progress > 0 && e.progress < 100)
     .slice(0, 2);
 
-  // Build recommendations based on real data
   const recommendations = [];
 
-  // 1. Currently learning skills → top priority
-  learning.forEach((s) => {
+  learning.forEach((s) =>
     recommendations.push({
       title: `Master ${s.name}`,
       type: "Skill Practice",
@@ -39,11 +37,10 @@ const buildPersonalizedPlan = async (userId) => {
       icon: "FaBookOpen",
       priority: "high",
       reason: `You marked ${s.name} as "learning" in your ${careerPath} path`,
-    });
-  });
+    }),
+  );
 
-  // 2. In-progress courses → finish them
-  inProgressCourses.forEach((e) => {
+  inProgressCourses.forEach((e) =>
     recommendations.push({
       title: `Complete: ${e.course?.title}`,
       type: "Course",
@@ -52,11 +49,10 @@ const buildPersonalizedPlan = async (userId) => {
       icon: "FaBook",
       priority: "high",
       reason: `You're ${e.progress}% done — finish it to earn the achievement!`,
-    });
-  });
+    }),
+  );
 
-  // 3. Active goals → work on them
-  inProgress.forEach((g) => {
+  inProgress.forEach((g) =>
     recommendations.push({
       title: `Work on: ${g.title}`,
       type: "Goal",
@@ -65,11 +61,10 @@ const buildPersonalizedPlan = async (userId) => {
       icon: "FaBullseye",
       priority: "medium",
       reason: `Active goal at ${g.progress}% — keep the momentum going`,
-    });
-  });
+    }),
+  );
 
-  // 4. Skills to pick up next
-  toLearn.slice(0, 2).forEach((s) => {
+  toLearn.slice(0, 2).forEach((s) =>
     recommendations.push({
       title: `Start Learning ${s.name}`,
       type: "Skill",
@@ -78,101 +73,75 @@ const buildPersonalizedPlan = async (userId) => {
       icon: "FaLightbulb",
       priority: "medium",
       reason: `Next skill in your ${careerPath} path`,
-    });
-  });
+    }),
+  );
 
-  // 5. Not started goals → schedule them
-  notStarted.slice(0, 1).forEach((g) => {
+  notStarted.slice(0, 1).forEach((g) =>
     recommendations.push({
       title: `Start: ${g.title}`,
       type: "Goal",
-      duration: "Schedule now",
+      duration: "TBD",
       completed: false,
       icon: "FaRocket",
       priority: "low",
-      reason: "Goal waiting to be started",
-    });
-  });
+      reason: `You haven't started this goal yet — good time to begin!`,
+    }),
+  );
 
-  // Fill with generic if still empty
   if (recommendations.length === 0) {
-    recommendations.push(
-      {
-        title: "Set your first goal",
-        type: "Action",
-        duration: "5 min",
-        completed: false,
-        icon: "FaBullseye",
-        priority: "high",
-        reason: "Start by defining what you want to achieve",
-      },
-      {
-        title: "Choose a career path",
-        type: "Action",
-        duration: "5 min",
-        completed: false,
-        icon: "FaRocket",
-        priority: "high",
-        reason: "Go to Skills page and select your path",
-      },
-      {
-        title: "Enroll in your first course",
-        type: "Course",
-        duration: "30 min",
-        completed: false,
-        icon: "FaBook",
-        priority: "medium",
-        reason: "Start learning with structured courses",
-      },
-      {
-        title: "Create a 21-day habit",
-        type: "Habit",
-        duration: "Daily",
-        completed: false,
-        icon: "FaCalendar",
-        priority: "medium",
-        reason: "Consistency builds expertise",
-      },
-      {
-        title: "Complete your profile",
-        type: "Profile",
-        duration: "10 min",
-        completed: false,
-        icon: "FaUser",
-        priority: "low",
-        reason: "A complete profile helps you track better",
-      },
-    );
+    recommendations.push({
+      title: "Set your first goal",
+      type: "Goal",
+      duration: "10 min",
+      completed: false,
+      icon: "FaBullseye",
+      priority: "high",
+      reason: "Start by adding a goal to generate your plan",
+    });
+    recommendations.push({
+      title: "Choose a skill path",
+      type: "Skill",
+      duration: "5 min",
+      completed: false,
+      icon: "FaLightbulb",
+      priority: "high",
+      reason: "Select a career path in the Skills page",
+    });
+    recommendations.push({
+      title: "Enroll in a course",
+      type: "Course",
+      duration: "1-2 hours",
+      completed: false,
+      icon: "FaBook",
+      priority: "medium",
+      reason: "Browse the Learning Library for courses",
+    });
   }
 
-  // Build milestones (4-week plan)
   const milestones = [
     {
       title: "Week 1-2: Foundation",
-      desc: skillPath
-        ? `Set up your ${careerPath} learning plan. Mark skills you already know as "Learned" and start 2 new skills as "Learning".`
-        : "Choose your career path, set your first 3 goals, and enroll in one course.",
+      desc: "Set up goals, choose skill path, and start first course",
       done: false,
     },
     {
-      title: "Week 3-4: Build Momentum",
-      desc:
-        inProgress.length > 0
-          ? `Push your active goals forward. Focus on: ${inProgress.map((g) => g.title).join(", ")}.`
-          : "Begin working on your goals daily. Aim for 30 minutes of focused learning each day.",
+      title: "Week 3-4: Momentum",
+      desc: "Complete 1 course and make progress on key skills",
       done: false,
     },
     {
-      title: "Week 5-8: Deep Work",
-      desc:
-        learning.length > 0
-          ? `Go deep on: ${learning.map((s) => s.name).join(", ")}. Build a project using these skills.`
-          : "Apply your learning in real mini-projects. Practice daily and track your habit streaks.",
+      title: "Week 5-6: Consistency",
+      desc: "Build daily habits, track activities",
       done: false,
     },
     {
-      title: "Week 9-12: Review & Level Up",
-      desc: "Review your progress, complete pending courses, update skill statuses, and set new goals for the next quarter.",
+      title: "Week 7-9: Progress",
+      desc: "Achieve 50% on major goals",
+      done: false,
+    },
+    {
+      title: "Week 10-12: Achievement",
+      desc: "Complete primary goal and review progress",
       done: false,
     },
   ];
@@ -184,43 +153,195 @@ const buildPersonalizedPlan = async (userId) => {
 const getDevPlan = async (req, res) => {
   try {
     let plan = await DevPlan.findOne({ user: req.user.id });
-
-    // Always regenerate recommendations from fresh data
-    const { recommendations, milestones } = await buildPersonalizedPlan(
-      req.user.id,
-    );
-
     if (!plan) {
+      const { recommendations, milestones } = await buildPersonalizedPlan(
+        req.user.id,
+      );
       plan = await DevPlan.create({
         user: req.user.id,
         recommendations,
         milestones,
       });
-    } else {
-      // Refresh recommendations but preserve completed status on milestones
-      const existingMilestones = plan.milestones || [];
-      const mergedMilestones = milestones.map((m, i) => ({
-        ...m,
-        done: existingMilestones[i]?.done || false,
-      }));
-
-      // Refresh recommendations (preserve completed ones by title match)
-      const mergedRecs = recommendations.map((r) => {
-        const existing = plan.recommendations.find((e) => e.title === r.title);
-        return { ...r, completed: existing?.completed || false };
-      });
-
-      plan.recommendations = mergedRecs;
-      plan.milestones = mergedMilestones;
-      await plan.save();
     }
-
     res.status(200).json({ success: true, data: plan });
-  } catch (error) {
-    console.error("getDevPlan error:", error);
+  } catch (err) {
+    console.error("getDevPlan error:", err);
     res
       .status(500)
-      .json({ success: false, message: "Failed to fetch development plan" });
+      .json({ success: false, message: "Failed to load development plan" });
+  }
+};
+
+// POST /api/devplan/refresh  — rebuild from current data
+const refreshPlan = async (req, res) => {
+  try {
+    const { recommendations, milestones } = await buildPersonalizedPlan(
+      req.user.id,
+    );
+    const plan = await DevPlan.findOneAndUpdate(
+      { user: req.user.id },
+      { recommendations, milestones },
+      { new: true, upsert: true },
+    );
+    res
+      .status(200)
+      .json({ success: true, message: "Plan refreshed!", data: plan });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to refresh plan" });
+  }
+};
+
+// POST /api/devplan/recommendations  — add new recommendation
+const addRecommendation = async (req, res) => {
+  try {
+    const {
+      title,
+      type,
+      duration,
+      priority,
+      reason,
+      startDate,
+      endDate,
+      linkedCourse,
+    } = req.body;
+    if (!title?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
+    if (!type?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Type is required" });
+    if (!priority)
+      return res
+        .status(400)
+        .json({ success: false, message: "Priority is required" });
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "Start date is required" });
+    if (!endDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "End date is required" });
+
+    let courseTitle = "";
+    if (linkedCourse) {
+      const course = await Course.findById(linkedCourse).select("title");
+      courseTitle = course?.title || "";
+    }
+
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Plan not found — load the page first",
+        });
+
+    plan.recommendations.push({
+      title,
+      type,
+      duration: duration || "",
+      priority,
+      reason: reason || "",
+      startDate,
+      endDate,
+      linkedCourse: linkedCourse || null,
+      courseTitle,
+    });
+    await plan.save();
+    res
+      .status(201)
+      .json({ success: true, message: "Recommendation added!", data: plan });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to add recommendation" });
+  }
+};
+
+// PUT /api/devplan/recommendations/:recId  — edit recommendation
+const updateRecommendation = async (req, res) => {
+  try {
+    const {
+      title,
+      type,
+      duration,
+      priority,
+      reason,
+      startDate,
+      endDate,
+      linkedCourse,
+    } = req.body;
+    if (!title?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "Start date is required" });
+    if (!endDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "End date is required" });
+
+    let courseTitle = "";
+    if (linkedCourse) {
+      const course = await Course.findById(linkedCourse).select("title");
+      courseTitle = course?.title || "";
+    }
+
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found" });
+
+    const rec = plan.recommendations.id(req.params.recId);
+    if (!rec)
+      return res
+        .status(404)
+        .json({ success: false, message: "Recommendation not found" });
+
+    rec.title = title;
+    rec.type = type || rec.type;
+    rec.duration = duration || rec.duration;
+    rec.priority = priority || rec.priority;
+    rec.reason = reason || rec.reason;
+    rec.startDate = startDate;
+    rec.endDate = endDate;
+    rec.linkedCourse = linkedCourse || null;
+    rec.courseTitle = courseTitle;
+
+    await plan.save();
+    res.status(200).json({ success: true, message: "Updated!", data: plan });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update recommendation" });
+  }
+};
+
+// DELETE /api/devplan/recommendations/:recId
+const deleteRecommendation = async (req, res) => {
+  try {
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found" });
+    plan.recommendations = plan.recommendations.filter(
+      (r) => r._id.toString() !== req.params.recId,
+    );
+    await plan.save();
+    res
+      .status(200)
+      .json({ success: true, message: "Recommendation deleted!", data: plan });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to delete" });
   }
 };
 
@@ -231,7 +352,7 @@ const toggleRecommendation = async (req, res) => {
     if (!plan)
       return res
         .status(404)
-        .json({ success: false, message: "Dev plan not found" });
+        .json({ success: false, message: "Plan not found" });
     const rec = plan.recommendations.id(req.params.recId);
     if (!rec)
       return res
@@ -239,11 +360,116 @@ const toggleRecommendation = async (req, res) => {
         .json({ success: false, message: "Recommendation not found" });
     rec.completed = !rec.completed;
     await plan.save();
+    res.status(200).json({ success: true, message: "Updated!", data: plan });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed" });
+  }
+};
+
+// POST /api/devplan/milestones  — add milestone
+const addMilestone = async (req, res) => {
+  try {
+    const { title, desc, startDate, endDate } = req.body;
+    if (!title?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "Start date is required" });
+    if (!endDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "End date is required" });
+
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found" });
+
+    plan.milestones.push({
+      title,
+      desc: desc || "",
+      startDate,
+      endDate,
+      done: false,
+    });
+    await plan.save();
+    res
+      .status(201)
+      .json({ success: true, message: "Milestone added!", data: plan });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to add milestone" });
+  }
+};
+
+// PUT /api/devplan/milestones/:milestoneId
+const updateMilestone = async (req, res) => {
+  try {
+    const { title, desc, startDate, endDate } = req.body;
+    if (!title?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Title is required" });
+    if (!startDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "Start date is required" });
+    if (!endDate)
+      return res
+        .status(400)
+        .json({ success: false, message: "End date is required" });
+
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found" });
+
+    const m = plan.milestones.id(req.params.milestoneId);
+    if (!m)
+      return res
+        .status(404)
+        .json({ success: false, message: "Milestone not found" });
+
+    m.title = title;
+    m.desc = desc || m.desc;
+    m.startDate = startDate;
+    m.endDate = endDate;
+    await plan.save();
     res
       .status(200)
-      .json({ success: true, message: "Progress updated!", data: plan });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to update" });
+      .json({ success: true, message: "Milestone updated!", data: plan });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update milestone" });
+  }
+};
+
+// DELETE /api/devplan/milestones/:milestoneId
+const deleteMilestone = async (req, res) => {
+  try {
+    const plan = await DevPlan.findOne({ user: req.user.id });
+    if (!plan)
+      return res
+        .status(404)
+        .json({ success: false, message: "Plan not found" });
+    plan.milestones = plan.milestones.filter(
+      (m) => m._id.toString() !== req.params.milestoneId,
+    );
+    await plan.save();
+    res
+      .status(200)
+      .json({ success: true, message: "Milestone deleted!", data: plan });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to delete milestone" });
   }
 };
 
@@ -254,22 +480,29 @@ const toggleMilestone = async (req, res) => {
     if (!plan)
       return res
         .status(404)
-        .json({ success: false, message: "Dev plan not found" });
-    const milestone = plan.milestones.id(req.params.milestoneId);
-    if (!milestone)
+        .json({ success: false, message: "Plan not found" });
+    const m = plan.milestones.id(req.params.milestoneId);
+    if (!m)
       return res
         .status(404)
         .json({ success: false, message: "Milestone not found" });
-    milestone.done = !milestone.done;
+    m.done = !m.done;
     await plan.save();
-    res
-      .status(200)
-      .json({ success: true, message: "Milestone updated!", data: plan });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update milestone" });
+    res.status(200).json({ success: true, message: "Updated!", data: plan });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed" });
   }
 };
 
-module.exports = { getDevPlan, toggleRecommendation, toggleMilestone };
+module.exports = {
+  getDevPlan,
+  refreshPlan,
+  addRecommendation,
+  updateRecommendation,
+  deleteRecommendation,
+  toggleRecommendation,
+  addMilestone,
+  updateMilestone,
+  deleteMilestone,
+  toggleMilestone,
+};

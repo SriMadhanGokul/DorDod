@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
+
 import {
   FaChartBar,
   FaUsers,
@@ -17,7 +18,8 @@ import {
   FaTimes,
   FaShieldAlt,
   FaClock,
-  FaLightbulb
+  FaLightbulb,
+  FaStar,
 } from "react-icons/fa";
 
 const navItems = [
@@ -27,7 +29,7 @@ const navItems = [
   { to: "/admin/pending-courses", icon: FaClock, label: "Pending Courses" },
   { to: "/admin/user-skills", icon: FaLightbulb, label: "User Skills" },
   { to: "/admin/habits", icon: FaCalendarCheck, label: "Habits" },
-  { to: '/admin/xp', label: '⭐ XP & Gamification' },
+  { to: "/admin/xp", icon: FaStar, label: "⭐ XP & Gamification" },
   { to: "/admin/courses", icon: FaBook, label: "Courses" },
   { to: "/admin/community", icon: FaCommunity, label: "Community" },
   { to: "/admin/achievements", icon: FaTrophy, label: "Achievements" },

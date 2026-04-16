@@ -1,5 +1,6 @@
 const Habit = require("../models/Habit");
 const { awardXP } = require("./xpController");
+const UserScore = require("../models/UserScore");
 
 const getHabits = async (req, res) => {
   try {
@@ -49,12 +50,23 @@ const toggleDay = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Habit not found" });
 
+    // Block toggling a day if habit is fully completed (all 21 done)
+    const wasCompleted = habit.days.filter(Boolean).length === 21;
+    if (wasCompleted)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "🔒 Completed habits cannot be modified",
+        });
+
+    const wasDone = habit.days[idx];
     habit.days[idx] = !habit.days[idx];
     habit.markModified("days");
     await habit.save();
 
-    // Award XP when marking day as done
-    if (habit.days[idx]) {
+    // Award XP only when MARKING as done (not when unchecking)
+    if (!wasDone && habit.days[idx]) {
       awardXP(req.user.id, "habit_day").catch(console.error);
     }
 
@@ -68,7 +80,7 @@ const toggleDay = async (req, res) => {
 
 const deleteHabit = async (req, res) => {
   try {
-    const habit = await Habit.findOneAndDelete({
+    const habit = await Habit.findOne({
       _id: req.params.id,
       user: req.user.id,
     });
@@ -76,6 +88,35 @@ const deleteHabit = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Habit not found" });
+
+    // Block deletion if habit is fully completed
+    const completedDays = habit.days.filter(Boolean).length;
+    if (completedDays === 21)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "🔒 Completed habits cannot be deleted",
+        });
+
+    // Deduct XP for the completed days being removed
+    if (completedDays > 0) {
+      const deductXP = completedDays * 10; // 10 XP per day
+      const score = await UserScore.findOne({ user: req.user.id });
+      if (score) {
+        score.totalXP = Math.max(0, score.totalXP - deductXP);
+        score.recalcLevel();
+        score.history.push({
+          type: "habit_deleted",
+          points: -deductXP,
+          description: `Habit "${habit.name}" deleted — ${completedDays} days XP removed`,
+          createdAt: new Date(),
+        });
+        await score.save();
+      }
+    }
+
+    await Habit.findByIdAndDelete(req.params.id);
     res.status(200).json({ success: true, message: "Habit deleted!" });
   } catch (error) {
     res.status(500).json({ success: false, message: "Failed to delete habit" });
@@ -83,4 +124,3 @@ const deleteHabit = async (req, res) => {
 };
 
 module.exports = { getHabits, createHabit, toggleDay, deleteHabit };
- 

@@ -4,7 +4,7 @@ const recommendationSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     type: { type: String, required: true },
-    duration: { type: String, required: true },
+    duration: { type: String, default: "" },
     completed: { type: Boolean, default: false },
     icon: { type: String, default: "FaBook" },
     priority: {
@@ -13,6 +13,14 @@ const recommendationSchema = new mongoose.Schema(
       default: "medium",
     },
     reason: { type: String, default: "" },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+    linkedCourse: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      default: null,
+    },
+    courseTitle: { type: String, default: "" },
   },
   { _id: true },
 );
@@ -20,8 +28,10 @@ const recommendationSchema = new mongoose.Schema(
 const milestoneSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
-    desc: { type: String, required: true },
+    desc: { type: String, default: "" },
     done: { type: Boolean, default: false },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
   },
   { _id: true },
 );

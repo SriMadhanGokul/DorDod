@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
@@ -10,11 +9,12 @@ import {
   FaFire,
   FaTrophy,
   FaLightbulb,
-  FaClock,
   FaCheck,
   FaCircle,
   FaChevronDown,
   FaChevronUp,
+  FaEdit,
+  FaClock,
 } from "react-icons/fa";
 
 interface Activity {
@@ -65,8 +65,15 @@ const PRIORITY_COLOR = {
   Low: "bg-muted text-foreground-muted",
 };
 
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  priority: "Medium",
+  dueDate: "",
+  goalId: "",
+};
+
 export default function ActivitiesPage() {
-  const navigate = useNavigate();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,31 +84,23 @@ export default function ActivitiesPage() {
   const [suggestions, setSuggestions] = useState<{ title: string }[]>([]);
   const [suggestGoal, setSuggestGoal] = useState("");
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
-
-  // Habit schedule modal
   const [habitModal, setHabitModal] = useState<{
     id: string;
     title: string;
   } | null>(null);
   const [reminderTime, setReminderTime] = useState("08:00");
   const [frequency, setFrequency] = useState("daily");
-
-  // Achievement modal
   const [achModal, setAchModal] = useState<{
     id: string;
     title: string;
   } | null>(null);
   const [achDesc, setAchDesc] = useState("");
-
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    priority: "Medium",
-    dueDate: "",
-    goalId: "",
-    subGoalId: "",
-  });
+  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+
+  // Edit state
+  const [editActivity, setEditActivity] = useState<Activity | null>(null);
+  const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
 
   useEffect(() => {
     const load = async () => {
@@ -112,7 +111,6 @@ export default function ActivitiesPage() {
         ]);
         setActivities(aRes.data.data);
         setGoals(gRes.data.data);
-        // expand all goal groups by default
         const ids = new Set<string>(
           aRes.data.data.map((a: Activity) => a.goalId?._id || "ungrouped"),
         );
@@ -125,6 +123,14 @@ export default function ActivitiesPage() {
     };
     load();
   }, []);
+
+  // Validate mandatory fields
+  const validateForm = (f: typeof EMPTY_FORM) => {
+    if (!f.title.trim()) return "Title is required";
+    if (!f.priority) return "Priority is required";
+    if (!f.dueDate) return "Due date is required";
+    return null;
+  };
 
   const fetchSuggestions = async (goalId: string) => {
     if (!goalId) return;
@@ -145,6 +151,7 @@ export default function ActivitiesPage() {
         goalId: suggestGoal,
         autoSuggested: true,
         priority: "Medium",
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       });
       setActivities((p) => [res.data.data, ...p]);
       toast.success("Activity added!");
@@ -154,23 +161,47 @@ export default function ActivitiesPage() {
   };
 
   const create = async () => {
-    if (!form.title.trim()) return toast.error("Title is required");
+    const err = validateForm(form);
+    if (err) return toast.error(err);
     setSaving(true);
     try {
       const res = await api.post("/activities", form);
       setActivities((p) => [res.data.data, ...p]);
-      setForm({
-        title: "",
-        description: "",
-        priority: "Medium",
-        dueDate: "",
-        goalId: "",
-        subGoalId: "",
-      });
+      setForm({ ...EMPTY_FORM });
       setShowModal(false);
       toast.success("Activity created!");
     } catch {
       toast.error("Failed to create");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEdit = (a: Activity) => {
+    setEditActivity(a);
+    setEditForm({
+      title: a.title,
+      description: a.description || "",
+      priority: a.priority,
+      dueDate: a.dueDate?.slice(0, 10) || "",
+      goalId: a.goalId?._id || "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editActivity) return;
+    const err = validateForm(editForm);
+    if (err) return toast.error(err);
+    setSaving(true);
+    try {
+      const res = await api.put(`/activities/${editActivity._id}`, editForm);
+      setActivities((p) =>
+        p.map((a) => (a._id === editActivity._id ? res.data.data : a)),
+      );
+      setEditActivity(null);
+      toast.success("Activity updated!");
+    } catch {
+      toast.error("Failed to update");
     } finally {
       setSaving(false);
     }
@@ -197,7 +228,7 @@ export default function ActivitiesPage() {
           a._id === habitModal.id ? { ...a, addedToHabit: true } : a,
         ),
       );
-      toast.success(`🔥 Habit created with daily reminder at ${reminderTime}!`);
+      toast.success(`🔥 Habit created with reminder at ${reminderTime}!`);
       setHabitModal(null);
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Failed");
@@ -241,14 +272,19 @@ export default function ActivitiesPage() {
       return s;
     });
 
-  // Filter
   const filtered = activities.filter((a) => {
-    const matchStatus = filterStatus === "all" || a.status === filterStatus;
+    const rawStatus = (a.status || "todo").toLowerCase().replace(/[^a-z]/g, "");
+    const norm =
+      rawStatus === "inprogress" || rawStatus === "inprog"
+        ? "inprogress"
+        : rawStatus === "done" || rawStatus === "completed"
+          ? "done"
+          : "todo";
+    const matchStatus = filterStatus === "all" || norm === filterStatus;
     const matchGoal = !filterGoal || a.goalId?._id === filterGoal;
     return matchStatus && matchGoal;
   });
 
-  // Group by goal
   const grouped = filtered.reduce(
     (acc, a) => {
       const key = a.goalId?._id || "ungrouped";
@@ -266,10 +302,88 @@ export default function ActivitiesPage() {
     done: filtered.filter((a) => a.status === "done").length,
   };
 
+  // Shared form fields
+  const FormFields = ({ f, setF }: { f: any; setF: any }) => (
+    <div className="space-y-3">
+      <div>
+        <label className="text-xs font-medium text-foreground-muted">
+          Title <span className="text-destructive">*</span>
+        </label>
+        <input
+          placeholder="Activity title"
+          value={f.title}
+          onChange={(e) => setF((p: any) => ({ ...p, title: e.target.value }))}
+          className="input-field mt-1"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-foreground-muted">
+          Description
+        </label>
+        <textarea
+          placeholder="Description (optional)"
+          value={f.description}
+          onChange={(e) =>
+            setF((p: any) => ({ ...p, description: e.target.value }))
+          }
+          className="input-field min-h-[60px] mt-1"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-foreground-muted">
+            Priority <span className="text-destructive">*</span>
+          </label>
+          <select
+            value={f.priority}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, priority: e.target.value }))
+            }
+            className="input-field mt-1"
+          >
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-foreground-muted">
+            Due Date <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="date"
+            value={f.dueDate}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, dueDate: e.target.value }))
+            }
+            className="input-field mt-1"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-foreground-muted">
+          Link to Goal
+        </label>
+        <select
+          value={f.goalId}
+          onChange={(e) => setF((p: any) => ({ ...p, goalId: e.target.value }))}
+          className="input-field mt-1"
+        >
+          <option value="">No Goal</option>
+          {goals.map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.title}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Activities</h1>
@@ -293,7 +407,6 @@ export default function ActivitiesPage() {
           </div>
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           {[
             {
@@ -322,7 +435,6 @@ export default function ActivitiesPage() {
           ))}
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex gap-2 flex-wrap">
             {["all", "todo", "inprogress", "done"].map((s) => (
@@ -359,9 +471,6 @@ export default function ActivitiesPage() {
           <div className="text-center py-16 text-foreground-muted">
             <FaCircle className="text-4xl mx-auto mb-3 opacity-20" />
             <p className="font-medium">No activities yet</p>
-            <p className="text-sm mt-1">
-              Add activities or get suggestions based on your goals
-            </p>
             <div className="flex gap-3 justify-center mt-4">
               <button
                 onClick={() => setShowModal(true)}
@@ -379,11 +488,9 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {/* Grouped activity cards */}
         {!loading &&
           Object.entries(grouped).map(([goalKey, group]) => (
             <div key={goalKey} className="card-elevated">
-              {/* Group header */}
               <button
                 onClick={() => toggleGoal(goalKey)}
                 className="w-full flex items-center justify-between mb-1"
@@ -406,18 +513,18 @@ export default function ActivitiesPage() {
               {expandedGoals.has(goalKey) && (
                 <div className="space-y-2 mt-3">
                   {group.items.map((a) => {
-                    // Normalise status — DB may have different casing/values
                     const rawStatus = (a.status || "todo")
                       .toLowerCase()
                       .replace(/[^a-z]/g, "");
-                    const normalised =
+                    const norm =
                       rawStatus === "inprogress" || rawStatus === "inprog"
                         ? "inprogress"
                         : rawStatus === "done" || rawStatus === "completed"
                           ? "done"
                           : "todo";
                     const scfg =
-                      STATUS_CONFIG[normalised] || STATUS_CONFIG["todo"];
+                      STATUS_CONFIG[norm as keyof typeof STATUS_CONFIG] ||
+                      STATUS_CONFIG["todo"];
                     return (
                       <div
                         key={a._id}
@@ -430,7 +537,7 @@ export default function ActivitiesPage() {
                             />
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`text-sm font-medium ${a.status === "done" ? "line-through opacity-60" : ""}`}
+                                className={`text-sm font-medium ${norm === "done" ? "line-through opacity-60" : ""}`}
                               >
                                 {a.title}
                               </p>
@@ -469,12 +576,9 @@ export default function ActivitiesPage() {
                               </div>
                             </div>
                           </div>
-
-                          {/* Actions */}
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Status cycle button */}
                             <select
-                              value={normalised}
+                              value={norm}
                               onChange={(e) =>
                                 updateStatus(a._id, e.target.value)
                               }
@@ -484,33 +588,32 @@ export default function ActivitiesPage() {
                               <option value="inprogress">🔄 In Progress</option>
                               <option value="done">✅ Done</option>
                             </select>
-
-                            {/* Add to Habit */}
+                            <button
+                              onClick={() => openEdit(a)}
+                              className="text-foreground-muted hover:text-primary p-1 hover:bg-primary/10 rounded-lg transition-all"
+                            >
+                              <FaEdit className="w-3.5 h-3.5" />
+                            </button>
                             {!a.addedToHabit && (
                               <button
                                 onClick={() =>
                                   setHabitModal({ id: a._id, title: a.title })
                                 }
-                                title="Add to Habits"
                                 className="text-xs border border-border bg-card hover:border-destructive hover:text-destructive text-foreground-muted px-2 py-1 rounded-lg transition-all flex items-center gap-1"
                               >
                                 <FaFire className="w-2.5 h-2.5" /> Habit
                               </button>
                             )}
-
-                            {/* Add to Achievement (only when done) */}
-                            {a.status === "done" && !a.addedToAchievement && (
+                            {norm === "done" && !a.addedToAchievement && (
                               <button
                                 onClick={() =>
                                   setAchModal({ id: a._id, title: a.title })
                                 }
-                                title="Create Achievement"
                                 className="text-xs border border-border bg-card hover:border-secondary hover:text-secondary text-foreground-muted px-2 py-1 rounded-lg transition-all flex items-center gap-1"
                               >
                                 <FaTrophy className="w-2.5 h-2.5" /> Award
                               </button>
                             )}
-
                             <button
                               onClick={() => del(a._id)}
                               className="text-foreground-muted hover:text-destructive p-1"
@@ -527,99 +630,61 @@ export default function ActivitiesPage() {
             </div>
           ))}
 
-        {/* ── Create Activity Modal ─────────────────────────────────────────── */}
+        {/* Create Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg flex items-center gap-2">
-                  <FaPlus className="text-primary" /> New Activity
-                </h2>
+                <div>
+                  <h2 className="font-bold text-lg flex items-center gap-2">
+                    <FaPlus className="text-primary" /> New Activity
+                  </h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    Fields marked <span className="text-destructive">*</span>{" "}
+                    are required
+                  </p>
+                </div>
                 <button onClick={() => setShowModal(false)}>
                   <FaTimes />
                 </button>
               </div>
-              <div className="space-y-3">
-                <input
-                  placeholder="Activity title *"
-                  value={form.title}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, title: e.target.value }))
-                  }
-                  className="input-field"
-                  autoFocus
-                />
-                <textarea
-                  placeholder="Description (optional)"
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, description: e.target.value }))
-                  }
-                  className="input-field min-h-[60px]"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-foreground-muted">
-                      Link to Goal
-                    </label>
-                    <select
-                      value={form.goalId}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, goalId: e.target.value }))
-                      }
-                      className="input-field"
-                    >
-                      <option value="">No Goal</option>
-                      {goals.map((g) => (
-                        <option key={g._id} value={g._id}>
-                          {g.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted">
-                      Priority
-                    </label>
-                    <select
-                      value={form.priority}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, priority: e.target.value }))
-                      }
-                      className="input-field"
-                    >
-                      <option>High</option>
-                      <option>Medium</option>
-                      <option>Low</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-foreground-muted">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, dueDate: e.target.value }))
-                    }
-                    className="input-field"
-                  />
-                </div>
-                <button
-                  onClick={create}
-                  disabled={saving}
-                  className="btn-primary w-full disabled:opacity-50"
-                >
-                  {saving ? "Creating..." : "Create Activity"}
-                </button>
-              </div>
+              <FormFields f={form} setF={setForm} />
+              <button
+                onClick={create}
+                disabled={saving}
+                className="btn-primary w-full mt-4 disabled:opacity-50"
+              >
+                {saving ? "Creating..." : "Create Activity"}
+              </button>
             </div>
           </div>
         )}
 
-        {/* ── Suggestions Modal ─────────────────────────────────────────────── */}
+        {/* Edit Modal */}
+        {editActivity && (
+          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  <FaEdit className="text-primary" /> Edit Activity
+                </h2>
+                <button onClick={() => setEditActivity(null)}>
+                  <FaTimes />
+                </button>
+              </div>
+              <FormFields f={editForm} setF={setEditForm} />
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="btn-primary w-full mt-4 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Suggestions Modal */}
         {showSuggest && (
           <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
@@ -633,27 +698,19 @@ export default function ActivitiesPage() {
                 </button>
               </div>
               <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-foreground-muted font-medium">
-                    Choose a Goal to get suggestions for:
-                  </label>
-                  <select
-                    onChange={(e) => fetchSuggestions(e.target.value)}
-                    className="input-field mt-1"
-                  >
-                    <option value="">Select a goal...</option>
-                    {goals.map((g) => (
-                      <option key={g._id} value={g._id}>
-                        {g.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  onChange={(e) => fetchSuggestions(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="">Select a goal...</option>
+                  {goals.map((g) => (
+                    <option key={g._id} value={g._id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
                 {suggestions.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs text-foreground-muted font-medium">
-                      Suggested activities — click to add:
-                    </p>
                     {suggestions.map((s, i) => {
                       const exists = activities.some(
                         (a) =>
@@ -664,11 +721,7 @@ export default function ActivitiesPage() {
                           key={i}
                           disabled={exists}
                           onClick={() => addSuggestion(s.title)}
-                          className={`w-full text-left p-3 rounded-xl border text-sm transition-all ${
-                            exists
-                              ? "border-success/30 bg-success/10 text-success cursor-default"
-                              : "border-border hover:border-primary hover:bg-primary/5"
-                          }`}
+                          className={`w-full text-left p-3 rounded-xl border text-sm transition-all ${exists ? "border-success/30 bg-success/10 text-success cursor-default" : "border-border hover:border-primary hover:bg-primary/5"}`}
                         >
                           {exists ? "✅" : "+"} {s.title}
                         </button>
@@ -681,7 +734,7 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {/* ── Add to Habit Modal (with schedule) ───────────────────────────── */}
+        {/* Habit Modal */}
         {habitModal && (
           <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-sm my-auto animate-fade-in">
@@ -710,9 +763,6 @@ export default function ActivitiesPage() {
                     onChange={(e) => setReminderTime(e.target.value)}
                     className="input-field mt-1"
                   />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    You'll be reminded at this time every day
-                  </p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-foreground-muted">
@@ -724,8 +774,8 @@ export default function ActivitiesPage() {
                     className="input-field mt-1"
                   >
                     <option value="daily">Every Day</option>
-                    <option value="weekdays">Weekdays Only (Mon–Fri)</option>
-                    <option value="weekends">Weekends Only (Sat–Sun)</option>
+                    <option value="weekdays">Weekdays Only</option>
+                    <option value="weekends">Weekends Only</option>
                   </select>
                 </div>
                 <button onClick={addHabit} className="btn-primary w-full">
@@ -736,7 +786,7 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {/* ── Achievement Modal ─────────────────────────────────────────────── */}
+        {/* Achievement Modal */}
         {achModal && (
           <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-sm my-auto animate-fade-in">
@@ -753,12 +803,9 @@ export default function ActivitiesPage() {
                   <p className="text-sm font-medium text-success">
                     🏆 "{achModal.title}"
                   </p>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    This activity is done — award yourself!
-                  </p>
                 </div>
                 <textarea
-                  placeholder="Add a note about this achievement (optional)"
+                  placeholder="Add a note (optional)"
                   value={achDesc}
                   onChange={(e) => setAchDesc(e.target.value)}
                   className="input-field min-h-[70px]"
