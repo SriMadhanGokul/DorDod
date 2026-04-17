@@ -5,27 +5,28 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
-  FaBullseye,
-  FaLightbulb,
-  FaCalendarCheck,
-  FaTrophy,
-  FaSmile,
+  FaShareAlt,
   FaFire,
-  FaBook,
-  FaTimes,
   FaQuoteLeft,
+  FaLightbulb,
+  FaArrowRight,
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaTag,
+  FaBrain,
 } from "react-icons/fa";
-import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-} from "recharts";
 
-// ─── Motivational Quotes ──────────────────────────────────────────────────────
+// ── Daily quotes ─────────────────────────────────────────────────────────────
 const QUOTES = [
+  { text: "You are not lazy. You are in a loop. Break it.", author: "DoR-DoD" },
+  {
+    text: "Awareness is the first step. You took it by opening this app.",
+    author: "DoR-DoD",
+  },
+  {
+    text: "The gap between intention and action is where growth happens.",
+    author: "DoR-DoD",
+  },
   {
     text: "The secret of getting ahead is getting started.",
     author: "Mark Twain",
@@ -35,72 +36,11 @@ const QUOTES = [
     author: "Nelson Mandela",
   },
   {
-    text: "Don't watch the clock; do what it does. Keep going.",
-    author: "Sam Levenson",
-  },
-  {
     text: "The future depends on what you do today.",
     author: "Mahatma Gandhi",
   },
-  {
-    text: "Success is not final, failure is not fatal: it is the courage to continue that counts.",
-    author: "Winston Churchill",
-  },
-  {
-    text: "Believe you can and you're halfway there.",
-    author: "Theodore Roosevelt",
-  },
-  {
-    text: "You are never too old to set another goal or to dream a new dream.",
-    author: "C.S. Lewis",
-  },
-  {
-    text: "Act as if what you do makes a difference. It does.",
-    author: "William James",
-  },
-  {
-    text: "Success usually comes to those who are too busy to be looking for it.",
-    author: "Henry David Thoreau",
-  },
-  {
-    text: "The only way to do great work is to love what you do.",
-    author: "Steve Jobs",
-  },
-  {
-    text: "Don't let yesterday take up too much of today.",
-    author: "Will Rogers",
-  },
-  {
-    text: "You don't have to be great to start, but you have to start to be great.",
-    author: "Zig Ziglar",
-  },
-  { text: "Little by little, one travels far.", author: "J.R.R. Tolkien" },
   { text: "We become what we repeatedly do.", author: "Aristotle" },
-  {
-    text: "The harder you work for something, the greater you'll feel when you achieve it.",
-    author: "Unknown",
-  },
-  {
-    text: "Push yourself because no one else is going to do it for you.",
-    author: "Unknown",
-  },
-  { text: "Great things never come from comfort zones.", author: "Unknown" },
-  { text: "Dream it. Wish it. Do it.", author: "Unknown" },
-  { text: "Your limitation—it's only your imagination.", author: "Unknown" },
-  { text: "Sometimes later becomes never. Do it now.", author: "Unknown" },
-  {
-    text: "Hard work beats talent when talent doesn't work hard.",
-    author: "Tim Notke",
-  },
-  { text: "Stay focused and never give up.", author: "Unknown" },
-  {
-    text: "Small steps in the right direction can turn out to be the biggest step of your life.",
-    author: "Unknown",
-  },
-  {
-    text: "Wake up with determination. Go to bed with satisfaction.",
-    author: "Unknown",
-  },
+  { text: "Little by little, one travels far.", author: "J.R.R. Tolkien" },
   {
     text: "Do something today that your future self will thank you for.",
     author: "Sean Patrick Flanery",
@@ -109,239 +49,196 @@ const QUOTES = [
     text: "Discipline is the bridge between goals and accomplishment.",
     author: "Jim Rohn",
   },
-  { text: "Don't stop until you're proud.", author: "Unknown" },
-  { text: "Be stronger than your strongest excuse.", author: "Unknown" },
   { text: "One day or day one. You decide.", author: "Unknown" },
   {
-    text: "A year from now you may wish you had started today.",
-    author: "Karen Lamb",
+    text: "Don't watch the clock; do what it does. Keep going.",
+    author: "Sam Levenson",
   },
   {
-    text: "The best time to plant a tree was 20 years ago. The second best time is now.",
-    author: "Chinese Proverb",
+    text: "Act as if what you do makes a difference. It does.",
+    author: "William James",
+  },
+  {
+    text: "You are not lacking clarity. You might be avoiding.",
+    author: "DoR-DoD",
+  },
+];
+const getDailyQuote = () =>
+  QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
+
+// ── State config ──────────────────────────────────────────────────────────────
+const STATES = [
+  {
+    value: "Clear",
+    label: "Clear",
+    color: "bg-green-100  text-green-700  border-green-300",
+    active: "bg-green-500  text-white border-green-500",
+  },
+  {
+    value: "Confused",
+    label: "Confused",
+    color: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    active: "bg-yellow-500 text-white border-yellow-500",
+  },
+  {
+    value: "Avoiding",
+    label: "Avoiding",
+    color: "bg-red-100    text-red-700    border-red-300",
+    active: "bg-red-500    text-white border-red-500",
+  },
+  {
+    value: "Focused",
+    label: "Focused",
+    color: "bg-blue-100   text-blue-700   border-blue-300",
+    active: "bg-blue-500   text-white border-blue-500",
+  },
+  {
+    value: "Anxious",
+    label: "Anxious",
+    color: "bg-purple-100 text-purple-700 border-purple-300",
+    active: "bg-purple-500 text-white border-purple-500",
   },
 ];
 
-const getDailyQuote = () => {
-  const day = Math.floor(Date.now() / 86400000);
-  return QUOTES[day % QUOTES.length];
+// ── Severity badge ────────────────────────────────────────────────────────────
+const SEVERITY_CFG: Record<string, { color: string; icon: any; bg: string }> = {
+  Low: {
+    color: "text-yellow-600",
+    icon: FaExclamationTriangle,
+    bg: "bg-yellow-50 border-yellow-200",
+  },
+  Medium: {
+    color: "text-orange-600",
+    icon: FaExclamationTriangle,
+    bg: "bg-orange-50 border-orange-200",
+  },
+  High: {
+    color: "text-red-600",
+    icon: FaExclamationTriangle,
+    bg: "bg-red-50    border-red-200",
+  },
+  None: {
+    color: "text-success",
+    icon: FaCheckCircle,
+    bg: "bg-success/10 border-success/20",
+  },
 };
 
-// ─── Progress Ring Component ──────────────────────────────────────────────────
-function ProgressRing({
-  pct,
-  color,
-  label,
-  emoji,
-  size = 80,
-}: {
-  pct: number;
-  color: string;
-  label: string;
-  emoji: string;
-  size?: number;
-}) {
-  const r = (size - 10) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (Math.min(pct, 100) / 100) * circ;
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          {/* Track */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={8}
-            className="text-muted opacity-40"
-          />
-          {/* Progress */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={8}
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={offset}
-            style={{ transition: "stroke-dashoffset 0.8s ease" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg leading-none">{emoji}</span>
-          <span className="text-xs font-bold mt-0.5" style={{ color }}>
-            {pct}%
-          </span>
-        </div>
-      </div>
-      <span className="text-xs text-foreground-muted font-medium">{label}</span>
-    </div>
-  );
-}
-
-// ─── Streak Widget ────────────────────────────────────────────────────────────
-function StreakWidget({
-  streak,
-  bestStreak,
-}: {
-  streak: number;
-  bestStreak: number;
-}) {
-  const flames = Math.min(streak, 7);
-  const msgs = [
-    {
-      min: 0,
-      msg: "Start your streak today! 💪",
-      color: "text-foreground-muted",
-    },
-    { min: 1, msg: "Great start! Keep going! ✨", color: "text-yellow-500" },
-    {
-      min: 3,
-      msg: "3 days strong! You're building it! 🔥",
-      color: "text-orange-500",
-    },
-    {
-      min: 7,
-      msg: "7-day streak! You're on FIRE! 🔥🔥",
-      color: "text-red-500",
-    },
-    {
-      min: 14,
-      msg: "14 days! Unstoppable force! 💥",
-      color: "text-purple-500",
-    },
-    { min: 21, msg: "21 DAYS! You built a HABIT! 👑", color: "text-primary" },
-  ];
-  const current = [...msgs].reverse().find((m) => streak >= m.min) || msgs[0];
-
-  return (
-    <div className="card-elevated">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground-muted">
-            Daily Streak
-          </h3>
-          <p className={`text-4xl font-black mt-1 ${current.color}`}>
-            {streak}
-          </p>
-          <p className="text-sm text-foreground-muted">days in a row</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-foreground-muted">Best Streak</p>
-          <p className="text-2xl font-bold text-secondary">{bestStreak} 🏆</p>
-        </div>
-      </div>
-
-      {/* Flame bar */}
-      <div className="flex gap-1 mb-3">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <div
-            key={i}
-            className={`flex-1 h-8 rounded-lg flex items-center justify-center text-base transition-all ${
-              i < flames
-                ? "bg-gradient-to-b from-yellow-400 to-orange-500 shadow-sm"
-                : "bg-muted"
-            }`}
-          >
-            {i < flames ? "🔥" : "○"}
-          </div>
-        ))}
-      </div>
-
-      <p className={`text-sm font-medium text-center ${current.color}`}>
-        {current.msg}
-      </p>
-
-      {streak === 0 && (
-        <div className="mt-3 p-3 bg-destructive/5 border border-destructive/20 rounded-xl text-center">
-          <p className="text-xs text-destructive font-medium">
-            💔 No streak yet. Complete a habit today to start!
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-interface DashboardData {
-  stats: {
-    skillsAssessed: number;
-    activeGoals: number;
-    habitsTracked: number;
-    achievements: number;
-  };
-  radarData: { skill: string; current: number; desired: number }[];
-  activeGoals: {
-    _id: string;
-    title: string;
-    progress: number;
-    priority: string;
-  }[];
-  habit: { name: string; days: boolean[]; streak: number } | null;
-}
+// ── Realization tags ──────────────────────────────────────────────────────────
+const REALIZATION_TAGS = [
+  "Avoidance",
+  "Clarity",
+  "Fear",
+  "Progress",
+  "Insight",
+  "Breakthrough",
+  "Pattern",
+  "Gratitude",
+];
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [xpData, setXpData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [showGoalModal, setShowGoalModal] = useState(false);
-  const [showHabitModal, setShowHabitModal] = useState(false);
-  const [goalTitle, setGoalTitle] = useState("");
-  const [habitName, setHabitName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [ringsData, setRingsData] = useState({
-    goals: 0,
-    habits: 0,
-    learning: 0,
-  });
-
   const quote = getDailyQuote();
 
-  // Onboarding check
-  useEffect(() => {
-    if (!localStorage.getItem("onboarded")) navigate("/onboarding");
-  }, []);
+  // Check-in state
+  const [selectedState, setSelectedState] = useState("");
+  const [avoidingText, setAvoidingText] = useState("");
+  const [mattersText, setMattersText] = useState("");
+  const [checkInDone, setCheckInDone] = useState(false);
+  const [savingCheckIn, setSavingCheckIn] = useState(false);
+
+  // Post check-in data
+  const [insight, setInsight] = useState<string | null>(null);
+  const [suggestedAction, setSuggested] = useState<{
+    text: string;
+    type: string;
+    showGuidance: boolean;
+  } | null>(null);
+  const [weeklyLoops, setWeeklyLoops] = useState<
+    { pattern: string; count: number; severity: string }[]
+  >([]);
+  const [clarityScore, setClarityScore] = useState(0);
+  const [loopType, setLoopType] = useState("None");
+  const [loopSeverity, setLoopSeverity] = useState("None");
+  const [awarenessStreak, setAwarenessStreak] = useState(0);
+  const [external, setExternal] = useState({
+    execution: 0,
+    behavior: 0,
+    growth: 0,
+  });
+  const [xpData, setXpData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Realization with tags
+  const [realization, setRealization] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [savingReal, setSavingReal] = useState(false);
+  const [realizationSaved, setRealizationSaved] = useState(false);
+
+  // Guidance context (items #10, #11, #12)
+  const [showGuidanceCTA, setShowGuidanceCTA] = useState(false);
+  const [guidanceDone, setGuidanceDone] = useState(false);
+  const [showPostGuidance, setShowPostGuidance] = useState(false);
+  const [guidanceForm, setGuidanceForm] = useState({
+    goalUpdate: "",
+    behaviorSuggestion: "",
+    insight: "",
+  });
+  const [savingGuidance, setSavingGuidance] = useState(false);
 
   useEffect(() => {
+    if (!localStorage.getItem("onboarded")) {
+      navigate("/onboarding");
+      return;
+    }
     const load = async () => {
       try {
-        const [dashRes, xpRes] = await Promise.all([
-          api.get("/dashboard"),
+        const [insightRes, xpRes] = await Promise.all([
+          api.get("/checkin/dashboard"),
           api.get("/xp/me").catch(() => ({ data: { data: null } })),
         ]);
-        setData(dashRes.data.data);
+        const d = insightRes.data.data;
+        setAwarenessStreak(d.awarenessStreak || 0);
+        setExternal(
+          d.externalSystem || { execution: 0, behavior: 0, growth: 0 },
+        );
+        setWeeklyLoops(d.weeklyLoops || []);
         setXpData(xpRes.data.data);
 
-        // Calculate progress rings from dashboard data
-        const d = dashRes.data.data;
-        const totalGoals = d?.activeGoals?.length || 0;
-        const doneGoals =
-          d?.activeGoals?.filter((g: any) => g.progress === 100).length || 0;
-        const totalHDays = d?.habit?.days?.length || 21;
-        const doneHDays = d?.habit?.days?.filter(Boolean).length || 0;
-
-        setRingsData({
-          goals:
-            totalGoals > 0 ? Math.round((doneGoals / totalGoals) * 100) : 0,
-          habits:
-            totalHDays > 0 ? Math.round((doneHDays / totalHDays) * 100) : 0,
-          learning:
-            d?.stats?.skillsAssessed > 0
-              ? Math.min(100, d.stats.skillsAssessed * 10)
-              : 0,
-        });
+        if (d.todayCheckIn) {
+          setCheckInDone(true);
+          setClarityScore(d.todayCheckIn.clarityScore || 0);
+          setLoopType(d.todayCheckIn.loopType || "None");
+          setLoopSeverity(d.todayCheckIn.loopSeverity || "None");
+          setSelectedState(d.todayCheckIn.dailyState || "");
+          setRealization(d.todayCheckIn.realization || "");
+          setSelectedTags(d.todayCheckIn.realizationTags || []);
+          setGuidanceDone(d.todayCheckIn.guidanceSessionDone || false);
+          if (d.todayCheckIn.realization) setRealizationSaved(true);
+          // Restore suggested action
+          setSuggested(
+            buildSuggestedAction(
+              d.todayCheckIn.dailyState,
+              d.todayCheckIn.loopType,
+            ),
+          );
+          // Restore insight
+          setInsight(
+            buildInsight(d.todayCheckIn.loopType, d.todayCheckIn.dailyState),
+          );
+          // Show Guidance CTA if loop detected
+          if (
+            d.todayCheckIn.loopType !== "None" ||
+            ["Avoiding", "Confused", "Anxious"].includes(
+              d.todayCheckIn.dailyState,
+            )
+          ) {
+            setShowGuidanceCTA(true);
+          }
+        }
       } catch {
-        toast.error("Failed to load dashboard");
+        toast.error("Failed to load");
       } finally {
         setLoading(false);
       }
@@ -349,435 +246,750 @@ export default function DashboardPage() {
     load();
   }, []);
 
-  const quickAddGoal = async () => {
-    if (!goalTitle.trim()) return toast.error("Enter a goal title");
-    setSaving(true);
+  const buildSuggestedAction = (state: string, loop: string) => {
+    if (loop === "Avoidance" || state === "Avoiding")
+      return {
+        text: "Start with 1 small step (5 minutes)",
+        type: "micro-action",
+        showGuidance: true,
+      };
+    if (loop === "Overthinking" || state === "Confused")
+      return {
+        text: "Define 1 priority for today only",
+        type: "clarity",
+        showGuidance: true,
+      };
+    if (loop === "Inconsistency")
+      return {
+        text: "Pick 1 behavior to repeat today — just once",
+        type: "consistency",
+        showGuidance: false,
+      };
+    if (state === "Anxious")
+      return {
+        text: "Write down what worries you most — then set it aside",
+        type: "grounding",
+        showGuidance: true,
+      };
+    if (state === "Focused")
+      return {
+        text: "Protect this focused time — go deep on your top intent",
+        type: "protect",
+        showGuidance: false,
+      };
+    return {
+      text: "Check in on your top intent today",
+      type: "general",
+      showGuidance: false,
+    };
+  };
+
+  const buildInsight = (loop: string, state: string) => {
+    if (loop === "Avoidance")
+      return "You planned tasks but didn't start. This is avoidance, not laziness.";
+    if (loop === "Overthinking")
+      return "You are not lacking clarity. You are overthinking before acting.";
+    if (loop === "Inconsistency")
+      return "Inconsistency is information — something is misaligned, not wrong with you.";
+    if (state === "Clear")
+      return "You are clear. Move forward with intention today.";
+    if (state === "Focused")
+      return "You are focused. Protect this state — go deep.";
+    return null;
+  };
+
+  const handleCheckIn = async () => {
+    if (!selectedState) return toast.error("Select your current state first");
+    setSavingCheckIn(true);
     try {
-      await api.post("/goals", {
-        title: goalTitle,
-        category: "Career",
-        goalType: "Professional",
-        priority: "Medium",
-        status: "Not Started",
-        progress: 0,
+      const res = await api.post("/checkin", {
+        dailyState: selectedState,
+        avoidingText,
+        mattersTodayText: mattersText,
       });
-      toast.success("🎯 Goal created!");
-      setGoalTitle("");
-      setShowGoalModal(false);
+      const d = res.data.data;
+      setCheckInDone(true);
+      setClarityScore(d.checkIn.clarityScore);
+      setLoopType(d.checkIn.loopType);
+      setLoopSeverity(d.checkIn.loopSeverity);
+      setInsight(d.insight);
+      setSuggested(d.suggestedAction);
+      setWeeklyLoops(d.weeklyLoops);
+      // Show Guidance CTA if loop or negative state
+      if (
+        d.checkIn.loopType !== "None" ||
+        ["Avoiding", "Confused", "Anxious"].includes(selectedState)
+      ) {
+        setShowGuidanceCTA(true);
+      }
+      const iRes = await api.get("/checkin/dashboard");
+      setAwarenessStreak(iRes.data.data.awarenessStreak);
+      toast.success("✅ Check-in saved!");
     } catch {
-      toast.error("Failed");
+      toast.error("Failed to save check-in");
     } finally {
-      setSaving(false);
+      setSavingCheckIn(false);
     }
   };
 
-  const quickAddHabit = async () => {
-    if (!habitName.trim()) return toast.error("Enter a habit name");
-    setSaving(true);
+  const handleSaveRealization = async () => {
+    if (!realization.trim()) return;
+    setSavingReal(true);
     try {
-      await api.post("/habits", {
-        name: habitName,
-        days: Array(21).fill(false),
+      await api.patch("/checkin/realization", {
+        realization,
+        realizationTags: selectedTags,
       });
-      toast.success("🔥 Habit started!");
-      setHabitName("");
-      setShowHabitModal(false);
+      setRealizationSaved(true);
+      toast.success("Realization saved to your Insights! 🌟");
     } catch {
-      toast.error("Failed");
+      toast.error("Failed to save");
     } finally {
-      setSaving(false);
+      setSavingReal(false);
     }
   };
 
-  const streak = xpData?.streak || 0;
-  const bestStreak = xpData?.bestStreak || 0;
+  const handleShare = () => {
+    const sc = STATES.find((s) => s.value === selectedState);
+    const tags = selectedTags.length > 0 ? ` [${selectedTags.join(", ")}]` : "";
+    const text = `Today's realization: "${realization || insight || "Checked in on DoR-DoD"}"${tags} | Mind State: ${sc?.label || selectedState} | Clarity: ${clarityScore}/100 #DoRDoD #SelfAwareness`;
+    if (navigator.share) {
+      navigator.share({ title: "My DoR-DoD Insight", text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success("Insight copied to clipboard!");
+    }
+  };
 
-  const allRingsFull =
-    ringsData.goals >= 100 &&
-    ringsData.habits >= 100 &&
-    ringsData.learning >= 100;
+  // Navigate to Guidance with context (#10, #11)
+  const handleGetGuidance = () => {
+    const context = {
+      goal: mattersText || "Improve focus",
+      loopType,
+      mindState: selectedState,
+    };
+    sessionStorage.setItem("guidanceContext", JSON.stringify(context));
+    navigate("/guidance");
+  };
 
-  const stats = data
-    ? [
-        {
-          icon: FaLightbulb,
-          label: "Skills Assessed",
-          value: data.stats.skillsAssessed,
-          color: "bg-primary/10 text-primary",
-        },
-        {
-          icon: FaBullseye,
-          label: "Active Goals",
-          value: data.stats.activeGoals,
-          color: "bg-secondary/20 text-secondary",
-        },
-        {
-          icon: FaCalendarCheck,
-          label: "Habits Tracked",
-          value: data.stats.habitsTracked,
-          color: "bg-success/20 text-success",
-        },
-        {
-          icon: FaTrophy,
-          label: "Achievements",
-          value: data.stats.achievements,
-          color: "bg-destructive/10 text-destructive",
-        },
-      ]
-    : [];
+  // Handle post-guidance update (#12)
+  const handleSaveGuidanceUpdate = async () => {
+    setSavingGuidance(true);
+    try {
+      await api.post("/checkin/guidance-update", guidanceForm);
+      setGuidanceDone(true);
+      setShowPostGuidance(false);
+      toast.success("✅ Guidance session recorded!");
+    } catch {
+      toast.error("Failed to save");
+    } finally {
+      setSavingGuidance(false);
+    }
+  };
 
-  const quickActions = [
-    {
-      icon: FaBullseye,
-      label: "+ Add Goal",
-      color:
-        "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground",
-      onClick: () => setShowGoalModal(true),
-    },
-    {
-      icon: FaSmile,
-      label: "+ Log Mood",
-      color:
-        "bg-secondary/10 text-secondary hover:bg-secondary hover:text-secondary-foreground",
-      onClick: () => navigate("/frame-of-mind"),
-    },
-    {
-      icon: FaFire,
-      label: "+ Start Habit",
-      color:
-        "bg-destructive/10 text-destructive hover:bg-destructive hover:text-white",
-      onClick: () => setShowHabitModal(true),
-    },
-    {
-      icon: FaBook,
-      label: "+ Find Course",
-      color: "bg-success/10 text-success hover:bg-success hover:text-white",
-      onClick: () => navigate("/learning"),
-    },
-  ];
+  const toggleTag = (tag: string) =>
+    setSelectedTags((p) =>
+      p.includes(tag) ? p.filter((t) => t !== tag) : [...p, tag],
+    );
+
+  const sevCfg = SEVERITY_CFG[loopSeverity] || SEVERITY_CFG.None;
+  const stateStyle = (s: (typeof STATES)[0]) =>
+    selectedState === s.value ? s.active : s.color;
+
+  if (loading)
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center py-24">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </DashboardLayout>
+    );
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">
-              Welcome back, {user?.name?.split(" ")[0]}! 👋
-            </h1>
-            <p className="text-foreground-muted mt-1">
-              Here's your growth overview
-            </p>
-          </div>
-          {xpData && (
-            <div className="flex items-center gap-3 bg-card border border-border px-4 py-2 rounded-xl">
-              <div className="text-center">
-                <p className="text-xs text-foreground-muted">Level</p>
-                <p className="font-bold text-sm">{xpData.levelName}</p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <p className="text-xs text-foreground-muted">XP</p>
-                <p className="font-bold text-sm text-primary">
-                  {xpData.totalXP.toLocaleString()}
-                </p>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <p className="text-xs text-foreground-muted">Streak</p>
-                <p className="font-bold text-sm text-destructive">
-                  {streak} 🔥
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
+      <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
         {/* Quote of the Day */}
         <div className="card-elevated bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/10">
           <div className="flex gap-3">
             <FaQuoteLeft className="text-primary/40 text-2xl shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm md:text-base font-medium italic text-foreground leading-relaxed">
+              <p className="text-sm md:text-base font-medium italic leading-relaxed">
                 "{quote.text}"
               </p>
-              <p className="text-xs text-foreground-muted mt-2">
+              <p className="text-xs text-foreground-muted mt-1.5">
                 — {quote.author}
               </p>
             </div>
           </div>
         </div>
 
-        {loading && (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        {/* ── 1. DAILY CHECK-IN (first interaction on dashboard) ─────────── */}
+        <div className="card-elevated">
+          <div className="flex items-center gap-2 mb-1">
+            <FaBrain className="text-primary" />
+            <h2 className="text-xl font-bold">
+              Hi {user?.name?.split(" ")[0]}, how are you right now?
+            </h2>
           </div>
-        )}
+          <p className="text-sm text-foreground-muted mb-4">
+            Your current state shapes everything. Be honest — this is just for
+            you.
+          </p>
 
-        {!loading && (
+          {/* State selector */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {STATES.map((s) => (
+              <button
+                key={s.value}
+                onClick={() => !checkInDone && setSelectedState(s.value)}
+                disabled={checkInDone}
+                className={`px-4 py-2 rounded-full border-2 font-medium text-sm transition-all ${stateStyle(s)} ${checkInDone && selectedState !== s.value ? "opacity-40" : ""}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 2. Follow-up questions */}
+          {!checkInDone && selectedState && (
+            <div className="space-y-3 mb-4">
+              <input
+                placeholder="What are you avoiding?"
+                value={avoidingText}
+                onChange={(e) => setAvoidingText(e.target.value)}
+                className="input-field text-sm"
+              />
+              <input
+                placeholder="What matters today?"
+                value={mattersText}
+                onChange={(e) => setMattersText(e.target.value)}
+                className="input-field text-sm"
+              />
+            </div>
+          )}
+
+          {!checkInDone ? (
+            <button
+              onClick={handleCheckIn}
+              disabled={savingCheckIn || !selectedState}
+              className="btn-primary w-full disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {savingCheckIn ? "Saving..." : "Check In for Today"}
+              {!savingCheckIn && <FaArrowRight className="w-3 h-3" />}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 text-success text-sm font-medium">
+              <span className="w-5 h-5 bg-success rounded-full flex items-center justify-center text-white text-xs">
+                ✓
+              </span>
+              Checked in today as <strong>{selectedState}</strong>
+            </div>
+          )}
+        </div>
+
+        {/* ── After check-in ──────────────────────────────────────────────── */}
+        {checkInDone && (
           <>
-            {/* ── Progress Rings + Streak Row ─────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Progress Rings */}
+            {/* Internal + External System */}
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Internal System */}
               <div className="card-elevated">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold">Today's Progress</h3>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      Fill all three rings for bonus XP
+                <h3 className="font-bold text-base mb-3">Internal System</h3>
+
+                {/* 8. Clarity Score with formula explanation */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-foreground-muted uppercase tracking-wide">
+                      Clarity Score
+                    </p>
+                    <div className="group relative">
+                      <FaLightbulb className="text-foreground-muted w-3.5 h-3.5 cursor-help" />
+                      <div className="absolute right-0 top-5 w-52 bg-card border border-border rounded-xl p-3 text-xs shadow-lg z-10 hidden group-hover:block">
+                        <p className="font-semibold mb-1">
+                          How it's calculated:
+                        </p>
+                        <p>+ Check-in consistency (up to 30)</p>
+                        <p>+ Execution alignment (up to 40)</p>
+                        <p>− Loop frequency (up to −30)</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-5xl font-black text-primary leading-none">
+                    {clarityScore}
+                  </p>
+                  <p className="text-xs text-foreground-muted mt-1">
+                    out of 100
+                  </p>
+                  <div className="w-full bg-muted rounded-full h-2.5 mt-2">
+                    <div
+                      className={`h-2.5 rounded-full transition-all duration-700 ${
+                        clarityScore >= 70
+                          ? "bg-success"
+                          : clarityScore >= 40
+                            ? "bg-primary"
+                            : "bg-destructive"
+                      }`}
+                      style={{ width: `${clarityScore}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 6. Loop Tracker with Severity */}
+                {loopType !== "None" ? (
+                  <div className={`rounded-xl border p-3 mb-3 ${sevCfg.bg}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
+                        <FaExclamationTriangle
+                          className={`w-3 h-3 ${sevCfg.color}`}
+                        />
+                        Loop Detected
+                      </p>
+                      {/* 6. Severity Level badge */}
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full border ${sevCfg.bg} ${sevCfg.color}`}
+                      >
+                        {loopSeverity} Severity
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium mb-2">
+                      {loopType === "Avoidance" && "Avoiding important task"}
+                      {loopType === "Overthinking" &&
+                        "Overthinking before starting"}
+                      {loopType === "Inconsistency" &&
+                        "Inconsistent follow-through"}
+                    </p>
+                    {/* 3. Insight Card with Action Buttons */}
+                    {insight && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mt-2">
+                        <p className="text-xs font-semibold text-yellow-700 mb-1 flex items-center gap-1">
+                          <FaLightbulb className="w-3 h-3" /> Insight:
+                        </p>
+                        <p className="text-sm text-yellow-800 mb-3">
+                          {insight}
+                        </p>
+                        {/* ++ Action Buttons (Critical item #3) */}
+                        <div className="flex gap-2 flex-wrap">
+                          {suggestedAction && (
+                            <button
+                              onClick={() =>
+                                toast.success(
+                                  `✅ Starting: ${suggestedAction.text}`,
+                                )
+                              }
+                              className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-1"
+                            >
+                              ⚡ Start Small Step
+                            </button>
+                          )}
+                          {/* ++ Get Guidance CTA (item #10) */}
+                          {showGuidanceCTA && !guidanceDone && (
+                            <button
+                              onClick={handleGetGuidance}
+                              className="text-xs bg-secondary text-secondary-foreground px-3 py-1.5 rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-1"
+                            >
+                              🧭 Get Guidance
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-success/10 border border-success/20 rounded-xl p-3 mb-3">
+                    <p className="text-sm text-success font-medium">
+                      {selectedState === "Clear" &&
+                        "✨ You are clear. Move forward with intention."}
+                      {selectedState === "Focused" &&
+                        "🎯 Focused state. Protect this time."}
+                      {selectedState === "Anxious" &&
+                        "🌱 Awareness is the first step. You showed up."}
+                      {!["Clear", "Focused", "Anxious"].includes(
+                        selectedState,
+                      ) && "✅ Check-in complete. No loops detected today."}
                     </p>
                   </div>
-                  {allRingsFull && (
-                    <span className="text-xs bg-success text-white px-2 py-1 rounded-full font-bold animate-pulse">
-                      +50 XP! 🔥
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-around py-2">
-                  <ProgressRing
-                    pct={ringsData.goals}
-                    color="#6366f1"
-                    label="Goals"
-                    emoji="🎯"
-                    size={90}
-                  />
-                  <ProgressRing
-                    pct={ringsData.habits}
-                    color="#ef4444"
-                    label="Habits"
-                    emoji="🔥"
-                    size={90}
-                  />
-                  <ProgressRing
-                    pct={ringsData.learning}
-                    color="#22c55e"
-                    label="Learning"
-                    emoji="📚"
-                    size={90}
-                  />
-                </div>
-                {allRingsFull && (
-                  <p className="text-center text-sm font-bold text-success mt-2">
-                    🎉 All rings complete! You're AMAZING today!
-                  </p>
                 )}
-                {!allRingsFull && (
-                  <p className="text-center text-xs text-foreground-muted mt-2">
-                    {[
-                      ringsData.goals < 100 && "Complete a goal",
-                      ringsData.habits < 100 && "check a habit",
-                      ringsData.learning < 100 && "learn a skill",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}{" "}
-                    to fill your rings
-                  </p>
-                )}
-              </div>
 
-              {/* Streak */}
-              <StreakWidget streak={streak} bestStreak={bestStreak} />
-            </div>
-
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {stats.map((s, i) => (
-                <div key={i} className="stat-card">
-                  <div
-                    className={`w-10 h-10 rounded-xl ${s.color} flex items-center justify-center mb-3`}
-                  >
-                    <s.icon className="text-lg" />
+                {/* 7. Suggested Action — based on Mind State + Loop Type */}
+                {suggestedAction && (
+                  <div className="bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-900 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">
+                      Suggested Action
+                    </p>
+                    <p className="text-sm text-blue-800 dark:text-blue-300">
+                      {suggestedAction.text}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold">{s.value}</p>
-                  <p className="text-sm text-foreground-muted">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Quick Actions */}
-            <div>
-              <h2 className="font-semibold text-sm text-foreground-muted mb-3 uppercase tracking-wide">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {quickActions.map((a, i) => (
-                  <button
-                    key={i}
-                    onClick={a.onClick}
-                    className={`flex flex-col items-center gap-2 p-4 rounded-xl font-medium text-sm transition-all ${a.color}`}
-                  >
-                    <a.icon className="text-xl" />
-                    <span>{a.label}</span>
-                  </button>
-                ))}
+                )}
               </div>
-            </div>
 
-            {/* Active Goals */}
-            {data?.activeGoals && data.activeGoals.length > 0 && (
+              {/* External System */}
               <div className="card-elevated">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold">Active Goals</h2>
-                  <button
-                    onClick={() => navigate("/goals")}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    View all →
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {data.activeGoals.slice(0, 4).map((goal) => (
-                    <div key={goal._id}>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium truncate flex-1 mr-3">
-                          {goal.title}
+                <h3 className="font-bold text-base mb-3">External System</h3>
+                <div className="space-y-3 mb-4">
+                  {[
+                    {
+                      label: "Execution (Intent / Goals)",
+                      val: external.execution,
+                      color: "#6366f1",
+                      emoji: "🎯",
+                    },
+                    {
+                      label: "Behavior (Habits)",
+                      val: external.behavior,
+                      color: "#ef4444",
+                      emoji: "🔥",
+                    },
+                    {
+                      label: "Growth (Knowledge)",
+                      val: external.growth,
+                      color: "#22c55e",
+                      emoji: "📚",
+                    },
+                  ].map((item, i) => (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-foreground-muted">
+                          {item.emoji} {item.label}
                         </span>
-                        <span className="text-xs text-foreground-muted shrink-0">
-                          {goal.progress}%
+                        <span
+                          className="font-bold"
+                          style={{ color: item.color }}
+                        >
+                          {item.val}%
                         </span>
                       </div>
                       <div className="w-full bg-muted rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all duration-500 ${goal.progress === 100 ? "bg-success" : goal.progress >= 75 ? "bg-primary" : "bg-secondary"}`}
-                          style={{ width: `${goal.progress}%` }}
+                          className="h-2 rounded-full transition-all"
+                          style={{
+                            width: `${item.val}%`,
+                            background: item.color,
+                          }}
                         />
                       </div>
                     </div>
                   ))}
                 </div>
+                {/* 5. Awareness Streak with meaning (#5) */}
+                <div className="pt-3 border-t border-border">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FaFire className="text-destructive" />
+                    <p className="text-xs text-foreground-muted uppercase tracking-wide">
+                      Awareness Streak
+                    </p>
+                  </div>
+                  <p className="font-black text-2xl text-destructive">
+                    {awarenessStreak}{" "}
+                    <span className="text-base font-normal">
+                      {awarenessStreak === 1 ? "day" : "days"}
+                    </span>
+                  </p>
+                  {/* Show meaning not just number */}
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    {awarenessStreak === 0 &&
+                      "Start your reflection streak today"}
+                    {awarenessStreak === 1 &&
+                      "You reflected today — day 1 begins 🌱"}
+                    {awarenessStreak >= 2 &&
+                      awarenessStreak < 7 &&
+                      `You reflected ${awarenessStreak} days — building awareness 🔥`}
+                    {awarenessStreak >= 7 &&
+                      awarenessStreak < 14 &&
+                      `You reflected ${awarenessStreak} days — strong pattern forming 💪`}
+                    {awarenessStreak >= 14 &&
+                      `You reflected ${awarenessStreak} days — self-awareness mastery 👑`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 6. This Week's Loops with Severity */}
+            {weeklyLoops.length > 0 && (
+              <div className="card-elevated">
+                <h3 className="font-bold text-base mb-3">This Week's Loops</h3>
+                <div className="space-y-2">
+                  {weeklyLoops.map((loop, i) => {
+                    const sc = SEVERITY_CFG[loop.severity] || SEVERITY_CFG.Low;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between rounded-xl px-4 py-3 border ${sc.bg}`}
+                      >
+                        <p className="text-sm font-medium">{loop.pattern}</p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded-full border ${sc.bg} ${sc.color}`}
+                          >
+                            {loop.severity}
+                          </span>
+                          <span className={`text-xs font-bold ${sc.color}`}>
+                            {loop.count}×
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-foreground-muted mt-3 italic">
+                  Loops aren't failures. They're patterns waiting to be
+                  understood.
+                </p>
               </div>
             )}
 
-            {/* Radar Chart */}
-            {data?.radarData && data.radarData.length > 0 && (
+            {/* Guidance CTA Card (item #10) — when loop detected */}
+            {showGuidanceCTA && !guidanceDone && (
+              <div className="card-elevated bg-gradient-to-r from-secondary/10 to-primary/10 border-secondary/30">
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">🧭</span>
+                  <div className="flex-1">
+                    <h3 className="font-bold">You may need Guidance</h3>
+                    <p className="text-sm text-foreground-muted mt-0.5 mb-3">
+                      {loopType === "Avoidance" &&
+                        "A pattern of avoidance was detected. Guidance can help you identify what's holding you back."}
+                      {loopType === "Overthinking" &&
+                        "You seem to be overthinking. Guidance can help you gain clarity and take action."}
+                      {loopType === "Inconsistency" &&
+                        "Inconsistency spotted. Guidance can help realign your behaviors with your intent."}
+                      {loopType === "None" &&
+                        "Your current state suggests you'd benefit from a quick Guidance session."}
+                    </p>
+                    <button
+                      onClick={handleGetGuidance}
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      🧭 Get Guidance
+                      <FaArrowRight className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => setShowGuidanceCTA(false)}
+                      className="text-xs text-foreground-muted hover:text-foreground ml-4"
+                    >
+                      Maybe later
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Post-Guidance Update (item #12) */}
+            {guidanceDone ? (
+              <div className="card-elevated border-success/30 bg-success/5">
+                <div className="flex items-center gap-2 text-success text-sm font-medium">
+                  <FaCheckCircle /> Guidance session recorded for today
+                </div>
+              </div>
+            ) : (
+              showPostGuidance && (
+                <div className="card-elevated">
+                  <h3 className="font-bold mb-3">
+                    After Guidance — Update your system
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-foreground-muted">
+                        Intent update (what changed?)
+                      </label>
+                      <input
+                        placeholder="e.g. Focus on one goal this week"
+                        value={guidanceForm.goalUpdate}
+                        onChange={(e) =>
+                          setGuidanceForm((p) => ({
+                            ...p,
+                            goalUpdate: e.target.value,
+                          }))
+                        }
+                        className="input-field mt-1 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-foreground-muted">
+                        Behavior to try
+                      </label>
+                      <input
+                        placeholder="e.g. Start tasks within 2 minutes of opening them"
+                        value={guidanceForm.behaviorSuggestion}
+                        onChange={(e) =>
+                          setGuidanceForm((p) => ({
+                            ...p,
+                            behaviorSuggestion: e.target.value,
+                          }))
+                        }
+                        className="input-field mt-1 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-foreground-muted">
+                        Key insight from session
+                      </label>
+                      <textarea
+                        placeholder="What did you realize?"
+                        value={guidanceForm.insight}
+                        onChange={(e) =>
+                          setGuidanceForm((p) => ({
+                            ...p,
+                            insight: e.target.value,
+                          }))
+                        }
+                        className="input-field min-h-[60px] mt-1 text-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSaveGuidanceUpdate}
+                      disabled={savingGuidance}
+                      className="btn-primary w-full disabled:opacity-50"
+                    >
+                      {savingGuidance ? "Saving..." : "Record Guidance Update"}
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+
+            {/* 9. Today's Realization — with Tags + Save to Insights */}
+            <div
+              className="card-elevated"
+              style={{
+                background: "linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%)",
+              }}
+            >
+              <h3 className="font-bold text-base mb-2">Today's Realization</h3>
+              <textarea
+                placeholder="Write your realization..."
+                value={realization}
+                onChange={(e) => {
+                  setRealization(e.target.value);
+                  setRealizationSaved(false);
+                }}
+                className="w-full bg-white dark:bg-card border border-border rounded-xl p-3 text-sm resize-none outline-none focus:ring-2 focus:ring-primary/30 min-h-[80px]"
+              />
+
+              {/* Tag selector */}
+              {realization.trim().length > 5 && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-foreground-muted mb-2 flex items-center gap-1">
+                    <FaTag className="w-3 h-3" /> Tag this realization:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {REALIZATION_TAGS.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`text-xs px-3 py-1 rounded-full border transition-all ${
+                          selectedTags.includes(tag)
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-white border-border text-foreground-muted hover:border-primary/50"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex gap-2">
+                  {realization.trim() && (
+                    <button
+                      onClick={handleSaveRealization}
+                      disabled={savingReal || realizationSaved}
+                      className={`text-xs px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1 ${
+                        realizationSaved
+                          ? "bg-success/10 text-success border border-success/30"
+                          : "btn-secondary"
+                      }`}
+                    >
+                      {realizationSaved
+                        ? "✅ Saved to Insights"
+                        : savingReal
+                          ? "Saving..."
+                          : "💾 Save to Insights"}
+                    </button>
+                  )}
+                </div>
+                {realization.trim() && (
+                  <button
+                    onClick={handleShare}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:bg-primary/10 px-3 py-2 rounded-xl transition-all border border-primary/20"
+                  >
+                    <FaShareAlt className="w-3 h-3" /> Share Insight
+                  </button>
+                )}
+              </div>
+
+              {/* Trigger post-guidance update */}
+              {!guidanceDone && checkInDone && (
+                <div className="mt-3 pt-3 border-t border-purple-200/50">
+                  <button
+                    onClick={() => setShowPostGuidance((p) => !p)}
+                    className="text-xs text-secondary hover:underline"
+                  >
+                    📝 Had a Guidance session today? Record the update →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* XP summary */}
+            {xpData && (
               <div className="card-elevated">
-                <h2 className="font-semibold mb-4">Skill Overview</h2>
-                <ResponsiveContainer width="100%" height={260}>
-                  <RadarChart data={data.radarData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="skill" tick={{ fontSize: 12 }} />
-                    <PolarRadiusAxis
-                      angle={30}
-                      domain={[0, 5]}
-                      tick={{ fontSize: 10 }}
-                    />
-                    <Radar
-                      name="Current"
-                      dataKey="current"
-                      stroke="hsl(var(--primary))"
-                      fill="hsl(var(--primary))"
-                      fillOpacity={0.3}
-                    />
-                    <Radar
-                      name="Desired"
-                      dataKey="desired"
-                      stroke="hsl(var(--secondary))"
-                      fill="hsl(var(--secondary))"
-                      fillOpacity={0.1}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="text-xs text-foreground-muted">Level</p>
+                      <p className="font-bold">{xpData.levelName}</p>
+                    </div>
+                    <div className="w-px h-8 bg-border" />
+                    <div>
+                      <p className="text-xs text-foreground-muted">Total XP</p>
+                      <p className="font-bold text-primary">
+                        {xpData.totalXP?.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="w-px h-8 bg-border" />
+                    <div>
+                      <p className="text-xs text-foreground-muted">Streak</p>
+                      <p className="font-bold text-destructive">
+                        {xpData.streak} 🔥
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/leaderboard")}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    Progress Board <FaArrowRight className="w-2.5 h-2.5" />
+                  </button>
+                </div>
               </div>
             )}
           </>
         )}
 
-        {/* Quick Add Goal Modal */}
-        {showGoalModal && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold flex items-center gap-2">
-                  <FaBullseye className="text-primary" /> Quick Add Goal
-                </h2>
-                <button onClick={() => setShowGoalModal(false)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <input
-                placeholder="What do you want to achieve?"
-                value={goalTitle}
-                onChange={(e) => setGoalTitle(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && quickAddGoal()}
-                className="input-field mb-3"
-                autoFocus
-              />
-              <div className="flex gap-2">
+        {/* If not checked in — quick navigation */}
+        {!checkInDone && !selectedState && (
+          <div className="card-elevated">
+            <h3 className="font-semibold mb-3 text-sm text-foreground-muted uppercase tracking-wide">
+              Quick Navigation
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Intent", emoji: "🎯", path: "/goals" },
+                { label: "Behavior", emoji: "🔥", path: "/habits" },
+                { label: "Knowledge", emoji: "📚", path: "/learning" },
+                { label: "Execution", emoji: "⚡", path: "/activities" },
+              ].map((a, i) => (
                 <button
-                  onClick={quickAddGoal}
-                  disabled={saving || !goalTitle.trim()}
-                  className="btn-primary flex-1 disabled:opacity-50"
+                  key={i}
+                  onClick={() => navigate(a.path)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-muted hover:bg-accent font-medium text-sm transition-all"
                 >
-                  {saving ? "Adding..." : "🎯 Add Goal"}
+                  <span className="text-2xl">{a.emoji}</span>
+                  <span>{a.label}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setShowGoalModal(false);
-                    navigate("/goals");
-                  }}
-                  className="btn-secondary text-sm px-4"
-                >
-                  Full Form →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Add Habit Modal */}
-        {showHabitModal && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold flex items-center gap-2">
-                  <FaFire className="text-destructive" /> Quick Start Habit
-                </h2>
-                <button onClick={() => setShowHabitModal(false)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <input
-                placeholder="e.g. Practice coding for 1 hour"
-                value={habitName}
-                onChange={(e) => setHabitName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && quickAddHabit()}
-                className="input-field mb-3"
-                autoFocus
-              />
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {[
-                  "Practice coding daily",
-                  "Read 30 minutes",
-                  "Exercise for 20 mins",
-                  "Learn 5 new things",
-                ].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setHabitName(s)}
-                    className="text-xs bg-muted hover:bg-accent px-3 py-2 rounded-lg text-left transition-all"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={quickAddHabit}
-                  disabled={saving || !habitName.trim()}
-                  className="btn-primary flex-1 disabled:opacity-50"
-                >
-                  {saving ? "Starting..." : "🔥 Start Habit"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowHabitModal(false);
-                    navigate("/habits");
-                  }}
-                  className="btn-secondary text-sm px-4"
-                >
-                  Full Page →
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         )}
