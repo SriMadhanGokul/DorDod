@@ -567,8 +567,9 @@ export default function DashboardPage() {
                         <p className="text-sm text-yellow-800 mb-3">
                           {insight}
                         </p>
-                        {/* ++ Action Buttons (Critical item #3) */}
+                        {/* Action Buttons — Primary + Optional Guidance */}
                         <div className="flex gap-2 flex-wrap">
+                          {/* PRIMARY CTA — always shown */}
                           {suggestedAction && (
                             <button
                               onClick={() =>
@@ -581,13 +582,13 @@ export default function DashboardPage() {
                               ⚡ Start Small Step
                             </button>
                           )}
-                          {/* ++ Get Guidance CTA (item #10) */}
+                          {/* SECONDARY CTA — optional, contextual, non-intrusive */}
                           {showGuidanceCTA && !guidanceDone && (
                             <button
                               onClick={handleGetGuidance}
-                              className="text-xs bg-secondary text-secondary-foreground px-3 py-1.5 rounded-lg font-medium hover:opacity-90 transition-all flex items-center gap-1"
+                              className="text-xs border border-secondary/40 text-secondary hover:bg-secondary/10 px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1"
                             >
-                              🧭 Get Guidance
+                              🧭 Explore Guidance (Optional)
                             </button>
                           )}
                         </div>

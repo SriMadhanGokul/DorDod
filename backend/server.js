@@ -27,11 +27,12 @@ const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customSkillRoutes = require("./routes/customSkillRoutes");
 
+const xpRoutes = require("./routes/xpRoutes");
+const friendsRoutes = require("./routes/friendsRoutes");
+
 // ── New routes ─────────────────────────────────────────────────────────────────
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
-const xpRoutes = require("./routes/xpRoutes");
-const friendsRoutes = require("./routes/friendsRoutes");
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -48,7 +49,6 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:8080",
   "http://localhost:3000",
-  "https://dordod-2.onrender.com",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
@@ -82,16 +82,22 @@ app.use("/api/learning", learningRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/community", communityRoutes);
-app.use("/api/xp", xpRoutes);
-app.use("/api/friends", friendsRoutes);
 app.use("/api/scorecard", scoreCardRoutes);
 app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
+app.use("/api/xp", xpRoutes);
+app.use("/api/friends", friendsRoutes);
+app.use("/api/guidance", require("./routes/guidanceRoutes"));
+app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/documents", documentRoutes);
 app.use("/api/frame-of-mind", frameOfMindRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
 app.use("/api/activities", activityRoutes);
+app.use("/api/xp", xpRoutes);
+app.use("/api/friends", friendsRoutes);
+app.use("/api/guidance", require("./routes/guidanceRoutes"));
+app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/search", searchRoutes);
 app.use("/api/notifications", notifUserRoutes);
 

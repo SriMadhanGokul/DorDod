@@ -2,9 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
+// ─── Public Pages ─────────────────────────────────────────────────────────────
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -14,6 +16,7 @@ import SetupPasswordPage from "./pages/SetupPasswordPage";
 import PricingPage from "./pages/PricingPage";
 import NotFound from "./pages/NotFound";
 
+// ─── User Pages ───────────────────────────────────────────────────────────────
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
 import GoalsPage from "./pages/GoalsPage";
@@ -28,7 +31,12 @@ import AchievementsPage from "./pages/AchievementsPage";
 import ActivitiesPage from "./pages/ActivitiesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import FrameOfMindPage from "./pages/FrameOfMindPage";
+import GuidancePage from "./pages/GuidancePage";
+import OnboardingPage from "./pages/OnboardingPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import XPHistoryPage from "./pages/XPHistoryPage";
 
+// ─── Admin Pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UsersPage from "./pages/admin/UsersPage";
 import UserDetailsPage from "./pages/admin/UserDetailsPage";
@@ -39,20 +47,14 @@ import CommunityModeration from "./pages/admin/CommunityModeration";
 import AchievementsManagement from "./pages/admin/AchievementsManagement";
 import NotificationsPage from "./pages/admin/NotificationsPage";
 import SettingsPage from "./pages/admin/SettingsPage";
-import PendingCoursesPage from "./pages/admin/PendingCoursesPage";
-import UserSkillsPage from "./pages/admin/UserSkillsPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import XPHistoryPage from "./pages/XPHistoryPage";
-import LeaderboardPage from "./pages/LeaderboardPage";
-import XPManagement from "./pages/admin/XPManagement";
 
 const queryClient = new QueryClient();
 
+// ─── Route Guards ─────────────────────────────────────────────────────────────
 const Protected = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>{children}</ProtectedRoute>
 );
 
-// ✅ Fixed: !== not ! ==
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading)
@@ -67,6 +69,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -83,12 +86,15 @@ const App = () => (
         />
         <BrowserRouter>
           <Routes>
+            {/* ─── Public Routes ──────────────────────────────────────────── */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+
+            {/* ─── Semi-Protected (needs login) ───────────────────────────── */}
             <Route
               path="/setup-password"
               element={
@@ -97,6 +103,8 @@ const App = () => (
                 </Protected>
               }
             />
+
+            {/* ─── User Protected Routes ──────────────────────────────────── */}
             <Route
               path="/dashboard"
               element={
@@ -209,6 +217,8 @@ const App = () => (
                 </Protected>
               }
             />
+
+            {/* ─── Admin Routes ───────────────────────────────────────────── */}
             <Route
               path="/admin"
               element={
@@ -289,36 +299,14 @@ const App = () => (
                 </AdminRoute>
               }
             />
+
+            {/* ─── 404 ────────────────────────────────────────────────────── */}
             <Route
-              path="/admin/pending-courses"
-              element={
-                <AdminRoute>
-                  <PendingCoursesPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/admin/user-skills"
-              element={
-                <AdminRoute>
-                  <UserSkillsPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/xp-history"
+              path="/guidance"
               element={
                 <Protected>
-                  <XPHistoryPage />
+                  <GuidancePage />
                 </Protected>
-              }
-            />
-            <Route
-              path="/admin/xp"
-              element={
-                <AdminRoute>
-                  <XPManagement />
-                </AdminRoute>
               }
             />
             <Route
@@ -334,6 +322,14 @@ const App = () => (
               element={
                 <Protected>
                   <LeaderboardPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/xp-history"
+              element={
+                <Protected>
+                  <XPHistoryPage />
                 </Protected>
               }
             />
