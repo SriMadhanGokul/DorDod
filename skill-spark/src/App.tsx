@@ -31,6 +31,7 @@ import AchievementsPage from "./pages/AchievementsPage";
 import ActivitiesPage from "./pages/ActivitiesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import FrameOfMindPage from "./pages/FrameOfMindPage";
+import InsightsPage from "./pages/InsightsPage";
 import GuidancePage from "./pages/GuidancePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
@@ -158,6 +159,14 @@ const App = () => (
               element={
                 <Protected>
                   <AnalyticsPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/insights"
+              element={
+                <Protected>
+                  <InsightsPage />
                 </Protected>
               }
             />

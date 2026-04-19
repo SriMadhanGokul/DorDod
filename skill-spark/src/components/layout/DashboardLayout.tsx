@@ -36,7 +36,7 @@ const navItems = [
   { to: "/habits", icon: FaCalendarCheck, label: "Behavior" },
   { to: "/activities", icon: FaTasks, label: "Execution" },
   { to: "/achievements", icon: FaTrophy, label: "Outcomes" },
-  { to: "/analytics", icon: FaChartLine, label: "Insights" },
+  { to: "/insights", icon: FaChartLine, label: "Insights" },
   { to: "/guidance", icon: FaMedal, label: "Guidance" },
   { to: "/learning", icon: FaBook, label: "Knowledge" },
   { to: "/community", icon: FaUsers, label: "Network" },
