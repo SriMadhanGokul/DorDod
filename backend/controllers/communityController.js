@@ -1,151 +1,341 @@
 const Post = require("../models/Post");
+const path = require("path");
+const fs = require("fs");
 
-// @route GET /api/community
+const formatPost = (post, userId) => ({
+  _id: post._id,
+  author: post.user?.name || "Unknown",
+  avatar: post.user?.avatar || "",
+  userId: post.user?._id?.toString() || "",
+  content: post.content,
+  tags: post.tags,
+  likes: post.likes?.length || 0,
+  liked:
+    post.likes?.some((id) => id.toString() === userId?.toString()) || false,
+  comments:
+    post.comments?.map((c) => ({
+      _id: c._id,
+      content: c.content,
+      author: c.user?.name || "Unknown",
+      userId: c.user?._id?.toString() || "",
+      time: c.createdAt,
+    })) || [],
+  time: post.createdAt,
+  mediaType: post.mediaType || "none",
+  mediaUrl: post.mediaUrl || "",
+  mediaFileName: post.mediaFileName || "",
+  linkPreview: post.linkPreview || {},
+});
+
+// ✅ GET POSTS
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find()
-      .populate("user", "name avatar firstName lastName")
+    const { tag, page = 1, limit = 20 } = req.query;
+
+    const filter = {};
+    if (tag && tag !== "All") filter.tags = tag;
+
+    const posts = await Post.find(filter)
+      .populate("user", "name avatar")
       .populate("comments.user", "name avatar")
       .sort({ createdAt: -1 })
-      .limit(50);
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(parseInt(limit));
 
-    const formatted = posts.map((p) => ({
-      _id: p._id,
-      author: p.user?.name || "Unknown",
-      avatar: p.user?.name?.substring(0, 2).toUpperCase() || "U",
-      userId: p.user?._id,
-      content: p.content,
-      tags: p.tags,
-      likes: p.likes.length,
-      liked: p.likes.map((id) => id.toString()).includes(req.user.id),
-      comments: p.comments.map((c) => ({
-        _id: c._id,
-        author: c.user?.name || "Unknown",
-        content: c.content,
-        time: c.createdAt,
-      })),
-      time: p.createdAt,
-    }));
-
-    res.status(200).json({ success: true, data: formatted });
-  } catch (error) {
-    console.error("getPosts error:", error);
+    res.status(200).json({
+      success: true,
+      data: posts.map((p) => formatPost(p, req.user.id)),
+    });
+  } catch (err) {
     res.status(500).json({ success: false, message: "Failed to fetch posts" });
   }
 };
 
-// @route POST /api/community
+// ✅ CREATE POST
 const createPost = async (req, res) => {
   try {
-    const { content, tags } = req.body;
-    if (!content?.trim())
-      return res
-        .status(400)
-        .json({ success: false, message: "Content is required" });
+    const {
+      content,
+      tags,
+      mediaType,
+      mediaUrl,
+      linkTitle,
+      linkDescription,
+      linkUrl,
+    } = req.body;
+
+    if (!content?.trim() && !req.file && !mediaUrl?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Post must have text, media, or a link",
+      });
+    }
+
+    let finalMediaType = "none";
+    let finalMediaUrl = "";
+    let mediaFileName = "";
+
+    if (req.file) {
+      finalMediaType = req.file.mimetype.startsWith("image/")
+        ? "image"
+        : "video";
+      finalMediaUrl = `/uploads/community/${req.file.filename}`;
+      mediaFileName = req.file.originalname;
+    } else if (mediaUrl?.trim()) {
+      finalMediaType = "link";
+      finalMediaUrl = mediaUrl.trim();
+    }
+
+    const tagList = tags
+      ? Array.isArray(tags)
+        ? tags
+        : tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+      : ["General"];
 
     const post = await Post.create({
       user: req.user.id,
-      content,
-      tags: tags || ["General"],
+      content: content?.trim() || "",
+      tags: tagList,
+      mediaType: finalMediaType,
+      mediaUrl: finalMediaUrl,
+      mediaFileName,
+      linkPreview:
+        finalMediaType === "link"
+          ? {
+              title: linkTitle || "",
+              description: linkDescription || "",
+              url: linkUrl || mediaUrl || "",
+            }
+          : {},
     });
+
     await post.populate("user", "name avatar");
 
     res.status(201).json({
       success: true,
       message: "Post shared!",
-      data: {
-        _id: post._id,
-        author: post.user?.name,
-        avatar: post.user?.name?.substring(0, 2).toUpperCase(),
-        userId: post.user?._id,
-        content: post.content,
-        tags: post.tags,
-        likes: 0,
-        liked: false,
-        comments: [],
-        time: post.createdAt,
-      },
+      data: formatPost(post, req.user.id),
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to create post" });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to create post",
+    });
   }
 };
 
-// @route PATCH /api/community/:id/like
-const toggleLike = async (req, res) => {
+// ✅ EDIT POST
+const editPost = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
-    if (!post)
-      return res
-        .status(404)
-        .json({ success: false, message: "Post not found" });
+    const { content, tags } = req.body;
 
-    const uid = req.user.id;
-    const liked = post.likes.map((id) => id.toString()).includes(uid);
+    const post = await Post.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
 
-    if (liked) post.likes = post.likes.filter((id) => id.toString() !== uid);
-    else post.likes.push(uid);
-
-    await post.save();
-    res
-      .status(200)
-      .json({
-        success: true,
-        data: { likes: post.likes.length, liked: !liked },
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found or not yours",
       });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to toggle like" });
-  }
-};
+    }
 
-// @route POST /api/community/:id/comments
-const addComment = async (req, res) => {
-  try {
-    const { content } = req.body;
-    if (!content?.trim())
-      return res
-        .status(400)
-        .json({ success: false, message: "Comment cannot be empty" });
+    if (content !== undefined) post.content = content.trim();
 
-    const post = await Post.findById(req.params.id);
-    if (!post)
-      return res
-        .status(404)
-        .json({ success: false, message: "Post not found" });
+    if (tags) {
+      post.tags = Array.isArray(tags)
+        ? tags
+        : tags.split(",").map((t) => t.trim());
+    }
 
-    post.comments.push({ user: req.user.id, content });
     await post.save();
-    await post.populate("comments.user", "name");
+    await post.populate("user", "name avatar");
+    await post.populate("comments.user", "name avatar");
 
-    const newComment = post.comments[post.comments.length - 1];
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: "Comment added!",
-      data: {
-        _id: newComment._id,
-        author: req.user.name,
-        content: newComment.content,
-        time: newComment.createdAt,
-      },
+      message: "Post updated!",
+      data: formatPost(post, req.user.id),
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to add comment" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to update post" });
   }
 };
 
-// @route DELETE /api/community/:id
+// ✅ DELETE POST
 const deletePost = async (req, res) => {
   try {
-    const post = await Post.findOne({ _id: req.params.id, user: req.user.id });
-    if (!post)
-      return res
-        .status(404)
-        .json({ success: false, message: "Post not found" });
-    await post.deleteOne();
-    res.status(200).json({ success: true, message: "Post deleted!" });
-  } catch (error) {
+    const post = await Post.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found or not yours",
+      });
+    }
+
+    if (post.mediaUrl?.startsWith("/uploads/")) {
+      const fullPath = path.join(__dirname, "..", post.mediaUrl);
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Post deleted!",
+    });
+  } catch (err) {
     res.status(500).json({ success: false, message: "Failed to delete post" });
   }
 };
 
-module.exports = { getPosts, createPost, toggleLike, addComment, deletePost };
+// ✅ TOGGLE LIKE
+const toggleLike = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate("user", "name avatar")
+      .populate("comments.user", "name avatar");
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    const idx = post.likes.findIndex((id) => id.toString() === req.user.id);
+
+    if (idx > -1) {
+      post.likes.splice(idx, 1);
+    } else {
+      post.likes.push(req.user.id);
+    }
+
+    await post.save();
+
+    res.status(200).json({
+      success: true,
+      data: formatPost(post, req.user.id),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed" });
+  }
+};
+
+// ✅ ADD COMMENT (FIXED HERE)
+const addComment = async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    if (!content?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Comment cannot be empty",
+      });
+    }
+
+    const post = await Post.findById(req.params.id)
+      .populate("user", "name avatar")
+      .populate("comments.user", "name avatar");
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    post.comments.push({
+      user: req.user.id,
+      content: content.trim(),
+    });
+
+    await post.save();
+    await post.populate("comments.user", "name avatar");
+
+    const newC = post.comments[post.comments.length - 1];
+
+    res.status(201).json({
+      success: true,
+      data: {
+        _id: newC._id,
+        content: newC.content,
+        author: req.user?.name || "You", // ✅ FIXED
+        userId: req.user.id,
+        time: newC.createdAt,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to add comment",
+    });
+  }
+};
+
+// ✅ DELETE COMMENT
+const deleteComment = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    const comment = post.comments.id(req.params.commentId);
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: "Comment not found",
+      });
+    }
+
+    if (
+      comment.user.toString() !== req.user.id &&
+      post.user.toString() !== req.user.id
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    post.comments = post.comments.filter(
+      (c) => c._id.toString() !== req.params.commentId,
+    );
+
+    await post.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Comment deleted!",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete comment",
+    });
+  }
+};
+
+module.exports = {
+  getPosts,
+  createPost,
+  editPost,
+  deletePost,
+  toggleLike,
+  addComment,
+  deleteComment,
+};

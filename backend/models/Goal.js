@@ -1,35 +1,37 @@
 const mongoose = require("mongoose");
 
-const subGoalSchema = new mongoose.Schema(
+const dayActivitySchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
+    dayNumber: { type: Number, required: true }, // 1-21
+    title: { type: String, required: true },
     description: { type: String, default: "" },
-    startDate: { type: Date },
-    expectedDueDate: { type: Date },
-    weightage: { type: Number, default: 0 },
-    measurementCriteria: { type: String, default: "" },
-    requiredEffort: { type: Number, default: 0 },
-    utilizedEffort: { type: Number, default: 0 },
-    spentEffort: { type: Number, default: 0 },
+    dueDate: { type: Date, default: null },
     status: {
       type: String,
-      enum: ["Not Started", "In Progress", "Completed", "On Hold"],
-      default: "Not Started",
+      enum: ["Upcoming", "Completed", "Missed", "Late"],
+      default: "Upcoming",
     },
-    actualCompletionDate: { type: Date },
-    accomplishment: { type: String, default: "" },
+    completedAt: { type: Date, default: null },
   },
-  { timestamps: true },
+  { _id: true },
+);
+
+const subGoalSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    status: { type: String, default: "Not Started" },
+    expectedDueDate: { type: Date },
+    measurementCriteria: { type: String, default: "" },
+  },
+  { _id: true },
 );
 
 const goalSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    goalType: {
-      type: String,
-      enum: ["Personal", "Professional"],
-      default: "Personal",
-    },
+    title: { type: String, required: [true, "Title is required"], trim: true },
+    description: { type: String, default: "" },
     category: {
       type: String,
       enum: [
@@ -42,19 +44,13 @@ const goalSchema = new mongoose.Schema(
         "Intellectual",
         "Other",
       ],
-      default: "Other",
+      required: [true, "Category is required"],
     },
-    title: {
+    goalType: {
       type: String,
-      required: [true, "Title is required"],
-      trim: true,
-      maxlength: 100,
+      enum: ["Personal", "Professional"],
+      default: "Personal",
     },
-    description: { type: String, default: "", maxlength: 500 },
-    startDate: { type: Date },
-    expectedEndDate: { type: Date },
-    expectedDueDate: { type: Date },
-    progress: { type: Number, default: 0, min: 0, max: 100 },
     priority: {
       type: String,
       enum: ["High", "Medium", "Low"],
@@ -65,16 +61,22 @@ const goalSchema = new mongoose.Schema(
       enum: ["Not Started", "In Progress", "Completed", "On Hold"],
       default: "Not Started",
     },
-    tags: { type: [String], default: [] },
-    effortRequired: { type: Number, default: 0 },
-    weightage: { type: Number, default: 0 },
+    progress: { type: Number, default: 0, min: 0, max: 100 },
+    startDate: { type: Date },
+    expectedEndDate: { type: Date },
     measurementCriteria: { type: String, default: "" },
-    accomplishment: { type: String, default: "" },
     coach: { type: String, default: "" },
-    actualCompletionDate: { type: Date },
+    // 21-day daily activity plan (only for In-Progress goals)
+    dayActivities: { type: [dayActivitySchema], default: [] },
+    planStartDate: { type: Date, default: null },
     subGoals: { type: [subGoalSchema], default: [] },
+    tags: { type: [String], default: [] },
+    icon: { type: String, default: "🎯" },
+    color: { type: String, default: "#6366f1" },
   },
   { timestamps: true },
 );
+
+goalSchema.index({ user: 1, status: 1 });
 
 module.exports = mongoose.model("Goal", goalSchema);

@@ -31,6 +31,9 @@ import AchievementsPage from "./pages/AchievementsPage";
 import ActivitiesPage from "./pages/ActivitiesPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import FrameOfMindPage from "./pages/FrameOfMindPage";
+import ExecutionPage from "./pages/ExecutionPage";
+import NetworkPage from "./pages/NetworkPage";
+import ResourcesPage from "./pages/ResourcesPage";
 import InsightsPage from "./pages/InsightsPage";
 import GuidancePage from "./pages/GuidancePage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -174,6 +177,14 @@ const App = () => (
               path="/community"
               element={
                 <Protected>
+                  <NetworkPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/network"
+              element={
+                <Protected>
                   <CommunityPage />
                 </Protected>
               }
@@ -203,6 +214,14 @@ const App = () => (
               }
             />
             <Route
+              path="/execution"
+              element={
+                <Protected>
+                  <ExecutionPage />
+                </Protected>
+              }
+            />
+            <Route
               path="/activities"
               element={
                 <Protected>
@@ -212,6 +231,14 @@ const App = () => (
             />
             <Route
               path="/documents"
+              element={
+                <Protected>
+                  <ResourcesPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/resources"
               element={
                 <Protected>
                   <DocumentsPage />

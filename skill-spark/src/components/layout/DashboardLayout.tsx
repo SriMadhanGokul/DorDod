@@ -33,15 +33,15 @@ const navItems = [
   { to: "/goals", icon: FaBullseye, label: "Intent" },
   { to: "/skills", icon: FaLightbulb, label: "Capabilities" },
   { to: "/development-plan", icon: FaRocket, label: "Growth Plan" },
-  { to: "/habits", icon: FaCalendarCheck, label: "Behavior" },
-  { to: "/activities", icon: FaTasks, label: "Execution" },
+  // { to: '/habits',           icon: FaCalendarCheck, label: 'Behavior' }, // HIDDEN per client req
+  { to: "/execution", icon: FaTasks, label: "Execution" },
   { to: "/achievements", icon: FaTrophy, label: "Outcomes" },
   { to: "/insights", icon: FaChartLine, label: "Insights" },
   { to: "/guidance", icon: FaMedal, label: "Guidance" },
   { to: "/learning", icon: FaBook, label: "Knowledge" },
-  { to: "/community", icon: FaUsers, label: "Network" },
-  { to: "/leaderboard", icon: FaMedal, label: "Progress Board" },
-  { to: "/documents", icon: FaFileAlt, label: "Resources" },
+  { to: "/network", icon: FaUsers, label: "Network" },
+  // { to: '/leaderboard',      icon: FaMedal,         label: 'Progress Board' }, // HIDDEN per client req
+  { to: "/resources", icon: FaFileAlt, label: "Resources" },
 ];
 
 // ─── Dark Mode Hook ────────────────────────────────────────────────────────────

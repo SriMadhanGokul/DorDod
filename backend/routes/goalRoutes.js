@@ -3,19 +3,21 @@ const router = express.Router();
 const {
   getGoals,
   createGoal,
+  activateGoal,
+  deactivateGoal,
+  completeDayActivity,
   updateGoal,
   deleteGoal,
-  addSubGoal,
-  updateSubGoal,
-  deleteSubGoal,
 } = require("../controllers/goalController");
 const protect = require("../utils/protect");
 
 router.use(protect);
-
-router.route("/").get(getGoals).post(createGoal);
-router.route("/:id").put(updateGoal).delete(deleteGoal);
-router.route("/:id/subgoals").post(addSubGoal);
-router.route("/:id/subgoals/:subId").put(updateSubGoal).delete(deleteSubGoal);
+router.get("/", getGoals);
+router.post("/", createGoal);
+router.put("/:id", updateGoal);
+router.delete("/:id", deleteGoal);
+router.patch("/:id/activate", activateGoal);
+router.patch("/:id/deactivate", deactivateGoal);
+router.patch("/:id/day/:dayNumber/complete", completeDayActivity);
 
 module.exports = router;

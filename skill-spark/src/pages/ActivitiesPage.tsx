@@ -21,14 +21,14 @@ interface Activity {
   _id: string;
   title: string;
   description: string;
-  status: "todo" | "inprogress" | "done";
+  status: "todo" | "inprogress" | "done" | "Completed";
   priority: "High" | "Medium" | "Low";
   dueDate?: string;
-  goalId?: { _id: string; title: string; category: string };
+  startDate?: string;
+  linkedGoal?: { _id: string; title: string; category: string };
   goalTitle: string;
   addedToHabit: boolean;
   addedToAchievement: boolean;
-  autoSuggested: boolean;
 }
 interface Goal {
   _id: string;
@@ -36,7 +36,7 @@ interface Goal {
   category: string;
 }
 
-const STATUS_CONFIG = {
+const STATUS_CFG = {
   todo: {
     label: "To Do",
     icon: FaCircle,
@@ -58,19 +58,27 @@ const STATUS_CONFIG = {
     bg: "bg-success/10 border-success/30",
     dot: "bg-success",
   },
+  Completed: {
+    label: "Completed",
+    icon: FaCheck,
+    color: "text-success",
+    bg: "bg-success/10 border-success/30",
+    dot: "bg-success",
+  },
 };
-const PRIORITY_COLOR = {
+const PRI_COLOR = {
   High: "bg-destructive/10 text-destructive",
   Medium: "bg-secondary/20 text-secondary-foreground",
   Low: "bg-muted text-foreground-muted",
 };
 
-const EMPTY_FORM = {
+const EMPTY = {
   title: "",
   description: "",
   priority: "Medium",
   dueDate: "",
-  goalId: "",
+  startDate: "",
+  linkedGoal: "",
 };
 
 export default function ActivitiesPage() {
@@ -83,24 +91,20 @@ export default function ActivitiesPage() {
   const [showSuggest, setShowSuggest] = useState(false);
   const [suggestions, setSuggestions] = useState<{ title: string }[]>([]);
   const [suggestGoal, setSuggestGoal] = useState("");
-  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set());
+  const [expandedGoals, setExpanded] = useState<Set<string>>(new Set());
   const [habitModal, setHabitModal] = useState<{
     id: string;
     title: string;
   } | null>(null);
-  const [reminderTime, setReminderTime] = useState("08:00");
-  const [frequency, setFrequency] = useState("daily");
   const [achModal, setAchModal] = useState<{
     id: string;
     title: string;
   } | null>(null);
   const [achDesc, setAchDesc] = useState("");
-  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [form, setForm] = useState({ ...EMPTY });
   const [saving, setSaving] = useState(false);
-
-  // Edit state
   const [editActivity, setEditActivity] = useState<Activity | null>(null);
-  const [editForm, setEditForm] = useState({ ...EMPTY_FORM });
+  const [editForm, setEditForm] = useState({ ...EMPTY });
 
   useEffect(() => {
     const load = async () => {
@@ -112,9 +116,9 @@ export default function ActivitiesPage() {
         setActivities(aRes.data.data);
         setGoals(gRes.data.data);
         const ids = new Set<string>(
-          aRes.data.data.map((a: Activity) => a.goalId?._id || "ungrouped"),
+          aRes.data.data.map((a: Activity) => a.linkedGoal?._id || "ungrouped"),
         );
-        setExpandedGoals(ids);
+        setExpanded(ids);
       } catch {
         toast.error("Failed to load");
       } finally {
@@ -124,11 +128,13 @@ export default function ActivitiesPage() {
     load();
   }, []);
 
-  // Validate mandatory fields
-  const validateForm = (f: typeof EMPTY_FORM) => {
+  // Validate mandatory fields per client requirement
+  const validateForm = (f: typeof EMPTY) => {
     if (!f.title.trim()) return "Title is required";
     if (!f.priority) return "Priority is required";
     if (!f.dueDate) return "Due date is required";
+    if (!f.startDate) return "Start date is required";
+    if (!f.linkedGoal) return "Please select a Goal to link this activity";
     return null;
   };
 
@@ -148,9 +154,9 @@ export default function ActivitiesPage() {
     try {
       const res = await api.post("/activities", {
         title,
-        goalId: suggestGoal,
-        autoSuggested: true,
+        linkedGoal: suggestGoal,
         priority: "Medium",
+        startDate: new Date().toISOString().slice(0, 10),
         dueDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
       });
       setActivities((p) => [res.data.data, ...p]);
@@ -165,13 +171,16 @@ export default function ActivitiesPage() {
     if (err) return toast.error(err);
     setSaving(true);
     try {
-      const res = await api.post("/activities", form);
+      const res = await api.post("/activities", {
+        ...form,
+        goalId: form.linkedGoal,
+      });
       setActivities((p) => [res.data.data, ...p]);
-      setForm({ ...EMPTY_FORM });
+      setForm({ ...EMPTY });
       setShowModal(false);
       toast.success("Activity created!");
     } catch {
-      toast.error("Failed to create");
+      toast.error("Failed");
     } finally {
       setSaving(false);
     }
@@ -184,7 +193,8 @@ export default function ActivitiesPage() {
       description: a.description || "",
       priority: a.priority,
       dueDate: a.dueDate?.slice(0, 10) || "",
-      goalId: a.goalId?._id || "",
+      startDate: (a.startDate as any)?.slice(0, 10) || "",
+      linkedGoal: a.linkedGoal?._id || "",
     });
   };
 
@@ -194,14 +204,17 @@ export default function ActivitiesPage() {
     if (err) return toast.error(err);
     setSaving(true);
     try {
-      const res = await api.put(`/activities/${editActivity._id}`, editForm);
+      const res = await api.put(`/activities/${editActivity._id}`, {
+        ...editForm,
+        goalId: editForm.linkedGoal,
+      });
       setActivities((p) =>
         p.map((a) => (a._id === editActivity._id ? res.data.data : a)),
       );
       setEditActivity(null);
-      toast.success("Activity updated!");
+      toast.success("Updated!");
     } catch {
-      toast.error("Failed to update");
+      toast.error("Failed");
     } finally {
       setSaving(false);
     }
@@ -212,23 +225,20 @@ export default function ActivitiesPage() {
       const res = await api.patch(`/activities/${id}/status`, { status });
       setActivities((p) => p.map((a) => (a._id === id ? res.data.data : a)));
     } catch {
-      toast.error("Failed to update status");
+      toast.error("Failed");
     }
   };
 
   const addHabit = async () => {
     if (!habitModal) return;
     try {
-      await api.post(`/activities/${habitModal.id}/add-habit`, {
-        reminderTime,
-        frequency,
-      });
+      await api.post(`/activities/${habitModal.id}/add-habit`, {});
       setActivities((p) =>
         p.map((a) =>
           a._id === habitModal.id ? { ...a, addedToHabit: true } : a,
         ),
       );
-      toast.success(`🔥 Habit created with reminder at ${reminderTime}!`);
+      toast.success("🔥 Added as Habit!");
       setHabitModal(null);
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Failed");
@@ -265,30 +275,31 @@ export default function ActivitiesPage() {
     }
   };
 
-  const toggleGoal = (id: string) =>
-    setExpandedGoals((prev) => {
+  const toggleGroup = (id: string) =>
+    setExpanded((prev) => {
       const s = new Set(prev);
       s.has(id) ? s.delete(id) : s.add(id);
       return s;
     });
 
+  const getNorm = (s: string) => {
+    const low = (s || "todo").toLowerCase().replace(/[^a-z]/g, "");
+    if (low === "done" || low === "completed") return "done";
+    if (low === "inprogress" || low === "inprog") return "inprogress";
+    return "todo";
+  };
+
   const filtered = activities.filter((a) => {
-    const rawStatus = (a.status || "todo").toLowerCase().replace(/[^a-z]/g, "");
-    const norm =
-      rawStatus === "inprogress" || rawStatus === "inprog"
-        ? "inprogress"
-        : rawStatus === "done" || rawStatus === "completed"
-          ? "done"
-          : "todo";
+    const norm = getNorm(a.status);
     const matchStatus = filterStatus === "all" || norm === filterStatus;
-    const matchGoal = !filterGoal || a.goalId?._id === filterGoal;
+    const matchGoal = !filterGoal || a.linkedGoal?._id === filterGoal;
     return matchStatus && matchGoal;
   });
 
   const grouped = filtered.reduce(
     (acc, a) => {
-      const key = a.goalId?._id || "ungrouped";
-      const label = a.goalTitle || a.goalId?.title || "No Goal";
+      const key = a.linkedGoal?._id || "ungrouped";
+      const label = a.goalTitle || a.linkedGoal?.title || "No Goal";
       if (!acc[key]) acc[key] = { label, items: [] };
       acc[key].items.push(a);
       return acc;
@@ -297,12 +308,13 @@ export default function ActivitiesPage() {
   );
 
   const counts = {
-    todo: filtered.filter((a) => a.status === "todo").length,
-    inprogress: filtered.filter((a) => a.status === "inprogress").length,
-    done: filtered.filter((a) => a.status === "done").length,
+    todo: filtered.filter((a) => getNorm(a.status) === "todo").length,
+    inprogress: filtered.filter((a) => getNorm(a.status) === "inprogress")
+      .length,
+    done: filtered.filter((a) => getNorm(a.status) === "done").length,
   };
 
-  // Shared form fields
+  // Shared form UI
   const FormFields = ({ f, setF }: { f: any; setF: any }) => (
     <div className="space-y-3">
       <div>
@@ -316,6 +328,28 @@ export default function ActivitiesPage() {
           className="input-field mt-1"
           autoFocus
         />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-foreground-muted">
+          Link to Goal <span className="text-destructive">*</span>
+        </label>
+        <select
+          value={f.linkedGoal}
+          onChange={(e) =>
+            setF((p: any) => ({ ...p, linkedGoal: e.target.value }))
+          }
+          className="input-field mt-1"
+        >
+          <option value="">Please select a goal</option>
+          {goals.map((g) => (
+            <option key={g._id} value={g._id}>
+              {g.title}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-foreground-muted mt-0.5">
+          Activities must be linked to a goal (21 activities per goal)
+        </p>
       </div>
       <div>
         <label className="text-xs font-medium text-foreground-muted">
@@ -342,20 +376,21 @@ export default function ActivitiesPage() {
             }
             className="input-field mt-1"
           >
-            <option>High</option>
-            <option>Medium</option>
-            <option>Low</option>
+            <option value="">Please select priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
           </select>
         </div>
         <div>
           <label className="text-xs font-medium text-foreground-muted">
-            Due Date <span className="text-destructive">*</span>
+            Start Date <span className="text-destructive">*</span>
           </label>
           <input
             type="date"
-            value={f.dueDate}
+            value={f.startDate}
             onChange={(e) =>
-              setF((p: any) => ({ ...p, dueDate: e.target.value }))
+              setF((p: any) => ({ ...p, startDate: e.target.value }))
             }
             className="input-field mt-1"
           />
@@ -363,20 +398,16 @@ export default function ActivitiesPage() {
       </div>
       <div>
         <label className="text-xs font-medium text-foreground-muted">
-          Link to Goal
+          Due Date <span className="text-destructive">*</span>
         </label>
-        <select
-          value={f.goalId}
-          onChange={(e) => setF((p: any) => ({ ...p, goalId: e.target.value }))}
+        <input
+          type="date"
+          value={f.dueDate}
+          onChange={(e) =>
+            setF((p: any) => ({ ...p, dueDate: e.target.value }))
+          }
           className="input-field mt-1"
-        >
-          <option value="">No Goal</option>
-          {goals.map((g) => (
-            <option key={g._id} value={g._id}>
-              {g.title}
-            </option>
-          ))}
-        </select>
+        />
       </div>
     </div>
   );
@@ -386,9 +417,9 @@ export default function ActivitiesPage() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Activities</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Execution</h1>
             <p className="text-foreground-muted mt-1">
-              Action steps linked to your goals
+              21 activities per goal · linked actions drive your Alignment Score
             </p>
           </div>
           <div className="flex gap-2">
@@ -450,7 +481,7 @@ export default function ActivitiesPage() {
           <select
             value={filterGoal}
             onChange={(e) => setFilterGoal(e.target.value)}
-            className="input-field text-sm sm:w-48"
+            className="input-field text-sm sm:w-56"
           >
             <option value="">All Goals</option>
             {goals.map((g) => (
@@ -466,9 +497,8 @@ export default function ActivitiesPage() {
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-
         {!loading && filtered.length === 0 && (
-          <div className="text-center py-16 text-foreground-muted">
+          <div className="text-center py-16 text-foreground-muted card-elevated">
             <FaCircle className="text-4xl mx-auto mb-3 opacity-20" />
             <p className="font-medium">No activities yet</p>
             <div className="flex gap-3 justify-center mt-4">
@@ -492,7 +522,7 @@ export default function ActivitiesPage() {
           Object.entries(grouped).map(([goalKey, group]) => (
             <div key={goalKey} className="card-elevated">
               <button
-                onClick={() => toggleGoal(goalKey)}
+                onClick={() => toggleGroup(goalKey)}
                 className="w-full flex items-center justify-between mb-1"
               >
                 <div className="flex items-center gap-2">
@@ -500,7 +530,7 @@ export default function ActivitiesPage() {
                     🎯 {group.label}
                   </span>
                   <span className="text-xs text-foreground-muted">
-                    ({group.items.length})
+                    ({group.items.length}/21)
                   </span>
                 </div>
                 {expandedGoals.has(goalKey) ? (
@@ -509,22 +539,13 @@ export default function ActivitiesPage() {
                   <FaChevronDown className="text-foreground-muted w-3 h-3" />
                 )}
               </button>
-
               {expandedGoals.has(goalKey) && (
                 <div className="space-y-2 mt-3">
                   {group.items.map((a) => {
-                    const rawStatus = (a.status || "todo")
-                      .toLowerCase()
-                      .replace(/[^a-z]/g, "");
-                    const norm =
-                      rawStatus === "inprogress" || rawStatus === "inprog"
-                        ? "inprogress"
-                        : rawStatus === "done" || rawStatus === "completed"
-                          ? "done"
-                          : "todo";
+                    const norm = getNorm(a.status);
                     const scfg =
-                      STATUS_CONFIG[norm as keyof typeof STATUS_CONFIG] ||
-                      STATUS_CONFIG["todo"];
+                      STATUS_CFG[norm as keyof typeof STATUS_CFG] ||
+                      STATUS_CFG["todo"];
                     return (
                       <div
                         key={a._id}
@@ -548,24 +569,33 @@ export default function ActivitiesPage() {
                               )}
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <span
-                                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLOR[a.priority]}`}
+                                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRI_COLOR[a.priority] || ""}`}
                                 >
                                   {a.priority}
                                 </span>
+                                {(a as any).startDate && (
+                                  <span className="text-xs text-foreground-muted">
+                                    ▶{" "}
+                                    {new Date(
+                                      (a as any).startDate,
+                                    ).toLocaleDateString("en-IN", {
+                                      day: "numeric",
+                                      month: "short",
+                                    })}
+                                  </span>
+                                )}
                                 {a.dueDate && (
                                   <span className="text-xs text-foreground-muted">
                                     📅{" "}
-                                    {new Date(a.dueDate).toLocaleDateString()}
-                                  </span>
-                                )}
-                                {a.autoSuggested && (
-                                  <span className="text-xs bg-secondary/15 text-secondary px-2 py-0.5 rounded-full">
-                                    💡 Suggested
+                                    {new Date(a.dueDate).toLocaleDateString(
+                                      "en-IN",
+                                      { day: "numeric", month: "short" },
+                                    )}
                                   </span>
                                 )}
                                 {a.addedToHabit && (
                                   <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">
-                                    🔥 In Habits
+                                    🔥 Habit
                                   </span>
                                 )}
                                 {a.addedToAchievement && (
@@ -578,7 +608,7 @@ export default function ActivitiesPage() {
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <select
-                              value={norm}
+                              value={norm === "done" ? "done" : a.status}
                               onChange={(e) =>
                                 updateStatus(a._id, e.target.value)
                               }
@@ -604,16 +634,17 @@ export default function ActivitiesPage() {
                                 <FaFire className="w-2.5 h-2.5" /> Habit
                               </button>
                             )}
-                            {norm === "done" && !a.addedToAchievement && (
-                              <button
-                                onClick={() =>
-                                  setAchModal({ id: a._id, title: a.title })
-                                }
-                                className="text-xs border border-border bg-card hover:border-secondary hover:text-secondary text-foreground-muted px-2 py-1 rounded-lg transition-all flex items-center gap-1"
-                              >
-                                <FaTrophy className="w-2.5 h-2.5" /> Award
-                              </button>
-                            )}
+                            {(norm === "done" || a.status === "Completed") &&
+                              !a.addedToAchievement && (
+                                <button
+                                  onClick={() =>
+                                    setAchModal({ id: a._id, title: a.title })
+                                  }
+                                  className="text-xs border border-border bg-card hover:border-secondary hover:text-secondary text-foreground-muted px-2 py-1 rounded-lg transition-all flex items-center gap-1"
+                                >
+                                  <FaTrophy className="w-2.5 h-2.5" /> Award
+                                </button>
+                              )}
                             <button
                               onClick={() => del(a._id)}
                               className="text-foreground-muted hover:text-destructive p-1"
@@ -684,51 +715,43 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {/* Suggestions Modal */}
+        {/* Suggestions */}
         {showSuggest && (
           <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
             <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold text-lg flex items-center gap-2">
-                  <FaLightbulb className="text-secondary" /> Activity
-                  Suggestions
+                  <FaLightbulb className="text-secondary" /> Suggestions
                 </h2>
                 <button onClick={() => setShowSuggest(false)}>
                   <FaTimes />
                 </button>
               </div>
-              <div className="space-y-3">
-                <select
-                  onChange={(e) => fetchSuggestions(e.target.value)}
-                  className="input-field"
-                >
-                  <option value="">Select a goal...</option>
-                  {goals.map((g) => (
-                    <option key={g._id} value={g._id}>
-                      {g.title}
-                    </option>
-                  ))}
-                </select>
-                {suggestions.length > 0 && (
-                  <div className="space-y-2">
-                    {suggestions.map((s, i) => {
-                      const exists = activities.some(
-                        (a) =>
-                          a.title === s.title && a.goalId?._id === suggestGoal,
-                      );
-                      return (
-                        <button
-                          key={i}
-                          disabled={exists}
-                          onClick={() => addSuggestion(s.title)}
-                          className={`w-full text-left p-3 rounded-xl border text-sm transition-all ${exists ? "border-success/30 bg-success/10 text-success cursor-default" : "border-border hover:border-primary hover:bg-primary/5"}`}
-                        >
-                          {exists ? "✅" : "+"} {s.title}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              <select
+                onChange={(e) => fetchSuggestions(e.target.value)}
+                className="input-field mb-3"
+              >
+                <option value="">Please select a goal</option>
+                {goals.map((g) => (
+                  <option key={g._id} value={g._id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+              <div className="space-y-2">
+                {suggestions.map((s, i) => {
+                  const exists = activities.some((a) => a.title === s.title);
+                  return (
+                    <button
+                      key={i}
+                      disabled={exists}
+                      onClick={() => addSuggestion(s.title)}
+                      className={`w-full text-left p-3 rounded-xl border text-sm transition-all ${exists ? "border-success/30 bg-success/10 text-success cursor-default" : "border-border hover:border-primary hover:bg-primary/5"}`}
+                    >
+                      {exists ? "✅" : "+"} {s.title}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -740,48 +763,21 @@ export default function ActivitiesPage() {
             <div className="bg-card rounded-2xl p-6 w-full max-w-sm my-auto animate-fade-in">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold flex items-center gap-2">
-                  <FaFire className="text-destructive" /> Add to Habits
+                  <FaFire className="text-destructive" /> Add to Behavior
                 </h2>
                 <button onClick={() => setHabitModal(null)}>
                   <FaTimes />
                 </button>
               </div>
-              <div className="space-y-4">
-                <div className="bg-muted rounded-xl p-3">
-                  <p className="text-sm font-medium">"{habitModal.title}"</p>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    will become a daily habit
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-muted">
-                    Daily Reminder Time
-                  </label>
-                  <input
-                    type="time"
-                    value={reminderTime}
-                    onChange={(e) => setReminderTime(e.target.value)}
-                    className="input-field mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-muted">
-                    Frequency
-                  </label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.target.value)}
-                    className="input-field mt-1"
-                  >
-                    <option value="daily">Every Day</option>
-                    <option value="weekdays">Weekdays Only</option>
-                    <option value="weekends">Weekends Only</option>
-                  </select>
-                </div>
-                <button onClick={addHabit} className="btn-primary w-full">
-                  🔥 Create Habit
-                </button>
+              <div className="bg-muted rounded-xl p-3 mb-4">
+                <p className="text-sm font-medium">"{habitModal.title}"</p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  will become a daily habit
+                </p>
               </div>
+              <button onClick={addHabit} className="btn-primary w-full">
+                🔥 Add as Behavior Habit
+              </button>
             </div>
           </div>
         )}
@@ -792,28 +788,26 @@ export default function ActivitiesPage() {
             <div className="bg-card rounded-2xl p-6 w-full max-w-sm my-auto animate-fade-in">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold flex items-center gap-2">
-                  <FaTrophy className="text-secondary" /> Create Achievement
+                  <FaTrophy className="text-secondary" /> Create Outcome
                 </h2>
                 <button onClick={() => setAchModal(null)}>
                   <FaTimes />
                 </button>
               </div>
-              <div className="space-y-3">
-                <div className="bg-success/10 border border-success/30 rounded-xl p-3">
-                  <p className="text-sm font-medium text-success">
-                    🏆 "{achModal.title}"
-                  </p>
-                </div>
-                <textarea
-                  placeholder="Add a note (optional)"
-                  value={achDesc}
-                  onChange={(e) => setAchDesc(e.target.value)}
-                  className="input-field min-h-[70px]"
-                />
-                <button onClick={addAchievement} className="btn-primary w-full">
-                  🏆 Award Achievement
-                </button>
+              <div className="bg-success/10 border border-success/30 rounded-xl p-3 mb-3">
+                <p className="text-sm font-medium text-success">
+                  🏆 "{achModal.title}"
+                </p>
               </div>
+              <textarea
+                placeholder="Add a note (optional)"
+                value={achDesc}
+                onChange={(e) => setAchDesc(e.target.value)}
+                className="input-field min-h-[70px] mb-3"
+              />
+              <button onClick={addAchievement} className="btn-primary w-full">
+                🏆 Create Outcome
+              </button>
             </div>
           </div>
         )}

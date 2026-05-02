@@ -91,6 +91,13 @@ app.use("/api/friends", friendsRoutes);
 app.use("/api/guidance", require("./routes/guidanceRoutes"));
 app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/documents", documentRoutes);
+
+
+
+
+
+
+
 app.use("/api/frame-of-mind", frameOfMindRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
