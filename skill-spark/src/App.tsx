@@ -32,7 +32,7 @@ import ActivitiesPage     from "./pages/ActivitiesPage";
 import DocumentsPage      from "./pages/DocumentsPage";
 import FrameOfMindPage    from "./pages/FrameOfMindPage";
 import ExecutionPage      from "./pages/ExecutionPage";
-import NetworkPage        from "./pages/NetworkPage";
+import NetworkPage        from "./pages/Networkpage";
 import ResourcesPage      from "./pages/ResourcesPage";
 import InsightsPage       from "./pages/InsightsPage";
 import GuidancePage       from "./pages/GuidancePage";

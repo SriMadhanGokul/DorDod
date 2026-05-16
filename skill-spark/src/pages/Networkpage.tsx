@@ -40,7 +40,7 @@ const Avatar = ({ name, avatar, size = 'w-10 h-10' }: { name: string; avatar?: s
         {name?.charAt(0)?.toUpperCase() || 'U'}
       </div>;
 
-export default function NetworkPage() {
+export default function Networkpage() {
   const [posts, setPosts]             = useState<Post[]>([]);
   const [loading, setLoading]         = useState(true);
   const [filterTag, setFilterTag]     = useState('All');
