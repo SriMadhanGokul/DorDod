@@ -34,7 +34,7 @@ const isImage = (fileName:string, mimeType:string) =>
 const isPdf = (fileName:string, mimeType:string) =>
   fileName?.toLowerCase().endsWith('.pdf') || mimeType === 'application/pdf';
 
-export default function ResourcesPage() {
+export default function Resourcespage() {
   const [docs, setDocs]             = useState<Doc[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState('All');
