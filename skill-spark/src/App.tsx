@@ -33,7 +33,7 @@ import DocumentsPage      from "./pages/DocumentsPage";
 import FrameOfMindPage    from "./pages/FrameOfMindPage";
 import ExecutionPage      from "./pages/ExecutionPage";
 import NetworkPage        from "./pages/Networkpage";
-import ResourcesPage      from "./pages/ResourcesPage";
+import ResourcesPage      from "./pages/Resourcespage";
 import InsightsPage       from "./pages/InsightsPage";
 import GuidancePage       from "./pages/GuidancePage";
 import OnboardingPage     from "./pages/OnboardingPage";
