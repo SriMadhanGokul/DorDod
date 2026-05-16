@@ -1,20 +1,62 @@
 const mongoose = require("mongoose");
 
+const checkInSlotSchema = new mongoose.Schema(
+  {
+    slot: {
+      type: String,
+      enum: ["Morning", "Midday", "Evening"],
+      required: true,
+    },
+    state: {
+      type: String,
+      enum: [
+        "Calm",
+        "Focused",
+        "Stressed",
+        "Distracted",
+        "Energized",
+        "Clear",
+        "Confused",
+        "Avoiding",
+        "Anxious",
+      ],
+      required: true,
+    },
+    note: { type: String, default: "" },
+    time: { type: String, default: "" }, // e.g. "09:10 AM"
+    recordedAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
 const dailyCheckInSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     date: { type: String, required: true }, // 'YYYY-MM-DD'
 
-    // State + follow-ups
+    // Up to 3 check-ins per day (Morning / Midday / Evening)
+    slots: { type: [checkInSlotSchema], default: [] },
+
+    // Latest state (last slot's state — used for insight engine)
     dailyState: {
       type: String,
-      enum: ["Clear", "Confused", "Avoiding", "Focused", "Anxious"],
-      required: true,
+      enum: [
+        "Calm",
+        "Focused",
+        "Stressed",
+        "Distracted",
+        "Energized",
+        "Clear",
+        "Confused",
+        "Avoiding",
+        "Anxious",
+      ],
+      default: "Focused",
     },
     avoidingText: { type: String, default: "" },
     mattersTodayText: { type: String, default: "" },
 
-    // Derived flags
+    // Derived
     avoidanceFlag: { type: Boolean, default: false },
     loopType: {
       type: String,
@@ -26,15 +68,13 @@ const dailyCheckInSchema = new mongoose.Schema(
       enum: ["Low", "Medium", "High", "None"],
       default: "None",
     },
-
-    // Clarity score 0-100
     clarityScore: { type: Number, default: 0 },
 
-    // Today's realization with tags
+    // Realization
     realization: { type: String, default: "" },
-    realizationTags: { type: [String], default: [] }, // e.g. ['Avoidance','Clarity','Fear']
+    realizationTags: { type: [String], default: [] },
 
-    // Guidance session context (set after Guidance session)
+    // Post-guidance
     guidanceSessionDone: { type: Boolean, default: false },
     guidanceGoalUpdate: { type: String, default: "" },
     guidanceBehaviorSugg: { type: String, default: "" },

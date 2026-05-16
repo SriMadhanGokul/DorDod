@@ -2,6 +2,16 @@ const Document = require("../models/Document");
 const path = require("path");
 const fs = require("fs");
 
+// Only images and PDF allowed per client requirement
+const ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"];
+const ALLOWED_MIMETYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/jpg",
+];
 const CATEGORIES = [
   "Resume",
   "Portfolio",
@@ -48,8 +58,24 @@ const createDocument = async (req, res) => {
         .status(400)
         .json({
           success: false,
-          message: "Please upload a file or provide a file URL",
+          message: "Please upload a file (image or PDF) or provide a URL",
         });
+
+    // Validate file type if uploaded
+    if (req.file) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      if (!ALLOWED_EXTENSIONS.includes(ext)) {
+        // Delete the uploaded file
+        if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "Only images (JPG, PNG, GIF, WebP) and PDF files are allowed",
+          });
+      }
+    }
 
     const doc = await Document.create({
       user: req.user.id,
@@ -97,4 +123,44 @@ const deleteDocument = async (req, res) => {
   }
 };
 
-module.exports = { getDocuments, createDocument, deleteDocument };
+const updateDocument = async (req, res) => {
+  try {
+    const { name, category, notes } = req.body;
+    if (!name?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Document name is required" });
+    if (!category)
+      return res
+        .status(400)
+        .json({ success: false, message: "Please select a category" });
+    if (!CATEGORIES.includes(category))
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid category" });
+
+    const doc = await Document.findOneAndUpdate(
+      { _id: req.params.id, user: req.user.id },
+      { name: name.trim(), category, notes: notes || "" },
+      { new: true },
+    );
+    if (!doc)
+      return res
+        .status(404)
+        .json({ success: false, message: "Document not found" });
+    res
+      .status(200)
+      .json({ success: true, message: "Document updated!", data: doc });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update document" });
+  }
+};
+
+module.exports = {
+  getDocuments,
+  createDocument,
+  updateDocument,
+  deleteDocument,
+};

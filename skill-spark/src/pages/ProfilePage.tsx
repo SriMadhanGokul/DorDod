@@ -5,85 +5,57 @@ import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
   FaSignOutAlt,
-  FaUser,
-  FaBriefcase,
-  FaChevronDown,
-  FaChevronUp,
+  FaEdit,
   FaPlus,
   FaTrash,
+  FaTimes,
+  FaCheck,
   FaLock,
   FaEye,
   FaEyeSlash,
-  FaEdit,
-  FaCheck,
-  FaTimes,
+  FaChevronDown,
+  FaChevronUp,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
-const PROFICIENCY = ["Beginner", "Intermediate", "Advanced", "Native"];
-const fmtDate = (d?: string) =>
-  d
-    ? new Date(d).toLocaleDateString("en-IN", {
-        month: "short",
-        year: "numeric",
-      })
-    : "";
+const PROFICIENCY = [
+  "Please select",
+  "Beginner",
+  "Intermediate",
+  "Advanced",
+  "Fluent",
+  "Native",
+];
 
-// ── Reusable "Please select" select ──────────────────────────────────────────
-const SelectField = ({
-  label,
-  value,
-  onChange,
-  options,
-  className = "",
-  required = false,
-}: {
-  label?: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: (string | { value: string; label: string })[];
-  className?: string;
-  required?: boolean;
-}) => (
-  <select
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    className={`input-field ${className}`}
-  >
-    <option value="">
-      {label ? `Please select ${label}` : "Please select"}
-    </option>
-    {options.map((o) =>
-      typeof o === "string" ? (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ) : (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ),
-    )}
-  </select>
+const fmtFullDate = (d?: string) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const LabelValue = ({ label, value }: { label: string; value?: string }) => (
+  <div className="flex items-start gap-2 min-w-0">
+    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide shrink-0 w-36">
+      {label}
+    </span>
+    <span className="text-sm font-medium text-gray-800">
+      {value || <span className="text-gray-300 italic">Not provided</span>}
+    </span>
+  </div>
 );
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
   const [tab, setTab] = useState<"personal" | "professional" | "security">(
     "personal",
   );
-  const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
-  const [showPw, setShowPw] = useState({
-    curr: false,
-    new_: false,
-    conf: false,
-  });
-  const [savingPw, setSavingPw] = useState(false);
 
-  // ── Personal info — view/edit mode ─────────────────────────────────────────
-  const EMPTY_PERSONAL = {
+  // Personal
+  const EMPTY_P = {
     firstName: "",
     middleName: "",
     lastName: "",
@@ -100,21 +72,21 @@ export default function ProfilePage() {
     pincode: "",
     bio: "",
   };
-  const [personal, setPersonal] = useState(EMPTY_PERSONAL);
-  const [isEditingPersonal, setIsEditingPersonal] = useState(false);
-  const [savingPersonal, setSavingPersonal] = useState(false);
+  const [personal, setPersonal] = useState(EMPTY_P);
+  const [isEditingPersonal, setEditP] = useState(false);
+  const [savingPersonal, setSavingP] = useState(false);
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
     weekly: true,
   });
 
-  // ── Professional ───────────────────────────────────────────────────────────
+  // Professional
   const [prof, setProf] = useState<any>(null);
-  const [loadingProf, setLoadingProf] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [loadingProf, setLoadingP] = useState(false);
+  const [expandedSec, setExpSec] = useState<string | null>("work");
 
-  // New-entry forms
+  // Add forms
   const [newWork, setNewWork] = useState({
     isCurrent: false,
     organizationName: "",
@@ -142,13 +114,26 @@ export default function ProfilePage() {
     effectiveDate: "",
     expirationDate: "",
   });
-  const [newFSkill, setNewFSkill] = useState({ skill: "", proficiency: "" });
   const [newTSkill, setNewTSkill] = useState({ skill: "", proficiency: "" });
+  const [newFSkill, setNewFSkill] = useState({ skill: "", proficiency: "" });
   const [newHonor, setNewHonor] = useState({
     title: "",
     institution: "",
     issueDate: "",
   });
+
+  // Edit work form
+  const [editWork, setEditWork] = useState<any>(null);
+  const [editWorkForm, setEditWF] = useState<any>({});
+
+  // Security
+  const [pwForm, setPwForm] = useState({ current: "", newPw: "", confirm: "" });
+  const [showPw, setShowPw] = useState({
+    curr: false,
+    new_: false,
+    conf: false,
+  });
+  const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
     api
@@ -178,48 +163,34 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
-    if (tab === "professional") loadProfessional();
+    if (tab === "professional" && !prof) loadProfessional();
   }, [tab]);
 
   const loadProfessional = async () => {
-    if (prof) return;
-    setLoadingProf(true);
+    setLoadingP(true);
     try {
       const r = await api.get("/profile/professional");
       setProf(r.data.data);
     } catch {
       toast.error("Failed to load professional profile");
     } finally {
-      setLoadingProf(false);
+      setLoadingP(false);
     }
   };
 
   const savePersonal = async () => {
-    setSavingPersonal(true);
+    if (!personal.firstName.trim())
+      return toast.error("First name is required");
+    if (!personal.lastName.trim()) return toast.error("Last name is required");
+    setSavingP(true);
     try {
       await api.put("/profile", personal);
-      setIsEditingPersonal(false);
+      setEditP(false);
       toast.success("Profile updated!");
     } catch {
       toast.error("Failed to save");
     } finally {
-      setSavingPersonal(false);
-    }
-  };
-
-  const cancelEditPersonal = () => {
-    setIsEditingPersonal(false);
-  };
-
-  const toggleNotif = async (key: keyof typeof notifications) => {
-    const upd = { ...notifications, [key]: !notifications[key] };
-    setNotifications(upd);
-    try {
-      await api.put("/profile/notifications", upd);
-      toast.success("Saved!");
-    } catch {
-      setNotifications(notifications);
-      toast.error("Failed");
+      setSavingP(false);
     }
   };
 
@@ -229,14 +200,14 @@ export default function ProfilePage() {
       setProf(r.data.data);
       reset();
       toast.success("Added!");
-    } catch {
-      toast.error("Failed to add");
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed to add");
     }
   };
 
-  const deleteProfItem = async (section: string, itemId: string) => {
+  const delProfItem = async (section: string, id: string) => {
     try {
-      const r = await api.delete(`/profile/professional/${section}/${itemId}`);
+      const r = await api.delete(`/profile/professional/${section}/${id}`);
       setProf(r.data.data);
       toast.success("Deleted!");
     } catch {
@@ -244,7 +215,18 @@ export default function ProfilePage() {
     }
   };
 
-  const SectionHeader = ({
+  const updateProfItem = async (section: string, id: string, data: any) => {
+    try {
+      const r = await api.put(`/profile/professional/${section}/${id}`, data);
+      setProf(r.data.data);
+      toast.success("Updated!");
+      setEditWork(null);
+    } catch {
+      toast.error("Failed to update");
+    }
+  };
+
+  const SecHead = ({
     id,
     label,
     count = 0,
@@ -254,113 +236,140 @@ export default function ProfilePage() {
     count?: number;
   }) => (
     <button
-      onClick={() => setExpandedSection(expandedSection === id ? null : id)}
-      className="w-full flex justify-between items-center py-3 font-semibold text-sm border-b border-border hover:text-primary transition-colors"
+      onClick={() => setExpSec(expandedSec === id ? null : id)}
+      className="w-full flex justify-between items-center py-3 px-4 font-semibold text-sm bg-gray-50 rounded-xl hover:bg-gray-100 transition-all"
     >
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2 text-gray-800">
         {label}
         {count > 0 && (
-          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
             {count}
           </span>
         )}
       </span>
-      {expandedSection === id ? (
-        <FaChevronUp className="w-3 h-3" />
+      {expandedSec === id ? (
+        <FaChevronUp className="w-3 h-3 text-gray-400" />
       ) : (
-        <FaChevronDown className="w-3 h-3" />
+        <FaChevronDown className="w-3 h-3 text-gray-400" />
       )}
     </button>
   );
 
-  // ── Display-only field ──────────────────────────────────────────────────────
-  const DisplayField = ({ label, value }: { label: string; value: string }) => (
+  const Input = ({
+    label,
+    value,
+    onChange,
+    type = "text",
+    required = false,
+    placeholder = "",
+  }: any) => (
     <div>
-      <p className="text-xs text-foreground-muted font-medium mb-0.5">
+      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
         {label}
-      </p>
-      <p
-        className={`text-sm font-medium ${value ? "" : "text-foreground-muted italic"}`}
+        {required && <span className="text-red-400 ml-1">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+      />
+    </div>
+  );
+
+  const Select = ({
+    label,
+    value,
+    onChange,
+    options,
+    required = false,
+  }: any) => (
+    <div>
+      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+        {label}
+        {required && <span className="text-red-400 ml-1">*</span>}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
       >
-        {value || "Not provided"}
-      </p>
+        <option value="">Please select</option>
+        {options.map((o: string) => (
+          <option key={o}>{o}</option>
+        ))}
+      </select>
     </div>
   );
 
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in max-w-2xl">
-        <h1 className="text-2xl md:text-3xl font-bold">Identity</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Identity</h1>
 
         {/* User card */}
-        <div className="card-elevated flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full gradient-hero flex items-center justify-center text-primary-foreground text-xl font-bold shrink-0">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
             {user?.name?.charAt(0)?.toUpperCase() || "U"}
           </div>
           <div>
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-lg font-bold text-gray-900">
               {user?.name ||
                 `${personal.firstName} ${personal.lastName}`.trim() ||
                 "User"}
             </h2>
-            <p className="text-sm text-foreground-muted">
-              {(user as any)?.email}
-            </p>
-            <span className="text-xs bg-secondary/20 text-secondary-foreground px-2 py-0.5 rounded-full mt-1 inline-block">
+            <p className="text-sm text-gray-500">{(user as any)?.email}</p>
+            <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full mt-1 inline-block font-medium">
               {(user as any)?.subscription || "Free"} Plan
             </span>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
           {[
-            { id: "personal", icon: FaUser, label: "Personal" },
-            { id: "professional", icon: FaBriefcase, label: "Professional" },
-            { id: "security", icon: FaLock, label: "Security" },
+            { id: "personal", label: "Personal" },
+            { id: "professional", label: "Professional" },
+            { id: "security", label: "Security" },
           ].map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                tab === t.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground-muted hover:bg-accent"
-              }`}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === t.id ? "bg-indigo-600 text-white shadow-sm" : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
             >
-              <t.icon />
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* ══════════════════════════════════════════════════════════════════
-            PERSONAL TAB
-        ══════════════════════════════════════════════════════════════════ */}
+        {/* ── PERSONAL TAB ─────────────────────────────────────────────── */}
         {tab === "personal" && (
           <div className="space-y-4">
-            <div className="card-elevated space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Personal Information</h3>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-bold text-gray-900">
+                  Personal Information
+                </h3>
                 {!isEditingPersonal ? (
                   <button
-                    onClick={() => setIsEditingPersonal(true)}
-                    className="flex items-center gap-2 text-sm text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all border border-primary/20"
+                    onClick={() => setEditP(true)}
+                    className="flex items-center gap-1.5 text-sm text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
                   >
                     <FaEdit className="w-3 h-3" /> Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
                     <button
-                      onClick={cancelEditPersonal}
-                      className="flex items-center gap-1.5 text-sm text-foreground-muted hover:text-foreground px-3 py-1.5 rounded-lg border border-border transition-all"
+                      onClick={() => setEditP(false)}
+                      className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg"
                     >
                       <FaTimes className="w-3 h-3" /> Cancel
                     </button>
                     <button
                       onClick={savePersonal}
                       disabled={savingPersonal}
-                      className="flex items-center gap-1.5 text-sm btn-primary py-1.5 px-3 disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
                     >
                       <FaCheck className="w-3 h-3" />{" "}
                       {savingPersonal ? "Saving..." : "Save"}
@@ -369,262 +378,173 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* View mode */}
+              {/* VIEW MODE — horizontal label: value layout */}
               {!isEditingPersonal && (
-                <div className="grid grid-cols-2 gap-4">
-                  <DisplayField label="First Name" value={personal.firstName} />
-                  <DisplayField
-                    label="Middle Name"
-                    value={personal.middleName}
-                  />
-                  <DisplayField label="Last Name" value={personal.lastName} />
-                  <DisplayField
-                    label="Preferred Full Name"
-                    value={personal.preferredFullName}
-                  />
-                  <DisplayField
-                    label="Contact Number"
-                    value={personal.contactNumber}
-                  />
-                  <DisplayField label="Gender" value={personal.gender} />
-                  <DisplayField
-                    label="Date of Birth"
-                    value={
-                      personal.dateOfBirth
-                        ? new Date(personal.dateOfBirth).toLocaleDateString(
-                            "en-IN",
-                            { day: "numeric", month: "long", year: "numeric" },
-                          )
-                        : ""
-                    }
-                  />
-                  <DisplayField
-                    label="Marital Status"
-                    value={personal.maritalStatus}
-                  />
-                  <DisplayField
-                    label="Nationality"
-                    value={personal.nationality}
-                  />
-                  <DisplayField label="Country" value={personal.country} />
-                  <DisplayField label="State" value={personal.state} />
-                  <DisplayField label="City" value={personal.city} />
-                  <DisplayField
-                    label="Current City"
-                    value={personal.currentCity}
-                  />
-                  <DisplayField label="Pincode" value={personal.pincode} />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <LabelValue label="First Name" value={personal.firstName} />
+                    <LabelValue
+                      label="Middle Name"
+                      value={personal.middleName}
+                    />
+                    <LabelValue label="Last Name" value={personal.lastName} />
+                    <LabelValue
+                      label="Preferred Name"
+                      value={personal.preferredFullName}
+                    />
+                    <LabelValue
+                      label="Contact"
+                      value={personal.contactNumber}
+                    />
+                    <LabelValue label="Gender" value={personal.gender} />
+                    <LabelValue
+                      label="Date of Birth"
+                      value={
+                        personal.dateOfBirth
+                          ? fmtFullDate(personal.dateOfBirth)
+                          : ""
+                      }
+                    />
+                    <LabelValue
+                      label="Marital Status"
+                      value={personal.maritalStatus}
+                    />
+                    <LabelValue
+                      label="Nationality"
+                      value={personal.nationality}
+                    />
+                    <LabelValue label="Country" value={personal.country} />
+                    <LabelValue label="State" value={personal.state} />
+                    <LabelValue label="City" value={personal.city} />
+                    <LabelValue
+                      label="Current City"
+                      value={personal.currentCity}
+                    />
+                    <LabelValue label="Pincode" value={personal.pincode} />
+                  </div>
                   {personal.bio && (
-                    <div className="col-span-2">
-                      <p className="text-xs text-foreground-muted font-medium mb-0.5">
-                        Bio
-                      </p>
-                      <p className="text-sm">{personal.bio}</p>
+                    <div className="pt-2 border-t border-gray-100">
+                      <LabelValue label="Bio" value={personal.bio} />
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Edit mode */}
+              {/* EDIT MODE */}
               {isEditingPersonal && (
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      First Name <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.firstName}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          firstName: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Middle Name
-                    </label>
-                    <input
-                      value={personal.middleName}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          middleName: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Last Name <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.lastName}
-                      onChange={(e) =>
-                        setPersonal((p) => ({ ...p, lastName: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Preferred Full Name{" "}
-                      <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.preferredFullName}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          preferredFullName: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Contact Number
-                    </label>
-                    <input
-                      value={personal.contactNumber}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          contactNumber: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Gender <span className="text-destructive">*</span>
-                    </label>
-                    <SelectField
-                      label="gender"
-                      value={personal.gender}
-                      onChange={(v) =>
-                        setPersonal((p) => ({ ...p, gender: v }))
-                      }
-                      options={["Male", "Female", "Other", "Prefer not to say"]}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Date of Birth <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={personal.dateOfBirth}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          dateOfBirth: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Marital Status
-                    </label>
-                    <SelectField
-                      label="marital status"
-                      value={personal.maritalStatus}
-                      onChange={(v) =>
-                        setPersonal((p) => ({ ...p, maritalStatus: v }))
-                      }
-                      options={["Single", "Married", "Divorced", "Widowed"]}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Nationality
-                    </label>
-                    <input
-                      value={personal.nationality}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          nationality: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Country <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.country}
-                      onChange={(e) =>
-                        setPersonal((p) => ({ ...p, country: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      State <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.state}
-                      onChange={(e) =>
-                        setPersonal((p) => ({ ...p, state: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      City <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.city}
-                      onChange={(e) =>
-                        setPersonal((p) => ({ ...p, city: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Current City
-                    </label>
-                    <input
-                      value={personal.currentCity}
-                      onChange={(e) =>
-                        setPersonal((p) => ({
-                          ...p,
-                          currentCity: e.target.value,
-                        }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      Pincode <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={personal.pincode}
-                      onChange={(e) =>
-                        setPersonal((p) => ({ ...p, pincode: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    />
-                  </div>
+                  <Input
+                    label="First Name"
+                    value={personal.firstName}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, firstName: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="Middle Name"
+                    value={personal.middleName}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, middleName: v }))
+                    }
+                  />
+                  <Input
+                    label="Last Name"
+                    value={personal.lastName}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, lastName: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="Preferred Name"
+                    value={personal.preferredFullName}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, preferredFullName: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="Contact"
+                    value={personal.contactNumber}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, contactNumber: v }))
+                    }
+                  />
+                  <Select
+                    label="Gender"
+                    value={personal.gender}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, gender: v }))
+                    }
+                    options={["Male", "Female", "Other", "Prefer not to say"]}
+                    required
+                  />
+                  <Input
+                    label="Date of Birth"
+                    value={personal.dateOfBirth}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, dateOfBirth: v }))
+                    }
+                    type="date"
+                    required
+                  />
+                  <Select
+                    label="Marital Status"
+                    value={personal.maritalStatus}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, maritalStatus: v }))
+                    }
+                    options={["Single", "Married", "Divorced", "Widowed"]}
+                  />
+                  <Input
+                    label="Nationality"
+                    value={personal.nationality}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, nationality: v }))
+                    }
+                  />
+                  <Input
+                    label="Country"
+                    value={personal.country}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, country: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="State"
+                    value={personal.state}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, state: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="City"
+                    value={personal.city}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, city: v }))
+                    }
+                    required
+                  />
+                  <Input
+                    label="Current City"
+                    value={personal.currentCity}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, currentCity: v }))
+                    }
+                  />
+                  <Input
+                    label="Pincode"
+                    value={personal.pincode}
+                    onChange={(v: string) =>
+                      setPersonal((p) => ({ ...p, pincode: v }))
+                    }
+                    required
+                  />
                   <div className="col-span-2">
-                    <label className="text-xs text-foreground-muted font-medium">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
                       Bio
                     </label>
                     <textarea
@@ -632,10 +552,11 @@ export default function ProfilePage() {
                       onChange={(e) =>
                         setPersonal((p) => ({ ...p, bio: e.target.value }))
                       }
-                      className="input-field min-h-[80px] mt-1"
+                      rows={3}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
                       maxLength={300}
                     />
-                    <p className="text-xs text-foreground-muted mt-1 text-right">
+                    <p className="text-xs text-gray-400 text-right mt-1">
                       {personal.bio.length}/300
                     </p>
                   </div>
@@ -644,27 +565,35 @@ export default function ProfilePage() {
             </div>
 
             {/* Notifications */}
-            <div className="card-elevated">
-              <h3 className="font-semibold mb-4">Notifications</h3>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="font-bold text-gray-900 mb-4">Notifications</h3>
               <div className="space-y-3">
-                {(
-                  [
-                    { key: "email", label: "Email notifications" },
-                    { key: "push", label: "Push notifications" },
-                    { key: "weekly", label: "Weekly digest" },
-                  ] as const
-                ).map((n) => (
+                {[
+                  { key: "email", label: "Email notifications" },
+                  { key: "push", label: "Push notifications" },
+                  { key: "weekly", label: "Weekly digest" },
+                ].map((n) => (
                   <label
                     key={n.key}
                     className="flex items-center justify-between cursor-pointer"
                   >
-                    <span className="text-sm">{n.label}</span>
+                    <span className="text-sm text-gray-700">{n.label}</span>
                     <button
-                      onClick={() => toggleNotif(n.key)}
-                      className={`w-11 h-6 rounded-full transition-colors relative ${notifications[n.key] ? "bg-primary" : "bg-muted"}`}
+                      onClick={async () => {
+                        const upd = {
+                          ...notifications,
+                          [n.key]:
+                            !notifications[n.key as keyof typeof notifications],
+                        };
+                        setNotifications(upd);
+                        try {
+                          await api.put("/profile/notifications", upd);
+                        } catch {}
+                      }}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${notifications[n.key as keyof typeof notifications] ? "bg-indigo-600" : "bg-gray-200"}`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-card transition-transform ${notifications[n.key] ? "translate-x-5" : ""}`}
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${notifications[n.key as keyof typeof notifications] ? "translate-x-5" : ""}`}
                       />
                     </button>
                   </label>
@@ -677,535 +606,676 @@ export default function ProfilePage() {
                 logout();
                 navigate("/");
               }}
-              className="flex items-center gap-2 text-destructive hover:underline font-medium"
+              className="flex items-center gap-2 text-red-500 hover:underline font-medium text-sm"
             >
               <FaSignOutAlt /> Log Out
             </button>
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════════════════
-            PROFESSIONAL TAB
-        ══════════════════════════════════════════════════════════════════ */}
+        {/* ── PROFESSIONAL TAB ─────────────────────────────────────────── */}
         {tab === "professional" && (
-          <div className="card-elevated space-y-1">
+          <div className="space-y-3">
             {loadingProf && (
               <div className="flex justify-center py-8">
-                <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-
             {prof && (
               <>
-                {/* ── Work Experience ──────────────────────────────────── */}
-                <SectionHeader
-                  id="work"
-                  label="Work Experience"
-                  count={prof.workExperience?.length}
-                />
-                {expandedSection === "work" && (
-                  <div className="py-3 space-y-3">
-                    {(prof.workExperience || []).map((w: any) => (
-                      <div
-                        key={w._id}
-                        className="bg-muted rounded-xl p-3 flex justify-between items-start"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold">{w.title}</p>
-                          <p className="text-xs text-foreground-muted">
-                            {w.organizationName}
-                          </p>
-                          {/* FIX: Show start date → end date (or "Present") */}
-                          <p className="text-xs text-foreground-muted mt-1">
-                            {fmtDate(w.startDate)}
-                            {w.startDate && " — "}
-                            {w.isCurrent ? (
-                              <span className="text-success font-medium">
-                                Present
-                              </span>
-                            ) : w.endDate ? (
-                              fmtDate(w.endDate)
-                            ) : (
-                              <span className="opacity-50">
-                                End date not set
-                              </span>
-                            )}
-                          </p>
-                          {w.jobResponsibilities && (
-                            <p className="text-xs text-foreground-muted mt-1 line-clamp-2">
-                              {w.jobResponsibilities}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => deleteProfItem("work", w._id)}
-                          className="ml-3 shrink-0"
-                        >
-                          <FaTrash className="w-3 h-3 text-destructive/60 hover:text-destructive" />
-                        </button>
-                      </div>
-                    ))}
-
-                    {/* Add form */}
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold text-foreground-muted mb-2 uppercase tracking-wide">
-                        Add New
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          placeholder="Organization *"
-                          value={newWork.organizationName}
-                          onChange={(e) =>
-                            setNewWork((p) => ({
-                              ...p,
-                              organizationName: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <input
-                          placeholder="Job Title *"
-                          value={newWork.title}
-                          onChange={(e) =>
-                            setNewWork((p) => ({ ...p, title: e.target.value }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            Start Date
-                          </label>
-                          <input
-                            type="date"
-                            value={newWork.startDate}
-                            onChange={(e) =>
-                              setNewWork((p) => ({
-                                ...p,
-                                startDate: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            End Date{" "}
-                            {newWork.isCurrent && (
-                              <span className="text-success">
-                                (not required — Current)
-                              </span>
-                            )}
-                          </label>
-                          <input
-                            type="date"
-                            value={newWork.endDate}
-                            disabled={newWork.isCurrent}
-                            onChange={(e) =>
-                              setNewWork((p) => ({
-                                ...p,
-                                endDate: e.target.value,
-                              }))
-                            }
-                            className={`input-field text-sm mt-1 ${newWork.isCurrent ? "opacity-40 cursor-not-allowed" : ""}`}
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <textarea
-                            placeholder="Job responsibilities (optional)"
-                            value={newWork.jobResponsibilities}
-                            onChange={(e) =>
-                              setNewWork((p) => ({
-                                ...p,
-                                jobResponsibilities: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm min-h-[60px]"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 mt-2">
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={newWork.isCurrent}
-                            onChange={(e) =>
-                              setNewWork((p) => ({
-                                ...p,
-                                isCurrent: e.target.checked,
-                                endDate: e.target.checked ? "" : p.endDate,
-                              }))
-                            }
-                            className="rounded"
-                          />
-                          Currently working here
-                        </label>
-                        <button
-                          onClick={() =>
-                            addProfItem("work", newWork, () =>
-                              setNewWork({
-                                isCurrent: false,
-                                organizationName: "",
-                                title: "",
-                                startDate: "",
-                                endDate: "",
-                                jobResponsibilities: "",
-                              }),
-                            )
-                          }
-                          className="btn-primary text-sm py-2 flex items-center gap-1.5 ml-auto"
-                        >
-                          <FaPlus className="w-3 h-3" /> Add
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Education ────────────────────────────────────────── */}
-                <SectionHeader
-                  id="education"
-                  label="Education"
-                  count={prof.education?.length}
-                />
-                {expandedSection === "education" && (
-                  <div className="py-3 space-y-3">
-                    {(prof.education || []).map((e: any) => (
-                      <div
-                        key={e._id}
-                        className="bg-muted rounded-xl p-3 flex justify-between items-start"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold">
-                            {e.degree} {e.areaOfStudy && `in ${e.areaOfStudy}`}
-                          </p>
-                          <p className="text-xs text-foreground-muted">
-                            {e.collegeUniversity}
-                          </p>
-                          {e.dateCompleted && (
-                            <p className="text-xs text-foreground-muted mt-0.5">
-                              Completed: {fmtDate(e.dateCompleted)}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => deleteProfItem("education", e._id)}
-                          className="ml-3 shrink-0"
-                        >
-                          <FaTrash className="w-3 h-3 text-destructive/60 hover:text-destructive" />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold text-foreground-muted mb-2 uppercase tracking-wide">
-                        Add New
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          placeholder="College / University *"
-                          value={newEdu.collegeUniversity}
-                          onChange={(e) =>
-                            setNewEdu((p) => ({
-                              ...p,
-                              collegeUniversity: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <input
-                          placeholder="Degree *"
-                          value={newEdu.degree}
-                          onChange={(e) =>
-                            setNewEdu((p) => ({ ...p, degree: e.target.value }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <input
-                          placeholder="Area of Study"
-                          value={newEdu.areaOfStudy}
-                          onChange={(e) =>
-                            setNewEdu((p) => ({
-                              ...p,
-                              areaOfStudy: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            Date Completed
-                          </label>
-                          <input
-                            type="date"
-                            value={newEdu.dateCompleted}
-                            onChange={(e) =>
-                              setNewEdu((p) => ({
-                                ...p,
-                                dateCompleted: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm mt-1"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("education", newEdu, () =>
-                            setNewEdu({
-                              collegeUniversity: "",
-                              degree: "",
-                              areaOfStudy: "",
-                              degreeCompleted: false,
-                              dateCompleted: "",
-                            }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2 flex items-center gap-1.5 mt-2"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Language Skills ───────────────────────────────────── */}
-                <SectionHeader
-                  id="languages"
-                  label="Language Skills"
-                  count={prof.languages?.length}
-                />
-                {expandedSection === "languages" && (
-                  <div className="py-3 space-y-3">
-                    {(prof.languages || []).map((l: any) => (
-                      <div
-                        key={l._id}
-                        className="bg-muted rounded-xl p-3 flex justify-between items-start"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold">{l.language}</p>
-                          <p className="text-xs text-foreground-muted">
-                            Speaking: {l.speakingProficiency} · Writing:{" "}
-                            {l.writingProficiency} · Reading:{" "}
-                            {l.readingProficiency}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => deleteProfItem("languages", l._id)}
-                          className="ml-3 shrink-0"
-                        >
-                          <FaTrash className="w-3 h-3 text-destructive/60 hover:text-destructive" />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold text-foreground-muted mb-2 uppercase tracking-wide">
-                        Add New
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          placeholder="Language *"
-                          value={newLang.language}
-                          onChange={(e) =>
-                            setNewLang((p) => ({
-                              ...p,
-                              language: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <SelectField
-                          label="speaking proficiency"
-                          value={newLang.speakingProficiency}
-                          onChange={(v) =>
-                            setNewLang((p) => ({
-                              ...p,
-                              speakingProficiency: v,
-                            }))
-                          }
-                          options={PROFICIENCY}
-                        />
-                        <SelectField
-                          label="writing proficiency"
-                          value={newLang.writingProficiency}
-                          onChange={(v) =>
-                            setNewLang((p) => ({ ...p, writingProficiency: v }))
-                          }
-                          options={PROFICIENCY}
-                        />
-                        <SelectField
-                          label="reading proficiency"
-                          value={newLang.readingProficiency}
-                          onChange={(v) =>
-                            setNewLang((p) => ({ ...p, readingProficiency: v }))
-                          }
-                          options={PROFICIENCY}
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("languages", newLang, () =>
-                            setNewLang({
-                              language: "",
-                              speakingProficiency: "",
-                              writingProficiency: "",
-                              readingProficiency: "",
-                            }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2 flex items-center gap-1.5 mt-2"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Certifications ────────────────────────────────────── */}
-                <SectionHeader
-                  id="certifications"
-                  label="Certifications / Licenses"
-                  count={prof.certifications?.length}
-                />
-                {expandedSection === "certifications" && (
-                  <div className="py-3 space-y-3">
-                    {(prof.certifications || []).map((c: any) => (
-                      <div
-                        key={c._id}
-                        className="bg-muted rounded-xl p-3 flex justify-between items-start"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold">{c.name}</p>
-                          <p className="text-xs text-foreground-muted">
-                            {c.institution}
-                          </p>
-                          <p className="text-xs text-foreground-muted">
-                            {c.effectiveDate &&
-                              `From ${fmtDate(c.effectiveDate)}`}
-                            {c.effectiveDate && c.expirationDate && " · "}
-                            {c.expirationDate &&
-                              `Expires ${fmtDate(c.expirationDate)}`}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            deleteProfItem("certifications", c._id)
-                          }
-                          className="ml-3 shrink-0"
-                        >
-                          <FaTrash className="w-3 h-3 text-destructive/60 hover:text-destructive" />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold text-foreground-muted mb-2 uppercase tracking-wide">
-                        Add New
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          placeholder="Certification Name *"
-                          value={newCert.name}
-                          onChange={(e) =>
-                            setNewCert((p) => ({ ...p, name: e.target.value }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <input
-                          placeholder="Institution"
-                          value={newCert.institution}
-                          onChange={(e) =>
-                            setNewCert((p) => ({
-                              ...p,
-                              institution: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            Effective Date
-                          </label>
-                          <input
-                            type="date"
-                            value={newCert.effectiveDate}
-                            onChange={(e) =>
-                              setNewCert((p) => ({
-                                ...p,
-                                effectiveDate: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm mt-1"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            Expiration Date
-                          </label>
-                          <input
-                            type="date"
-                            value={newCert.expirationDate}
-                            onChange={(e) =>
-                              setNewCert((p) => ({
-                                ...p,
-                                expirationDate: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm mt-1"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("certifications", newCert, () =>
-                            setNewCert({
-                              name: "",
-                              institution: "",
-                              effectiveDate: "",
-                              expirationDate: "",
-                            }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2 flex items-center gap-1.5 mt-2"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Technical Skills ──────────────────────────────────── */}
-                <SectionHeader
-                  id="technical"
-                  label="Technical Skills"
-                  count={prof.technicalSkills?.length}
-                />
-                {expandedSection === "technical" && (
-                  <div className="py-3 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {(prof.technicalSkills || []).map((s: any) => (
+                {/* WORK EXPERIENCE */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="work"
+                    label="Work Experience"
+                    count={prof.workExperience?.length}
+                  />
+                  {expandedSec === "work" && (
+                    <div className="p-4 space-y-3">
+                      {(prof.workExperience || []).map((w: any) => (
                         <div
-                          key={s._id}
-                          className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5"
+                          key={w._id}
+                          className="border border-gray-100 rounded-xl p-4"
                         >
-                          <span className="text-sm">{s.skill}</span>
-                          <span className="text-xs text-foreground-muted">
-                            — {s.proficiency}
-                          </span>
+                          {editWork === w._id ? (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <Input
+                                  label="Organization *"
+                                  value={editWorkForm.organizationName}
+                                  onChange={(v: string) =>
+                                    setEditWF((p: any) => ({
+                                      ...p,
+                                      organizationName: v,
+                                    }))
+                                  }
+                                />
+                                <Input
+                                  label="Job Title *"
+                                  value={editWorkForm.title}
+                                  onChange={(v: string) =>
+                                    setEditWF((p: any) => ({ ...p, title: v }))
+                                  }
+                                />
+                                <Input
+                                  label="Start Date *"
+                                  value={editWorkForm.startDate}
+                                  onChange={(v: string) =>
+                                    setEditWF((p: any) => ({
+                                      ...p,
+                                      startDate: v,
+                                    }))
+                                  }
+                                  type="date"
+                                />
+                                <div>
+                                  <Input
+                                    label="End Date"
+                                    value={editWorkForm.endDate}
+                                    onChange={(v: string) =>
+                                      setEditWF((p: any) => ({
+                                        ...p,
+                                        endDate: v,
+                                      }))
+                                    }
+                                    type="date"
+                                  />
+                                  <label className="flex items-center gap-2 mt-1.5 text-xs text-gray-500 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={editWorkForm.isCurrent}
+                                      onChange={(e) =>
+                                        setEditWF((p: any) => ({
+                                          ...p,
+                                          isCurrent: e.target.checked,
+                                          endDate: e.target.checked
+                                            ? ""
+                                            : p.endDate,
+                                        }))
+                                      }
+                                      className="rounded"
+                                    />
+                                    Currently working here
+                                  </label>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+                                  Responsibilities
+                                </label>
+                                <textarea
+                                  value={editWorkForm.jobResponsibilities}
+                                  onChange={(e) =>
+                                    setEditWF((p: any) => ({
+                                      ...p,
+                                      jobResponsibilities: e.target.value,
+                                    }))
+                                  }
+                                  rows={2}
+                                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() =>
+                                    updateProfItem("work", w._id, editWorkForm)
+                                  }
+                                  className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditWork(null)}
+                                  className="border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">
+                                  {w.title}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {w.organizationName}
+                                </p>
+                                {/* Full date with day month year */}
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {fmtFullDate(w.startDate)} —{" "}
+                                  {w.isCurrent ? (
+                                    <span className="text-green-600 font-semibold">
+                                      Present
+                                    </span>
+                                  ) : (
+                                    fmtFullDate(w.endDate) || (
+                                      <span className="text-gray-300 italic">
+                                        End date not set
+                                      </span>
+                                    )
+                                  )}
+                                </p>
+                                {w.jobResponsibilities && (
+                                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2">
+                                    {w.jobResponsibilities}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex gap-1 ml-3">
+                                <button
+                                  onClick={() => {
+                                    setEditWork(w._id);
+                                    setEditWF({
+                                      organizationName: w.organizationName,
+                                      title: w.title,
+                                      startDate:
+                                        w.startDate?.slice(0, 10) || "",
+                                      endDate: w.endDate?.slice(0, 10) || "",
+                                      isCurrent: w.isCurrent || false,
+                                      jobResponsibilities:
+                                        w.jobResponsibilities || "",
+                                    });
+                                  }}
+                                  className="text-indigo-400 hover:text-indigo-600 p-1.5 hover:bg-indigo-50 rounded-lg"
+                                >
+                                  <FaEdit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => delProfItem("work", w._id)}
+                                  className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg"
+                                >
+                                  <FaTrash className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {/* Add form */}
+                      <div className="border-t border-gray-100 pt-3">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                          Add New
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input
+                            placeholder="Organization *"
+                            value={newWork.organizationName}
+                            onChange={(e) =>
+                              setNewWork((p) => ({
+                                ...p,
+                                organizationName: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                          />
+                          <input
+                            placeholder="Job Title *"
+                            value={newWork.title}
+                            onChange={(e) =>
+                              setNewWork((p) => ({
+                                ...p,
+                                title: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                          />
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">
+                              Start Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={newWork.startDate}
+                              onChange={(e) =>
+                                setNewWork((p) => ({
+                                  ...p,
+                                  startDate: e.target.value,
+                                }))
+                              }
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">
+                              End Date{" "}
+                              {newWork.isCurrent && (
+                                <span className="text-green-500">
+                                  (not needed)
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="date"
+                              value={newWork.endDate}
+                              disabled={newWork.isCurrent}
+                              onChange={(e) =>
+                                setNewWork((p) => ({
+                                  ...p,
+                                  endDate: e.target.value,
+                                }))
+                              }
+                              className={`w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none ${newWork.isCurrent ? "opacity-40 cursor-not-allowed" : ""}`}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <textarea
+                              placeholder="Job responsibilities"
+                              value={newWork.jobResponsibilities}
+                              onChange={(e) =>
+                                setNewWork((p) => ({
+                                  ...p,
+                                  jobResponsibilities: e.target.value,
+                                }))
+                              }
+                              rows={2}
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newWork.isCurrent}
+                              onChange={(e) =>
+                                setNewWork((p) => ({
+                                  ...p,
+                                  isCurrent: e.target.checked,
+                                  endDate: e.target.checked ? "" : p.endDate,
+                                }))
+                              }
+                              className="rounded"
+                            />
+                            Currently working here
+                          </label>
                           <button
                             onClick={() =>
-                              deleteProfItem("technical-skills", s._id)
+                              addProfItem("work", newWork, () =>
+                                setNewWork({
+                                  isCurrent: false,
+                                  organizationName: "",
+                                  title: "",
+                                  startDate: "",
+                                  endDate: "",
+                                  jobResponsibilities: "",
+                                }),
+                              )
                             }
-                            className="text-foreground-muted hover:text-destructive ml-1"
+                            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
                           >
-                            <FaTimes className="w-2.5 h-2.5" />
+                            <FaPlus className="w-3 h-3" /> Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* EDUCATION */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="edu"
+                    label="Education"
+                    count={prof.education?.length}
+                  />
+                  {expandedSec === "edu" && (
+                    <div className="p-4 space-y-3">
+                      {(prof.education || []).map((e: any) => (
+                        <div
+                          key={e._id}
+                          className="flex items-start justify-between border border-gray-100 rounded-xl p-3"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {e.degree}
+                              {e.areaOfStudy && ` in ${e.areaOfStudy}`}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {e.collegeUniversity}
+                            </p>
+                            {e.dateCompleted && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Completed: {fmtFullDate(e.dateCompleted)}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => delProfItem("education", e._id)}
+                            className="text-red-400 hover:text-red-600 p-1.5"
+                          >
+                            <FaTrash className="w-3 h-3" />
                           </button>
                         </div>
                       ))}
+                      <div className="border-t border-gray-100 pt-3">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input
+                            placeholder="College / University *"
+                            value={newEdu.collegeUniversity}
+                            onChange={(e) =>
+                              setNewEdu((p) => ({
+                                ...p,
+                                collegeUniversity: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                          />
+                          <input
+                            placeholder="Degree *"
+                            value={newEdu.degree}
+                            onChange={(e) =>
+                              setNewEdu((p) => ({
+                                ...p,
+                                degree: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                          />
+                          <input
+                            placeholder="Area of Study"
+                            value={newEdu.areaOfStudy}
+                            onChange={(e) =>
+                              setNewEdu((p) => ({
+                                ...p,
+                                areaOfStudy: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                          />
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">
+                              Date Completed *
+                            </label>
+                            <input
+                              type="date"
+                              value={newEdu.dateCompleted}
+                              onChange={(e) =>
+                                setNewEdu((p) => ({
+                                  ...p,
+                                  dateCompleted: e.target.value,
+                                }))
+                              }
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            addProfItem("education", newEdu, () =>
+                              setNewEdu({
+                                collegeUniversity: "",
+                                degree: "",
+                                areaOfStudy: "",
+                                degreeCompleted: false,
+                                dateCompleted: "",
+                              }),
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
+                        >
+                          <FaPlus className="w-3 h-3" /> Add Education
+                        </button>
+                      </div>
                     </div>
-                    <div className="border-t border-border pt-3 flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="text-xs text-foreground-muted">
-                          Skill name *
-                        </label>
+                  )}
+                </div>
+
+                {/* LANGUAGE SKILLS */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="lang"
+                    label="Language Skills"
+                    count={prof.languages?.length}
+                  />
+                  {expandedSec === "lang" && (
+                    <div className="p-4 space-y-3">
+                      {(prof.languages || []).map((l: any) => (
+                        <div
+                          key={l._id}
+                          className="flex items-start justify-between border border-gray-100 rounded-xl p-3"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {l.language}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Speaking: {l.speakingProficiency} · Writing:{" "}
+                              {l.writingProficiency} · Reading:{" "}
+                              {l.readingProficiency}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => delProfItem("languages", l._id)}
+                            className="text-red-400 hover:text-red-600 p-1.5"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-100 pt-3">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input
+                            placeholder="Language *"
+                            value={newLang.language}
+                            onChange={(e) =>
+                              setNewLang((p) => ({
+                                ...p,
+                                language: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none col-span-2"
+                          />
+                          <select
+                            value={newLang.speakingProficiency}
+                            onChange={(e) =>
+                              setNewLang((p) => ({
+                                ...p,
+                                speakingProficiency: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
+                          >
+                            {PROFICIENCY.map((p) => (
+                              <option key={p}>{p}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={newLang.writingProficiency}
+                            onChange={(e) =>
+                              setNewLang((p) => ({
+                                ...p,
+                                writingProficiency: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
+                          >
+                            {PROFICIENCY.map((p) => (
+                              <option key={p}>{p}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={newLang.readingProficiency}
+                            onChange={(e) =>
+                              setNewLang((p) => ({
+                                ...p,
+                                readingProficiency: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
+                          >
+                            {PROFICIENCY.map((p) => (
+                              <option key={p}>{p}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={() =>
+                            addProfItem("languages", newLang, () =>
+                              setNewLang({
+                                language: "",
+                                speakingProficiency: "",
+                                writingProficiency: "",
+                                readingProficiency: "",
+                              }),
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
+                        >
+                          <FaPlus className="w-3 h-3" /> Add Language
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* CERTIFICATIONS */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="cert"
+                    label="Certifications / Licenses"
+                    count={prof.certifications?.length}
+                  />
+                  {expandedSec === "cert" && (
+                    <div className="p-4 space-y-3">
+                      {(prof.certifications || []).map((c: any) => (
+                        <div
+                          key={c._id}
+                          className="flex items-start justify-between border border-gray-100 rounded-xl p-3"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {c.name}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {c.institution}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {c.effectiveDate &&
+                                `From ${fmtFullDate(c.effectiveDate)}`}
+                              {c.effectiveDate && c.expirationDate && " · "}
+                              {c.expirationDate &&
+                                `Expires ${fmtFullDate(c.expirationDate)}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => delProfItem("certifications", c._id)}
+                            className="text-red-400 hover:text-red-600 p-1.5"
+                          >
+                            <FaTrash className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-100 pt-3">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <input
+                            placeholder="Certification Name *"
+                            value={newCert.name}
+                            onChange={(e) =>
+                              setNewCert((p) => ({
+                                ...p,
+                                name: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none col-span-2"
+                          />
+                          <input
+                            placeholder="Institution"
+                            value={newCert.institution}
+                            onChange={(e) =>
+                              setNewCert((p) => ({
+                                ...p,
+                                institution: e.target.value,
+                              }))
+                            }
+                            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none col-span-2"
+                          />
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">
+                              Effective Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={newCert.effectiveDate}
+                              onChange={(e) =>
+                                setNewCert((p) => ({
+                                  ...p,
+                                  effectiveDate: e.target.value,
+                                }))
+                              }
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 mb-1 block">
+                              Expiry Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={newCert.expirationDate}
+                              onChange={(e) =>
+                                setNewCert((p) => ({
+                                  ...p,
+                                  expirationDate: e.target.value,
+                                }))
+                              }
+                              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() =>
+                            addProfItem("certifications", newCert, () =>
+                              setNewCert({
+                                name: "",
+                                institution: "",
+                                effectiveDate: "",
+                                expirationDate: "",
+                              }),
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 flex items-center gap-1.5"
+                        >
+                          <FaPlus className="w-3 h-3" /> Add Certification
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* TECHNICAL SKILLS */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="tech"
+                    label="Technical Skills"
+                    count={prof.technicalSkills?.length}
+                  />
+                  {expandedSec === "tech" && (
+                    <div className="p-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {(prof.technicalSkills || []).map((s: any) => (
+                          <div
+                            key={s._id}
+                            className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-full px-3 py-1 text-sm"
+                          >
+                            {s.skill}{" "}
+                            <span className="text-indigo-400">
+                              ·{s.proficiency}
+                            </span>
+                            <button
+                              onClick={() =>
+                                delProfItem("technical-skills", s._id)
+                              }
+                              className="text-indigo-300 hover:text-red-500 ml-1"
+                            >
+                              <FaTimes className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-2">
                         <input
+                          placeholder="Skill name *"
                           value={newTSkill.skill}
                           onChange={(e) =>
                             setNewTSkill((p) => ({
@@ -1213,72 +1283,71 @@ export default function ProfilePage() {
                               skill: e.target.value,
                             }))
                           }
-                          className="input-field text-sm mt-1"
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
                         />
-                      </div>
-                      <div className="w-40">
-                        <label className="text-xs text-foreground-muted">
-                          Level
-                        </label>
-                        <SelectField
-                          label="level"
+                        <select
                           value={newTSkill.proficiency}
-                          onChange={(v) =>
-                            setNewTSkill((p) => ({ ...p, proficiency: v }))
+                          onChange={(e) =>
+                            setNewTSkill((p) => ({
+                              ...p,
+                              proficiency: e.target.value,
+                            }))
                           }
-                          options={["1", "2", "3", "4", "5"]}
-                          className="text-sm mt-1"
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("technical-skills", newTSkill, () =>
-                            setNewTSkill({ skill: "", proficiency: "" }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2.5 px-4 flex items-center gap-1"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Functional Skills ─────────────────────────────────── */}
-                <SectionHeader
-                  id="functional"
-                  label="Functional Skills"
-                  count={prof.functionalSkills?.length}
-                />
-                {expandedSection === "functional" && (
-                  <div className="py-3 space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {(prof.functionalSkills || []).map((s: any) => (
-                        <div
-                          key={s._id}
-                          className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5"
+                          className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
                         >
-                          <span className="text-sm">{s.skill}</span>
-                          <span className="text-xs text-foreground-muted">
-                            — {s.proficiency}
-                          </span>
-                          <button
-                            onClick={() =>
-                              deleteProfItem("functional-skills", s._id)
-                            }
-                            className="text-foreground-muted hover:text-destructive ml-1"
-                          >
-                            <FaTimes className="w-2.5 h-2.5" />
-                          </button>
-                        </div>
-                      ))}
+                          <option value="">Level</option>
+                          {["1", "2", "3", "4", "5"].map((l) => (
+                            <option key={l}>{l}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() =>
+                            addProfItem("technical-skills", newTSkill, () =>
+                              setNewTSkill({ skill: "", proficiency: "" }),
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700"
+                        >
+                          <FaPlus />
+                        </button>
+                      </div>
                     </div>
-                    <div className="border-t border-border pt-3 flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="text-xs text-foreground-muted">
-                          Skill name *
-                        </label>
+                  )}
+                </div>
+
+                {/* FUNCTIONAL SKILLS */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <SecHead
+                    id="func"
+                    label="Functional Skills"
+                    count={prof.functionalSkills?.length}
+                  />
+                  {expandedSec === "func" && (
+                    <div className="p-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {(prof.functionalSkills || []).map((s: any) => (
+                          <div
+                            key={s._id}
+                            className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 text-purple-700 rounded-full px-3 py-1 text-sm"
+                          >
+                            {s.skill}{" "}
+                            <span className="text-purple-400">
+                              ·{s.proficiency}
+                            </span>
+                            <button
+                              onClick={() =>
+                                delProfItem("functional-skills", s._id)
+                              }
+                              className="text-purple-300 hover:text-red-500 ml-1"
+                            >
+                              <FaTimes className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 mt-2">
                         <input
+                          placeholder="Skill name *"
                           value={newFSkill.skill}
                           onChange={(e) =>
                             setNewFSkill((p) => ({
@@ -1286,292 +1355,126 @@ export default function ProfilePage() {
                               skill: e.target.value,
                             }))
                           }
-                          className="input-field text-sm mt-1"
+                          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none"
                         />
-                      </div>
-                      <div className="w-40">
-                        <label className="text-xs text-foreground-muted">
-                          Level
-                        </label>
-                        <SelectField
-                          label="level"
+                        <select
                           value={newFSkill.proficiency}
-                          onChange={(v) =>
-                            setNewFSkill((p) => ({ ...p, proficiency: v }))
+                          onChange={(e) =>
+                            setNewFSkill((p) => ({
+                              ...p,
+                              proficiency: e.target.value,
+                            }))
                           }
-                          options={["1", "2", "3", "4", "5"]}
-                          className="text-sm mt-1"
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("functional-skills", newFSkill, () =>
-                            setNewFSkill({ skill: "", proficiency: "" }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2.5 px-4 flex items-center gap-1"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Honors & Awards ───────────────────────────────────── */}
-                <SectionHeader
-                  id="honors"
-                  label="Honors / Awards / Publications"
-                  count={prof.honorsAwards?.length}
-                />
-                {expandedSection === "honors" && (
-                  <div className="py-3 space-y-3">
-                    {(prof.honorsAwards || []).map((h: any) => (
-                      <div
-                        key={h._id}
-                        className="bg-muted rounded-xl p-3 flex justify-between items-start"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold">{h.title}</p>
-                          <p className="text-xs text-foreground-muted">
-                            {h.institution}
-                          </p>
-                          {h.issueDate && (
-                            <p className="text-xs text-foreground-muted">
-                              {fmtDate(h.issueDate)}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => deleteProfItem("honors", h._id)}
-                          className="ml-3 shrink-0"
+                          className="w-28 border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none"
                         >
-                          <FaTrash className="w-3 h-3 text-destructive/60 hover:text-destructive" />
+                          <option value="">Level</option>
+                          {["1", "2", "3", "4", "5"].map((l) => (
+                            <option key={l}>{l}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() =>
+                            addProfItem("functional-skills", newFSkill, () =>
+                              setNewFSkill({ skill: "", proficiency: "" }),
+                            )
+                          }
+                          className="bg-indigo-600 text-white px-3 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700"
+                        >
+                          <FaPlus />
                         </button>
                       </div>
-                    ))}
-                    <div className="border-t border-border pt-3">
-                      <p className="text-xs font-semibold text-foreground-muted mb-2 uppercase tracking-wide">
-                        Add New
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          placeholder="Title *"
-                          value={newHonor.title}
-                          onChange={(e) =>
-                            setNewHonor((p) => ({
-                              ...p,
-                              title: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <input
-                          placeholder="Institution"
-                          value={newHonor.institution}
-                          onChange={(e) =>
-                            setNewHonor((p) => ({
-                              ...p,
-                              institution: e.target.value,
-                            }))
-                          }
-                          className="input-field text-sm"
-                        />
-                        <div>
-                          <label className="text-xs text-foreground-muted">
-                            Issue Date
-                          </label>
-                          <input
-                            type="date"
-                            value={newHonor.issueDate}
-                            onChange={(e) =>
-                              setNewHonor((p) => ({
-                                ...p,
-                                issueDate: e.target.value,
-                              }))
-                            }
-                            className="input-field text-sm mt-1"
-                          />
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          addProfItem("honors", newHonor, () =>
-                            setNewHonor({
-                              title: "",
-                              institution: "",
-                              issueDate: "",
-                            }),
-                          )
-                        }
-                        className="btn-primary text-sm py-2 flex items-center gap-1.5 mt-2"
-                      >
-                        <FaPlus className="w-3 h-3" /> Add
-                      </button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════════════════
-            SECURITY TAB
-        ══════════════════════════════════════════════════════════════════ */}
+        {/* ── SECURITY TAB ─────────────────────────────────────────────── */}
         {tab === "security" && (
-          <div className="space-y-4">
-            <div className="card-elevated">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <FaLock className="text-primary" /> Change Password
-              </h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (pwForm.newPw.length < 6)
-                    return toast.error(
-                      "Password must be at least 6 characters",
-                    );
-                  if (pwForm.newPw !== pwForm.confirm)
-                    return toast.error("Passwords do not match");
-                  setSavingPw(true);
-                  try {
-                    const res = await api.patch("/auth/change-password", {
-                      currentPassword: pwForm.current,
-                      newPassword: pwForm.newPw,
-                    });
-                    toast.success(res.data.message);
-                    setPwForm({ current: "", newPw: "", confirm: "" });
-                  } catch (e: any) {
-                    toast.error(
-                      e.response?.data?.message || "Failed to change password",
-                    );
-                  } finally {
-                    setSavingPw(false);
-                  }
-                }}
-                className="space-y-3"
-              >
-                {[
-                  {
-                    key: "current",
-                    label: "Current Password",
-                    showKey: "curr" as const,
-                  },
-                  {
-                    key: "newPw",
-                    label: "New Password",
-                    showKey: "new_" as const,
-                  },
-                  {
-                    key: "confirm",
-                    label: "Confirm New Password",
-                    showKey: "conf" as const,
-                  },
-                ].map((field) => (
-                  <div key={field.key}>
-                    <label className="text-xs text-foreground-muted font-medium">
-                      {field.label}
-                    </label>
-                    <div className="relative mt-1">
-                      <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-muted w-3.5 h-3.5" />
-                      <input
-                        type={showPw[field.showKey] ? "text" : "password"}
-                        value={(pwForm as any)[field.key]}
-                        onChange={(e) =>
-                          setPwForm((p) => ({
-                            ...p,
-                            [field.key]: e.target.value,
-                          }))
-                        }
-                        className="input-field pl-11 pr-11"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowPw((p) => ({
-                            ...p,
-                            [field.showKey]: !p[field.showKey],
-                          }))
-                        }
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
-                      >
-                        {showPw[field.showKey] ? (
-                          <FaEyeSlash className="w-3.5 h-3.5" />
-                        ) : (
-                          <FaEye className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
+              <FaLock className="text-indigo-500" /> Change Password
+            </h3>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (pwForm.newPw.length < 6)
+                  return toast.error("Min 6 characters");
+                if (pwForm.newPw !== pwForm.confirm)
+                  return toast.error("Passwords do not match");
+                setSavingPw(true);
+                try {
+                  const r = await api.patch("/auth/change-password", {
+                    currentPassword: pwForm.current,
+                    newPassword: pwForm.newPw,
+                  });
+                  toast.success(r.data.message);
+                  setPwForm({ current: "", newPw: "", confirm: "" });
+                } catch (e: any) {
+                  toast.error(e.response?.data?.message || "Failed");
+                } finally {
+                  setSavingPw(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              {[
+                {
+                  key: "current",
+                  label: "Current Password",
+                  showKey: "curr" as const,
+                },
+                {
+                  key: "newPw",
+                  label: "New Password",
+                  showKey: "new_" as const,
+                },
+                {
+                  key: "confirm",
+                  label: "Confirm Password",
+                  showKey: "conf" as const,
+                },
+              ].map((f) => (
+                <div key={f.key}>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+                    {f.label}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPw[f.showKey] ? "text" : "password"}
+                      value={(pwForm as any)[f.key]}
+                      onChange={(e) =>
+                        setPwForm((p) => ({ ...p, [f.key]: e.target.value }))
+                      }
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPw((p) => ({ ...p, [f.showKey]: !p[f.showKey] }))
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    >
+                      {showPw[f.showKey] ? (
+                        <FaEyeSlash className="w-4 h-4" />
+                      ) : (
+                        <FaEye className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
-                ))}
-                {pwForm.newPw.length > 0 && (
-                  <div>
-                    <div className="flex gap-1 mb-1">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div
-                          key={i}
-                          className={`flex-1 h-1.5 rounded-full transition-all ${
-                            pwForm.newPw.length >= i * 3
-                              ? i <= 1
-                                ? "bg-destructive"
-                                : i <= 2
-                                  ? "bg-secondary"
-                                  : i <= 3
-                                    ? "bg-blue-400"
-                                    : "bg-success"
-                              : "bg-muted"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-xs text-foreground-muted">
-                      {pwForm.newPw.length < 6
-                        ? "Too short"
-                        : pwForm.newPw.length < 9
-                          ? "Weak"
-                          : pwForm.newPw.length < 12
-                            ? "Good"
-                            : "Strong"}
-                    </p>
-                  </div>
-                )}
-                {pwForm.confirm.length > 0 && (
-                  <p
-                    className={`text-xs ${pwForm.newPw === pwForm.confirm ? "text-success" : "text-destructive"}`}
-                  >
-                    {pwForm.newPw === pwForm.confirm
-                      ? "✓ Passwords match"
-                      : "✗ Passwords do not match"}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={savingPw}
-                  className="btn-primary w-full disabled:opacity-50"
-                >
-                  {savingPw ? "Updating..." : "Change Password"}
-                </button>
-              </form>
-            </div>
-            <div className="card-elevated border-l-4 border-l-destructive">
-              <h3 className="font-semibold text-destructive mb-2">
-                Danger Zone
-              </h3>
-              <p className="text-sm text-foreground-muted mb-3">
-                These actions are permanent and cannot be undone.
-              </p>
+                </div>
+              ))}
               <button
-                onClick={async () => {
-                  if (!confirm("Sign out?")) return;
-                  logout();
-                  navigate("/login");
-                }}
-                className="text-sm text-destructive border border-destructive px-4 py-2 rounded-lg hover:bg-destructive/10 transition-all"
+                type="submit"
+                disabled={savingPw}
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50"
               >
-                Sign Out
+                {savingPw ? "Updating..." : "Change Password"}
               </button>
-            </div>
+            </form>
           </div>
         )}
       </div>

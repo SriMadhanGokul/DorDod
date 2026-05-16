@@ -19,12 +19,33 @@ const generate21DayPlan = (goalTitle, startDate = new Date()) => {
   return activities;
 };
 
+// Auto-mark past days as Missed (called when goal is loaded)
+const autoMarkMissedDays = async (goal) => {
+  const today = new Date().toISOString().slice(0, 10);
+  let changed = false;
+  for (const day of goal.dayActivities) {
+    const dueDay = day.dueDate?.toISOString?.()?.slice(0, 10);
+    if (dueDay && dueDay < today && day.status === "Upcoming") {
+      day.status = "Missed";
+      changed = true;
+    }
+  }
+  if (changed) {
+    goal.markModified("dayActivities");
+    await goal.save();
+  }
+  return goal;
+};
+
 // GET /api/goals
 const getGoals = async (req, res) => {
   try {
-    const goals = await Goal.find({ user: req.user.id }).sort({
-      createdAt: -1,
-    });
+    let goals = await Goal.find({ user: req.user.id }).sort({ createdAt: -1 });
+    // Auto-mark any past days as Missed for in-progress goals
+    for (const goal of goals.filter((g) => g.status === "In Progress")) {
+      await autoMarkMissedDays(goal);
+    }
+    goals = await Goal.find({ user: req.user.id }).sort({ createdAt: -1 });
     const inProgress = goals.filter((g) => g.status === "In Progress");
     const backlog = goals.filter((g) => g.status === "Not Started");
     const completed = goals.filter((g) => g.status === "Completed");
@@ -198,7 +219,45 @@ const completeDayActivity = async (req, res) => {
     const dueDay = day.dueDate?.toISOString().slice(0, 10);
     const wasCompleted = day.status === "Completed";
 
+    // ── ONE CLICK PER DAY ENFORCEMENT ────────────────────────────────────
+    // Users can only complete today's activity (dueDate === today)
+    // Cannot complete past days or future days
+    if (!wasCompleted) {
+      if (!dueDay)
+        return res
+          .status(400)
+          .json({ success: false, message: "This day has no due date set" });
+      if (dueDay !== today) {
+        if (dueDay < today) {
+          // Past day — mark as Missed (penalty applied), cannot be completed
+          return res.status(400).json({
+            success: false,
+            message: `Day ${dayNumber} was due on ${dueDay}. Missed days cannot be completed. A penalty has been applied.`,
+            missed: true,
+          });
+        } else {
+          // Future day — not allowed
+          return res.status(400).json({
+            success: false,
+            message: `Day ${dayNumber} is scheduled for ${dueDay}. You can only complete today's activity.`,
+          });
+        }
+      }
+    }
+
     if (wasCompleted) {
+      // Allow un-completing only if it was done today
+      const completedToday = day.completedAt
+        ? new Date(day.completedAt).toISOString().slice(0, 10) === today
+        : false;
+      if (!completedToday) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Cannot undo a previously completed day.",
+          });
+      }
       day.status = "Upcoming";
       day.completedAt = null;
     } else {
@@ -310,6 +369,65 @@ const deleteGoal = async (req, res) => {
   }
 };
 
+// PATCH /api/goals/:id/day/:dayNumber/pause
+const pauseDay = async (req, res) => {
+  try {
+    const { dayNumber } = req.params;
+    const goal = await Goal.findOne({ _id: req.params.id, user: req.user.id });
+    if (!goal)
+      return res
+        .status(404)
+        .json({ success: false, message: "Goal not found" });
+    if (goal.status !== "In Progress")
+      return res
+        .status(400)
+        .json({ success: false, message: "Goal is not active" });
+    if (goal.pausedDays >= goal.maxPauseDays)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `Max ${goal.maxPauseDays} pause days allowed per plan`,
+        });
+
+    const day = goal.dayActivities.find(
+      (d) => d.dayNumber === parseInt(dayNumber),
+    );
+    if (!day)
+      return res.status(404).json({ success: false, message: "Day not found" });
+    if (day.status === "Completed")
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot pause a completed day" });
+
+    day.status = "Paused";
+    day.isPaused = true;
+    goal.pausedDays += 1;
+
+    // Extend plan — push all remaining due dates by 1 day
+    const dueDate = day.dueDate ? new Date(day.dueDate) : new Date();
+    goal.dayActivities.forEach((d) => {
+      if (d.dayNumber > parseInt(dayNumber) && d.dueDate) {
+        const newDue = new Date(d.dueDate);
+        newDue.setDate(newDue.getDate() + 1);
+        d.dueDate = newDue;
+      }
+    });
+
+    goal.markModified("dayActivities");
+    await goal.save();
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: `Day ${dayNumber} paused. Plan extended by 1 day.`,
+        data: goal,
+      });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to pause day" });
+  }
+};
+
 module.exports = {
   getGoals,
   createGoal,
@@ -318,4 +436,5 @@ module.exports = {
   completeDayActivity,
   updateGoal,
   deleteGoal,
+  pauseDay,
 };

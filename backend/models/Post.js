@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const commentSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    content: { type: String, required: true, maxlength: 500 },
+    content: { type: String, required: true, maxlength: 1000 },
+    edited: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
@@ -15,13 +16,12 @@ const postSchema = new mongoose.Schema(
     tags: { type: [String], default: ["General"] },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comments: { type: [commentSchema], default: [] },
-    // Media support
     mediaType: {
       type: String,
-      enum: ["none", "image", "video", "link"],
+      enum: ["none", "image", "video", "link", "file"],
       default: "none",
     },
-    mediaUrl: { type: String, default: "" }, // URL or uploaded path
+    mediaUrl: { type: String, default: "" },
     mediaFileName: { type: String, default: "" },
     linkPreview: {
       title: { type: String, default: "" },

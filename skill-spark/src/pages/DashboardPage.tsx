@@ -10,7 +10,9 @@ import {
   FaArrowDown,
   FaTag,
   FaShareAlt,
-  FaArrowRight,
+  FaPlus,
+  FaTimes,
+  FaLock,
 } from "react-icons/fa";
 
 const QUOTES = [
@@ -23,6 +25,7 @@ const QUOTES = [
 const getDailyQuote = () =>
   QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 
+// States for check-in
 const STATES = [
   {
     value: "Calm",
@@ -56,6 +59,30 @@ const STATES = [
   },
 ];
 
+const SLOT_CONFIG = {
+  Morning: {
+    emoji: "🌅",
+    label: "Morning",
+    time: "Before 12 PM",
+    color: "text-amber-600",
+    bg: "bg-amber-50 border-amber-200",
+  },
+  Midday: {
+    emoji: "☀️",
+    label: "Midday",
+    time: "12 PM – 5 PM",
+    color: "text-orange-600",
+    bg: "bg-orange-50 border-orange-200",
+  },
+  Evening: {
+    emoji: "🌙",
+    label: "Evening",
+    time: "After 5 PM",
+    color: "text-indigo-600",
+    bg: "bg-indigo-50 border-indigo-200",
+  },
+};
+
 const REALIZATION_TAGS = [
   "Avoidance",
   "Clarity",
@@ -67,27 +94,12 @@ const REALIZATION_TAGS = [
   "Gratitude",
 ];
 
-function AlignmentRing({
-  score,
-  label,
-  delta,
-}: {
-  score: number;
-  label: string;
-  delta?: number;
-}) {
-  const size = 140;
-  const r = 54;
+function AlignmentRing({ score, label }: { score: number; label: string }) {
+  const size = 130;
+  const r = 50;
   const circ = 2 * Math.PI * r;
-  const pct = Math.min(score, 100) / 100;
-  const off = circ - pct * circ;
+  const off = circ - (Math.min(score, 100) / 100) * circ;
   const color = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
-  const labelColor =
-    score >= 70
-      ? "text-green-600"
-      : score >= 40
-        ? "text-amber-500"
-        : "text-red-500";
   return (
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: size, height: size }}>
@@ -98,7 +110,7 @@ function AlignmentRing({
             r={r}
             fill="none"
             stroke="#e5e7eb"
-            strokeWidth={14}
+            strokeWidth={12}
           />
           <circle
             cx={size / 2}
@@ -106,7 +118,7 @@ function AlignmentRing({
             r={r}
             fill="none"
             stroke={color}
-            strokeWidth={14}
+            strokeWidth={12}
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={off}
@@ -114,31 +126,17 @@ function AlignmentRing({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-4xl font-black" style={{ color }}>
+          <p className="text-3xl font-black" style={{ color }}>
             {score}
           </p>
-          <p className="text-xs text-gray-400 font-medium">/100</p>
+          <p className="text-xs text-gray-400">/100</p>
         </div>
       </div>
-      <div className="mt-2 text-center">
-        <span
-          className={`text-sm font-bold px-3 py-1 rounded-full ${score >= 70 ? "bg-green-100 text-green-700" : score >= 40 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"}`}
-        >
-          {label}
-        </span>
-        {delta !== undefined && delta !== 0 && (
-          <p
-            className={`text-xs mt-1 flex items-center justify-center gap-0.5 font-semibold ${delta > 0 ? "text-green-600" : "text-red-500"}`}
-          >
-            {delta > 0 ? (
-              <FaArrowUp className="w-2.5 h-2.5" />
-            ) : (
-              <FaArrowDown className="w-2.5 h-2.5" />
-            )}
-            {Math.abs(delta)} vs yesterday
-          </p>
-        )}
-      </div>
+      <span
+        className={`mt-2 text-xs font-bold px-3 py-1 rounded-full ${score >= 70 ? "bg-green-100 text-green-700" : score >= 40 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"}`}
+      >
+        {label}
+      </span>
     </div>
   );
 }
@@ -165,11 +163,10 @@ function ScoreBar({
       className={`rounded-xl p-3 border ${isNeg ? "bg-red-50 border-red-100" : "border-gray-100"}`}
       style={{ background: isNeg ? undefined : `${color}08` }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{icon}</span>
-          <p className="text-xs font-bold text-gray-700">{label}</p>
-        </div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+          {icon} {label}
+        </span>
         <span
           className="text-sm font-black"
           style={{ color: isNeg ? "#ef4444" : color }}
@@ -177,62 +174,13 @@ function ScoreBar({
           {isNeg ? score : score}/{isNeg ? -max : max}
         </span>
       </div>
-      <div className="w-full bg-gray-100 rounded-full h-2 mb-1.5">
+      <div className="w-full bg-gray-100 rounded-full h-2">
         <div
           className="h-2 rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, background: isNeg ? "#ef4444" : color }}
         />
       </div>
-      <p className="text-xs text-gray-400">{detail}</p>
-    </div>
-  );
-}
-
-function ActionRow({
-  icon,
-  label,
-  done,
-  action,
-  actionLabel,
-}: {
-  icon: string;
-  label: string;
-  done: boolean;
-  action?: () => void;
-  actionLabel?: string;
-}) {
-  return (
-    <div
-      className={`flex items-center justify-between p-3 rounded-xl transition-all ${done ? "bg-green-50 border border-green-100" : "bg-gray-50 hover:bg-gray-100"}`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${done ? "bg-green-500" : "bg-gray-200"}`}
-        >
-          {done ? (
-            <FaCheck className="text-white w-3.5 h-3.5" />
-          ) : (
-            <span>{icon}</span>
-          )}
-        </div>
-        <span
-          className={`text-sm font-medium ${done ? "text-gray-500 line-through" : " text-gray-800"}`}
-        >
-          {label}
-        </span>
-      </div>
-      {done ? (
-        <span className="text-xs text-green-600 font-semibold flex items-center gap-1">
-          <FaCheck className="w-3 h-3" /> Completed
-        </span>
-      ) : action ? (
-        <button
-          onClick={action}
-          className="text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-all"
-        >
-          {actionLabel || "Do it"}
-        </button>
-      ) : null}
+      <p className="text-xs text-gray-400 mt-1">{detail}</p>
     </div>
   );
 }
@@ -242,19 +190,27 @@ export default function DashboardPage() {
   const quote = getDailyQuote();
   const realRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── SLOT STATE ────────────────────────────────────────────────────────────
+  const [slots, setSlots] = useState<
+    { slot: string; state: string; note: string; time: string }[]
+  >([]);
+  const [usedSlots, setUsedSlots] = useState<string[]>([]);
+  const [currentSlot, setCurrentSlot] = useState<string>("Morning");
+  const [canCheckIn, setCanCheckIn] = useState(true);
   const [selectedState, setSelectedState] = useState("");
   const [noteText, setNoteText] = useState("");
-  const [checkInDone, setCheckInDone] = useState(false);
+  const [showCheckInForm, setShowCheckInForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ── SCORE STATE ───────────────────────────────────────────────────────────
   const [alignScore, setAlignScore] = useState(0);
   const [alignLabel, setAlignLabel] = useState("Misaligned");
-  const [yesterdayScore, setYesterdayScore] = useState(0);
   const [awareness, setAwareness] = useState(0);
   const [execution, setExecution] = useState(0);
   const [penalty, setPenalty] = useState(0);
   const [breakdown, setBreakdown] = useState<any>(null);
 
+  // ── OTHER STATE ───────────────────────────────────────────────────────────
   const [weeklyLoops, setWeeklyLoops] = useState<any[]>([]);
   const [awarenessStreak, setStreak] = useState(0);
   const [realization, setRealization] = useState("");
@@ -262,16 +218,13 @@ export default function DashboardPage() {
   const [realizationSaved, setRealSaved] = useState(false);
   const [savingReal, setSavingReal] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
-  const [suggestedAction, setSuggested] = useState<{
-    text: string;
-    showGuidance: boolean;
-  } | null>(null);
+  const [suggestedAction, setSuggested] = useState<{ text: string } | null>(
+    null,
+  );
   const [loopType, setLoopType] = useState("None");
-  const [loopSeverity, setLoopSeverity] = useState("None");
-  const [showGuidanceCTA, setShowGuidance] = useState(false);
+  const [todayActivity, setTodayActivity] = useState<any>(null);
   const [guidanceDone, setGuidanceDone] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [todayActivity, setTodayActivity] = useState<any>(null);
   const [showPostGuidance, setShowPG] = useState(false);
   const [guidanceForm, setGuidanceForm] = useState({
     goalUpdate: "",
@@ -284,59 +237,63 @@ export default function DashboardPage() {
       window.location.href = "/onboarding";
       return;
     }
-    const load = async () => {
-      try {
-        const [dashRes, goalRes] = await Promise.all([
-          api.get("/checkin/dashboard"),
-          api.get("/goals"),
-        ]);
-        const d = dashRes.data.data;
-        setStreak(d.awarenessStreak || 0);
-        setWeeklyLoops(d.weeklyLoops || []);
-        if (d.alignmentScore) {
-          setAlignScore(d.alignmentScore.final || 0);
-          setAlignLabel(d.alignmentScore.label?.label || "Misaligned");
-          setAwareness(d.alignmentScore.awareness || 0);
-          setExecution(d.alignmentScore.execution || 0);
-          setPenalty(d.alignmentScore.penalty || 0);
-          setBreakdown(d.alignmentScore.detail || null);
-        }
-        // Find today's activity from first active goal
-        const activeGoals = (goalRes.data.data || []).filter(
-          (g: any) => g.status === "In Progress",
-        );
-        if (activeGoals.length > 0) {
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const firstGoal = activeGoals[0];
-          const todayDay = firstGoal.dayActivities?.find(
-            (d: any) => d.dueDate?.slice(0, 10) === todayStr,
-          );
-          if (todayDay) setTodayActivity({ goal: firstGoal, day: todayDay });
-        }
-        if (d.todayCheckIn) {
-          const ci = d.todayCheckIn;
-          setCheckInDone(true);
-          setSelectedState(ci.dailyState || "");
-          setLoopType(ci.loopType || "None");
-          setLoopSeverity(ci.loopSeverity || "None");
-          setRealization(ci.realization || "");
-          setSelectedTags(ci.realizationTags || []);
-          setGuidanceDone(ci.guidanceSessionDone || false);
-          if (ci.realization) setRealSaved(true);
-          if (
-            ci.loopType !== "None" ||
-            ["Stressed", "Distracted"].includes(ci.dailyState)
-          )
-            setShowGuidance(true);
-        }
-      } catch {
-        toast.error("Failed to load dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, []);
+
+  const load = async () => {
+    try {
+      const [dashRes, slotRes, goalRes] = await Promise.all([
+        api.get("/checkin/dashboard"),
+        api.get("/checkin/slot-status"),
+        api.get("/goals"),
+      ]);
+
+      // Dashboard data
+      const d = dashRes.data.data;
+      setStreak(d.awarenessStreak || 0);
+      setWeeklyLoops(d.weeklyLoops || []);
+      if (d.alignmentScore) {
+        setAlignScore(d.alignmentScore.score || 0);
+        setAlignLabel(d.alignmentScore.label?.label || "Misaligned");
+        setAwareness(d.alignmentScore.awareness || 0);
+        setExecution(d.alignmentScore.execution || 0);
+        setPenalty(d.alignmentScore.penalty || 0);
+        setBreakdown(d.alignmentScore.detail || null);
+      }
+      if (d.todayCheckIn) {
+        const ci = d.todayCheckIn;
+        setSlots(ci.slots || []);
+        setRealization(ci.realization || "");
+        setSelectedTags(ci.realizationTags || []);
+        setGuidanceDone(ci.guidanceSessionDone || false);
+        if (ci.realization) setRealSaved(true);
+        if (ci.loopType && ci.loopType !== "None") setLoopType(ci.loopType);
+      }
+
+      // Slot status
+      const s = slotRes.data.data;
+      setUsedSlots(s.usedSlots || []);
+      setCurrentSlot(s.currentSlot || "Morning");
+      setCanCheckIn(s.canCheckIn);
+
+      // Today's goal activity
+      const activeGoals = (goalRes.data.data || []).filter(
+        (g: any) => g.status === "In Progress",
+      );
+      if (activeGoals.length > 0) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const firstGoal = activeGoals[0];
+        const todayDay = firstGoal.dayActivities?.find(
+          (d: any) => d.dueDate?.slice(0, 10) === todayStr,
+        );
+        if (todayDay) setTodayActivity({ goal: firstGoal, day: todayDay });
+      }
+    } catch {
+      toast.error("Failed to load dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCheckIn = async () => {
     if (!selectedState) return toast.error("Select your current state first");
@@ -344,11 +301,27 @@ export default function DashboardPage() {
     try {
       const res = await api.post("/checkin", {
         dailyState: selectedState,
+        note: noteText,
         avoidingText: noteText,
-        mattersTodayText: "",
       });
       const d = res.data.data;
-      setCheckInDone(true);
+
+      // Update slots display
+      setSlots((prev) => [
+        ...prev,
+        {
+          slot: d.currentSlot || currentSlot,
+          state: selectedState,
+          note: noteText,
+          time: new Date().toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ]);
+      setUsedSlots((prev) => [...prev, d.currentSlot || currentSlot]);
+
+      // Update score
       if (d.alignmentBreakdown) {
         setAlignScore(d.alignmentBreakdown.score || 0);
         setAlignLabel(d.alignmentLabel?.label || "Misaligned");
@@ -357,32 +330,39 @@ export default function DashboardPage() {
         setPenalty(d.alignmentBreakdown.penalty || 0);
         setBreakdown(d.alignmentBreakdown.detail || null);
       }
-      setInsight(d.insight || null);
-      setSuggested(d.suggestedAction || null);
-      setLoopType(d.checkIn?.loopType || "None");
-      setLoopSeverity(d.checkIn?.loopSeverity || "None");
-      setWeeklyLoops(d.weeklyLoops || []);
-      if (
-        d.checkIn?.loopType !== "None" ||
-        ["Stressed", "Distracted"].includes(selectedState)
-      )
-        setShowGuidance(true);
+      if (d.insight) setInsight(d.insight);
+      if (d.suggestedAction) setSuggested(d.suggestedAction);
+      if (d.checkIn?.loopType) setLoopType(d.checkIn.loopType);
+
+      // Refresh slot status
+      const slotRes = await api.get("/checkin/slot-status");
+      const s = slotRes.data.data;
+      setUsedSlots(s.usedSlots || []);
+      setCurrentSlot(s.currentSlot || "Morning");
+      setCanCheckIn(s.canCheckIn);
+
+      setSelectedState("");
+      setNoteText("");
+      setShowCheckInForm(false);
+
+      // Refresh streak
       const dashRes = await api.get("/checkin/dashboard");
       setStreak(dashRes.data.data.awarenessStreak || 0);
-      toast.success("✅ Check-in saved! Alignment Score updated.");
-    } catch {
-      toast.error("Failed to save check-in");
+      setWeeklyLoops(dashRes.data.data.weeklyLoops || []);
+
+      toast.success(`✅ ${d.currentSlot || currentSlot} check-in saved!`);
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed to save check-in");
     } finally {
       setSaving(false);
     }
   };
 
-  // Debounced realization save
   const handleRealizationChange = (val: string) => {
     setRealization(val);
     setRealSaved(false);
     if (realRef.current) clearTimeout(realRef.current);
-    if (val.trim().length > 5 && checkInDone) {
+    if (val.trim().length > 5 && slots.length > 0) {
       realRef.current = setTimeout(
         () => doSaveRealization(val, selectedTags),
         2000,
@@ -391,7 +371,7 @@ export default function DashboardPage() {
   };
 
   const doSaveRealization = async (text: string, tags: string[]) => {
-    if (!text.trim() || !checkInDone) return;
+    if (!text.trim() || slots.length === 0) return;
     setSavingReal(true);
     try {
       const res = await api.patch("/checkin/realization", {
@@ -415,25 +395,24 @@ export default function DashboardPage() {
   const handleCompleteActivity = async () => {
     if (!todayActivity) return;
     try {
-      const res = await api.patch(
+      await api.patch(
         `/goals/${todayActivity.goal._id}/day/${todayActivity.day.dayNumber}/complete`,
       );
       setTodayActivity((p: any) =>
         p ? { ...p, day: { ...p.day, status: "Completed" } } : p,
       );
-      // Refresh alignment score
+      // Refresh score
       const dashRes = await api.get("/checkin/dashboard");
-      const d = dashRes.data.data;
-      if (d.alignmentScore) {
-        setAlignScore(d.alignmentScore.final || 0);
-        setAlignLabel(d.alignmentScore.label?.label || "Misaligned");
-        setExecution(d.alignmentScore.execution || 0);
-        setPenalty(d.alignmentScore.penalty || 0);
-        setBreakdown(d.alignmentScore.detail || null);
+      const scoreData = dashRes.data.data.alignmentScore;
+      if (scoreData) {
+        setAlignScore(scoreData.score || 0);
+        setExecution(scoreData.execution || 0);
+        setPenalty(scoreData.penalty || 0);
+        setBreakdown(scoreData.detail || null);
       }
       toast.success("✅ Activity completed! Score updated.");
-    } catch {
-      toast.error("Failed");
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Failed");
     }
   };
 
@@ -446,14 +425,16 @@ export default function DashboardPage() {
   };
 
   const handleShare = () => {
-    const tags = selectedTags.length ? ` [${selectedTags.join(", ")}]` : "";
-    const text = `"${realization || insight}"${tags} — Alignment: ${alignScore}/100 #DoRDoD`;
+    const text = `"${realization || insight}" — Alignment: ${alignScore}/100 #DoRDoD`;
     if (navigator.share) navigator.share({ text }).catch(() => {});
     else {
       navigator.clipboard.writeText(text);
       toast.success("Copied!");
     }
   };
+
+  const allSlotsUsed = usedSlots.length >= 3;
+  const hasDoneAnyCheckIn = slots.length > 0;
 
   if (loading)
     return (
@@ -464,32 +445,38 @@ export default function DashboardPage() {
       </DashboardLayout>
     );
 
-  const stateBtn = (s: (typeof STATES)[0]) =>
-    selectedState === s.value ? s.active : s.bg;
-  const delta = alignScore - yesterdayScore;
-
   return (
     <DashboardLayout>
       <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
         {/* Greeting */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Good{" "}
-            {new Date().getHours() < 12
-              ? "Morning"
-              : new Date().getHours() < 17
-                ? "Afternoon"
-                : "Evening"}
-            , {(user as any)?.name?.split(" ")[0]} 👋
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Here's your alignment overview
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Good{" "}
+              {new Date().getHours() < 12
+                ? "Morning"
+                : new Date().getHours() < 17
+                  ? "Afternoon"
+                  : "Evening"}
+              , {(user as any)?.name?.split(" ")[0]} 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Here's your alignment overview
+            </p>
+          </div>
+          {awarenessStreak > 0 && (
+            <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-full">
+              <FaFire className="text-orange-500 w-3.5 h-3.5" />
+              <span className="text-sm font-bold text-orange-600">
+                {awarenessStreak}d streak
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Alignment Score Card */}
+        {/* ── ALIGNMENT SCORE ─────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-bold text-gray-900 text-lg">
                 Alignment Score
@@ -498,24 +485,10 @@ export default function DashboardPage() {
                 Based on what you repeat daily
               </p>
             </div>
-            {awarenessStreak > 0 && (
-              <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-full">
-                <FaFire className="text-orange-500 w-3.5 h-3.5" />
-                <span className="text-sm font-bold text-orange-600">
-                  {awarenessStreak} day streak
-                </span>
-              </div>
-            )}
           </div>
-
           <div className="flex flex-col sm:flex-row items-center gap-6">
-            <AlignmentRing
-              score={alignScore}
-              label={alignLabel}
-              delta={delta !== 0 ? delta : undefined}
-            />
-
-            <div className="flex-1 space-y-3 w-full">
+            <AlignmentRing score={alignScore} label={alignLabel} />
+            <div className="flex-1 space-y-2.5 w-full">
               <ScoreBar
                 label="Awareness"
                 score={awareness}
@@ -524,8 +497,8 @@ export default function DashboardPage() {
                 icon="🧠"
                 detail={
                   breakdown?.checkInDone
-                    ? `✓ Check-in completed${breakdown?.reflectionDone ? " · ✓ Reflection done" : " · Reflection missing (−10)"}`
-                    : "Check in to earn +20 awareness"
+                    ? `✓ Check-in done${breakdown?.reflectionDone ? " · ✓ Reflection added" : " · Add reflection for +10"}`
+                    : "Check in to earn +20"
                 }
               />
               <ScoreBar
@@ -534,7 +507,7 @@ export default function DashboardPage() {
                 max={70}
                 color="#22c55e"
                 icon="⚡"
-                detail={`${breakdown?.completed || 0} of ${breakdown?.total || 21} activities completed on time`}
+                detail={`${breakdown?.completed || 0} of ${breakdown?.totalActivities || 21} activities completed on time`}
               />
               <ScoreBar
                 label="Penalty"
@@ -544,173 +517,376 @@ export default function DashboardPage() {
                 icon="⚠️"
                 detail={
                   penalty < 0
-                    ? `${penalty} applied${!breakdown?.reflectionDone ? " (no reflection)" : ""}${breakdown?.missedToday ? " (missed today)" : ""}`
+                    ? `${penalty} applied — ${!breakdown?.reflectionDone ? "No reflection (-10)" : ""}${breakdown?.missedToday ? " Missed today (-5)" : ""}`
                     : "No penalties today 🎉"
                 }
               />
             </div>
           </div>
-
-          {/* Formula */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-center gap-2 flex-wrap text-xs text-gray-500">
-              <span className="font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">
-                Awareness {awareness}/30
-              </span>
-              <span className="font-bold text-gray-400">+</span>
-              <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-                Execution {execution}/70
-              </span>
-              <span className="font-bold text-gray-400">−</span>
-              <span className="font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg">
-                Penalty {Math.abs(penalty)}/30
-              </span>
-              <span className="font-bold text-gray-400">=</span>
-              <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-lg">
-                {alignScore}/100
-              </span>
-            </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-2 flex-wrap text-xs text-gray-500">
+            <span className="font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">
+              Awareness {awareness}/30
+            </span>
+            <span>+</span>
+            <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+              Execution {execution}/70
+            </span>
+            <span>−</span>
+            <span className="font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg">
+              Penalty {Math.abs(penalty)}/30
+            </span>
+            <span>=</span>
+            <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-lg">
+              {alignScore}/100
+            </span>
           </div>
         </div>
 
-        {/* Daily Check-In Card */}
+        {/* ── DAILY CHECK-IN — 3 SLOTS ─────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="font-bold text-gray-900 mb-1">Daily Check-In</h2>
-          <p className="text-sm text-gray-400 mb-4">How are you feeling?</p>
-
-          <div className="flex flex-wrap gap-2 mb-4">
-            {STATES.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => !checkInDone && setSelectedState(s.value)}
-                disabled={checkInDone}
-                className={`px-4 py-2 rounded-full border-2 font-medium text-sm transition-all ${stateBtn(s)} ${checkInDone && selectedState !== s.value ? "opacity-30 cursor-default" : "hover:scale-105"}`}
-              >
-                {s.label}
-                {s.value === selectedState && checkInDone && (
-                  <span className="ml-1.5 bg-white/30 text-xs px-1.5 py-0.5 rounded-full">
-                    +20
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {!checkInDone && selectedState && (
-            <textarea
-              placeholder="Add a note (optional)"
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              rows={2}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-          )}
-
-          {!checkInDone ? (
-            <button
-              onClick={handleCheckIn}
-              disabled={saving || !selectedState}
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl">
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                <FaCheck className="text-white w-3 h-3" />
-              </div>
-              <p className="text-sm text-green-700 font-medium">
-                Checked in as <strong>{selectedState}</strong> today
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-bold text-gray-900">Daily Check-In</h2>
+              <p className="text-xs text-gray-400">
+                Up to 3 times per day — Morning, Midday, Evening
               </p>
             </div>
+            <span
+              className={`text-xs font-bold px-3 py-1.5 rounded-full ${allSlotsUsed ? "bg-green-100 text-green-700" : "bg-indigo-100 text-indigo-700"}`}
+            >
+              {slots.length}/3 done
+            </span>
+          </div>
+
+          {/* Slots display — show all 3 slots with status */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {(["Morning", "Midday", "Evening"] as const).map((slotName) => {
+              const cfg = SLOT_CONFIG[slotName];
+              const doneSlot = slots.find((s) => s.slot === slotName);
+              const isUsed = usedSlots.includes(slotName);
+              const isCurrent = currentSlot === slotName && !isUsed;
+
+              return (
+                <div
+                  key={slotName}
+                  className={`rounded-xl p-3 border-2 text-center transition-all ${
+                    isUsed
+                      ? "bg-green-50 border-green-300"
+                      : isCurrent
+                        ? `${cfg.bg} border-current`
+                        : "bg-gray-50 border-gray-100 opacity-60"
+                  }`}
+                >
+                  <p className="text-xl mb-1">{cfg.emoji}</p>
+                  <p
+                    className={`text-xs font-bold ${isUsed ? "text-green-700" : cfg.color}`}
+                  >
+                    {cfg.label}
+                  </p>
+                  <p className="text-xs text-gray-400">{cfg.time}</p>
+                  {isUsed && doneSlot ? (
+                    <div className="mt-2">
+                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-1">
+                        <FaCheck className="text-white w-2.5 h-2.5" />
+                      </div>
+                      <p className="text-xs font-semibold text-green-700">
+                        {doneSlot.state}
+                      </p>
+                      {doneSlot.time && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {doneSlot.time}
+                        </p>
+                      )}
+                    </div>
+                  ) : isCurrent ? (
+                    <div className="mt-2">
+                      <div className="w-5 h-5 border-2 border-current rounded-full mx-auto flex items-center justify-center">
+                        <FaPlus className="w-2 h-2" />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Available</p>
+                    </div>
+                  ) : isUsed ? null : (
+                    <div className="mt-2">
+                      <FaLock className="w-4 h-4 text-gray-300 mx-auto" />
+                      <p className="text-xs text-gray-300 mt-1">Not yet</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Show today's check-in notes */}
+          {slots.length > 0 && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-xl">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Today's Check-ins
+              </p>
+              <div className="space-y-1.5">
+                {slots.map((s, i) => {
+                  const cfg = SLOT_CONFIG[s.slot as keyof typeof SLOT_CONFIG];
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span>{cfg?.emoji}</span>
+                      <span className="font-medium text-gray-700">
+                        {s.slot}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          ["Calm", "Focused", "Energized"].includes(s.state)
+                            ? "bg-green-100 text-green-700"
+                            : ["Stressed", "Distracted"].includes(s.state)
+                              ? "bg-red-100 text-red-700"
+                              : "bg-yellow-100 text-yellow-700"
+                        }`}
+                      >
+                        {s.state}
+                      </span>
+                      {s.time && (
+                        <span className="text-xs text-gray-400">{s.time}</span>
+                      )}
+                      {s.note && (
+                        <span className="text-xs text-gray-400 italic truncate">
+                          — "{s.note}"
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Check-in Form — show only if current slot available */}
+          {!allSlotsUsed && canCheckIn && (
+            <>
+              {!showCheckInForm ? (
+                <button
+                  onClick={() => setShowCheckInForm(true)}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <FaPlus className="w-3 h-3" />
+                  Check in for {currentSlot}
+                  <span className="text-xs opacity-80">
+                    (
+                    {SLOT_CONFIG[currentSlot as keyof typeof SLOT_CONFIG]?.time}
+                    )
+                  </span>
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-700">
+                      {
+                        SLOT_CONFIG[currentSlot as keyof typeof SLOT_CONFIG]
+                          ?.emoji
+                      }{" "}
+                      {currentSlot} — How are you feeling?
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowCheckInForm(false);
+                        setSelectedState("");
+                        setNoteText("");
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <FaTimes className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {STATES.map((s) => (
+                      <button
+                        key={s.value}
+                        onClick={() => setSelectedState(s.value)}
+                        className={`px-4 py-2 rounded-full border-2 font-medium text-sm transition-all hover:scale-105 ${selectedState === s.value ? s.active : s.bg}`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedState && (
+                    <input
+                      placeholder="Add a note (optional)"
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    />
+                  )}
+                  <button
+                    onClick={handleCheckIn}
+                    disabled={saving || !selectedState}
+                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
+                  >
+                    {saving ? "Saving..." : "Save Check-in"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* All slots used */}
+          {allSlotsUsed && (
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0">
+                <FaCheck className="text-white w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-green-800">
+                  All 3 check-ins completed today! 🎉
+                </p>
+                <p className="text-xs text-green-600">
+                  Come back tomorrow for your next check-in.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Current slot not available yet */}
+          {!allSlotsUsed && !canCheckIn && (
+            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+              <FaLock className="text-amber-500 w-4 h-4 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  {usedSlots.includes("Morning") &&
+                  !usedSlots.includes("Midday")
+                    ? "Midday check-in opens at 12 PM"
+                    : usedSlots.includes("Midday") &&
+                        !usedSlots.includes("Evening")
+                      ? "Evening check-in opens at 5 PM"
+                      : "No check-in slot available right now"}
+                </p>
+                <p className="text-xs text-amber-600">
+                  Missed slots cannot be filled later.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Today's Actions */}
-        {checkInDone && (
+        {/* ── TODAY'S ACTIONS ──────────────────────────────────────────────── */}
+        {hasDoneAnyCheckIn && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="font-bold text-gray-900 mb-4">Today's Actions</h2>
             <div className="space-y-2">
-              <ActionRow icon="📋" label="Daily Check-In" done={checkInDone} />
-              <ActionRow
-                icon="📝"
-                label="Reflection"
-                done={realizationSaved}
-                action={() =>
-                  document.getElementById("reflection-box")?.focus()
-                }
-                actionLabel="Write your reflection"
-              />
+              {/* Check-in status */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl ${hasDoneAnyCheckIn ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${hasDoneAnyCheckIn ? "bg-green-500" : "bg-gray-200"}`}
+                  >
+                    {hasDoneAnyCheckIn ? (
+                      <FaCheck className="text-white w-3.5 h-3.5" />
+                    ) : (
+                      <span>📋</span>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-gray-800">
+                    Daily Check-In ({slots.length}/3 slots)
+                  </span>
+                </div>
+                <span className="text-xs text-green-600 font-semibold">
+                  {slots.length} done
+                </span>
+              </div>
+
+              {/* Reflection */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl ${realizationSaved ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${realizationSaved ? "bg-green-500" : "bg-gray-200"}`}
+                  >
+                    {realizationSaved ? (
+                      <FaCheck className="text-white w-3.5 h-3.5" />
+                    ) : (
+                      <span>📝</span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-sm font-medium ${realizationSaved ? "line-through text-gray-400" : "text-gray-800"}`}
+                  >
+                    Daily Reflection
+                  </span>
+                </div>
+                {!realizationSaved ? (
+                  <button
+                    onClick={() =>
+                      document.getElementById("reflection-box")?.focus()
+                    }
+                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg"
+                  >
+                    Write reflection
+                  </button>
+                ) : (
+                  <span className="text-xs text-green-600 font-semibold">
+                    ✓ Completed
+                  </span>
+                )}
+              </div>
+
+              {/* Today's activity */}
               {todayActivity && (
-                <ActionRow
-                  icon="⚡"
-                  label={`Today's Activity — ${todayActivity.day.title}`}
-                  done={todayActivity.day.status === "Completed"}
-                  action={handleCompleteActivity}
-                  actionLabel="✓ Mark Complete"
-                />
+                <div
+                  className={`flex items-center justify-between p-3 rounded-xl ${todayActivity.day.status === "Completed" ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${todayActivity.day.status === "Completed" ? "bg-green-500" : "bg-gray-200"}`}
+                    >
+                      {todayActivity.day.status === "Completed" ? (
+                        <FaCheck className="text-white w-3.5 h-3.5" />
+                      ) : (
+                        <span>⚡</span>
+                      )}
+                    </div>
+                    <div>
+                      <span
+                        className={`text-sm font-medium ${todayActivity.day.status === "Completed" ? "line-through text-gray-400" : "text-gray-800"}`}
+                      >
+                        {todayActivity.day.title}
+                      </span>
+                      <p className="text-xs text-gray-400">
+                        {todayActivity.goal.title} — Day{" "}
+                        {todayActivity.day.dayNumber}/21
+                      </p>
+                    </div>
+                  </div>
+                  {todayActivity.day.status === "Completed" ? (
+                    <span className="text-xs text-green-600 font-semibold">
+                      ✓ Done
+                    </span>
+                  ) : (
+                    <button
+                      onClick={handleCompleteActivity}
+                      className="text-xs font-semibold text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      ✓ Mark Done
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-
-            {/* Motivational message */}
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <p className="text-sm text-center text-gray-500 italic">
-                {alignScore >= 70
-                  ? "🌟 You're on fire! Keep it up!"
-                  : alignScore >= 40
-                    ? "👍 You're on the right track. Keep improving!"
-                    : "💪 Every action counts. Start with one step."}
-              </p>
-            </div>
+            <p className="text-sm text-center text-gray-400 italic mt-4">
+              {alignScore >= 70
+                ? "🌟 You're aligned! Keep going!"
+                : alignScore >= 40
+                  ? "👍 You're improving. Keep it up!"
+                  : "💪 Every action counts. Start with one step."}
+            </p>
           </div>
         )}
 
-        {/* Insight card (after check-in with loop) */}
-        {checkInDone && insight && loopType !== "None" && (
-          <div
-            className={`bg-white rounded-2xl border-l-4 shadow-sm p-5 ${loopSeverity === "High" ? "border-red-400" : loopSeverity === "Medium" ? "border-amber-400" : "border-yellow-300"}`}
-          >
-            <div className="flex items-start gap-3 mb-3">
-              <span className="text-xl">💡</span>
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                  Insight · {loopType} Loop — {loopSeverity}
-                </p>
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  {insight}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() =>
-                  toast.success(
-                    suggestedAction?.text || "Starting your small step!",
-                  )
-                }
-                className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-indigo-700 transition-all"
-              >
-                ⚡ Start Small Step
-              </button>
-              {showGuidanceCTA && !guidanceDone && (
-                <button
-                  onClick={() => {
-                    sessionStorage.setItem(
-                      "guidanceContext",
-                      JSON.stringify({
-                        goal: "",
-                        loopType,
-                        mindState: selectedState,
-                      }),
-                    );
-                    window.location.href = "/guidance";
-                  }}
-                  className="text-sm border border-indigo-300 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-xl font-medium transition-all"
-                >
-                  🧭 Explore Guidance (Optional)
-                </button>
-              )}
-            </div>
+        {/* ── INSIGHT ─────────────────────────────────────────────────────── */}
+        {hasDoneAnyCheckIn && insight && (
+          <div className="bg-white rounded-2xl border-l-4 border-indigo-400 shadow-sm p-5">
+            <p className="text-xs font-bold text-indigo-400 uppercase tracking-wide mb-2">
+              💡 Today's Insight
+            </p>
+            <p className="text-sm text-gray-700 leading-relaxed">{insight}</p>
             {suggestedAction && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
                 <p className="text-xs text-blue-600 font-semibold mb-0.5">
@@ -722,8 +898,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Reflection Box */}
-        {checkInDone && (
+        {/* ── REFLECTION ──────────────────────────────────────────────────── */}
+        {hasDoneAnyCheckIn && (
           <div
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"
             style={{ background: "linear-gradient(135deg,#faf5ff,#f0fdf4)" }}
@@ -734,20 +910,18 @@ export default function DashboardPage() {
                 {savingReal ? (
                   "Saving..."
                 ) : realizationSaved ? (
-                  <span className="text-green-600 flex items-center gap-1">
-                    <FaCheck className="w-3 h-3" /> Saved to Insights
-                  </span>
+                  <span className="text-green-600">✓ Saved to Insights</span>
                 ) : (
                   "Auto-saves as you type"
                 )}
               </div>
             </div>
-            {!realizationSaved && (
+            {!realizationSaved && !breakdown?.reflectionDone && (
               <div className="flex items-center gap-2 mb-3 p-2.5 bg-amber-50 border border-amber-100 rounded-xl">
-                <span className="text-sm">⚠️</span>
+                <span>⚠️</span>
                 <p className="text-xs text-amber-700">
-                  No reflection added today. Reflection removes −10 penalty and
-                  brings clarity.
+                  No reflection added yet. Adding one removes the −10 penalty
+                  and adds +10 awareness.
                 </p>
               </div>
             )}
@@ -762,7 +936,7 @@ export default function DashboardPage() {
             {realization.trim().length > 5 && (
               <div className="mt-3">
                 <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                  <FaTag className="w-3 h-3" /> Tag this realization:
+                  <FaTag className="w-3 h-3" /> Tag:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {REALIZATION_TAGS.map((tag) => (
@@ -783,21 +957,21 @@ export default function DashboardPage() {
                   onClick={() => setShowPG((p) => !p)}
                   className="text-xs text-indigo-500 hover:underline"
                 >
-                  📝 Had a Guidance session? Record update →
+                  📝 Had a Guidance session? →
                 </button>
                 <button
                   onClick={handleShare}
-                  className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"
+                  className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg"
                 >
-                  <FaShareAlt className="w-3 h-3" /> Share Insight
+                  <FaShareAlt className="w-3 h-3" /> Share
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Post-guidance form */}
-        {showPostGuidance && !guidanceDone && checkInDone && (
+        {/* ── POST-GUIDANCE ─────────────────────────────────────────────── */}
+        {showPostGuidance && !guidanceDone && hasDoneAnyCheckIn && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="font-bold mb-3 text-gray-900">
               After Guidance — Update Your System
@@ -841,15 +1015,15 @@ export default function DashboardPage() {
                     toast.error("Failed");
                   }
                 }}
-                className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all"
+                className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700"
               >
-                ✅ Record Guidance Update
+                ✅ Record Update
               </button>
             </div>
           </div>
         )}
 
-        {/* This Week's Patterns */}
+        {/* ── WEEKLY PATTERNS ──────────────────────────────────────────────── */}
         {weeklyLoops.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-bold text-gray-900 mb-3">
@@ -888,19 +1062,15 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Quote */}
+        {/* ── QUOTE ───────────────────────────────────────────────────────── */}
         <div className="bg-indigo-600 rounded-2xl p-6 text-center">
-          <span className="text-3xl mb-3 block">"</span>
           <p className="text-white font-semibold text-base leading-relaxed">
-            {quote}
+            "{quote}"
           </p>
-          <div className="mt-4 flex items-center justify-center">
-            <div className="w-16 h-0.5 bg-white/40 rounded" />
-          </div>
         </div>
 
-        {/* Quick nav */}
-        {!checkInDone && !selectedState && (
+        {/* Quick nav — only when no check-in done */}
+        {!hasDoneAnyCheckIn && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Intent", emoji: "🎯", path: "/goals" },
