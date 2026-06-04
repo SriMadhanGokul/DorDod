@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
@@ -12,7 +13,6 @@ import {
   FaCalendarAlt,
   FaChevronLeft,
   FaChevronRight,
-  FaEllipsisV,
 } from "react-icons/fa";
 
 interface DayActivity {
@@ -45,6 +45,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   Social: "🤝",
   Other: "🎯",
 };
+
 const today = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d?: string) =>
   d
@@ -63,10 +64,10 @@ function CircleProgress({
   total: number;
   color: string;
 }) {
-  const size = 80;
-  const r = 32;
-  const circ = 2 * Math.PI * r;
-  const off = circ - (completed / total) * circ;
+  const size = 72,
+    r = 28,
+    circ = 2 * Math.PI * r;
+  const off = circ - (total > 0 ? completed / total : 0) * circ;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
@@ -76,7 +77,7 @@ function CircleProgress({
           r={r}
           fill="none"
           stroke="#e5e7eb"
-          strokeWidth={8}
+          strokeWidth={7}
         />
         <circle
           cx={size / 2}
@@ -84,7 +85,7 @@ function CircleProgress({
           r={r}
           fill="none"
           stroke={color}
-          strokeWidth={8}
+          strokeWidth={7}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={off}
@@ -92,7 +93,7 @@ function CircleProgress({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-lg font-black" style={{ color }}>
+        <span className="text-base font-black" style={{ color }}>
           {completed}
         </span>
         <span className="text-xs text-gray-400">/{total}</span>
@@ -110,7 +111,8 @@ export default function ExecutionPage() {
     "grid",
   );
   const [calMonth, setCalMonth] = useState(new Date());
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const location = useLocation();
+  const navGoalId = (location.state as any)?.goalId || null;
 
   const load = async () => {
     try {
@@ -119,7 +121,17 @@ export default function ExecutionPage() {
       const inProg = all.filter((g: Goal) => g.status === "In Progress");
       setGoals(inProg);
       setBacklog(all.filter((g: Goal) => g.status === "Not Started"));
-      if (inProg.length > 0 && !selectedGoal) setSelectedGoal(inProg[0]);
+
+      if (navGoalId) {
+        // Navigated from Goals page — highlight that specific goal in grid view
+        const target = inProg.find((g: Goal) => g._id === navGoalId);
+        if (target) {
+          setSelectedGoal(target);
+          setPlanView("grid");
+        } else if (inProg.length > 0) setSelectedGoal(inProg[0]);
+      } else if (inProg.length > 0 && !selectedGoal) {
+        setSelectedGoal(inProg[0]);
+      }
     } catch {
       toast.error("Failed to load");
     } finally {
@@ -152,7 +164,6 @@ export default function ExecutionPage() {
     }
   };
 
-  // Today's focus — one task per active goal (today's due day)
   const todayFocus = goals
     .map((goal) => {
       const todayStr = today();
@@ -168,12 +179,12 @@ export default function ExecutionPage() {
     (x) => x.day?.status === "Completed",
   ).length;
 
-  // Calendar helpers
+  // Calendar
   const calDays = () => {
-    const yr = calMonth.getFullYear();
-    const mo = calMonth.getMonth();
-    const first = new Date(yr, mo, 1);
-    const last = new Date(yr, mo + 1, 0);
+    const yr = calMonth.getFullYear(),
+      mo = calMonth.getMonth();
+    const first = new Date(yr, mo, 1),
+      last = new Date(yr, mo + 1, 0);
     const days: (Date | null)[] = Array(first.getDay()).fill(null);
     for (let d = 1; d <= last.getDate(); d++) days.push(new Date(yr, mo, d));
     return days;
@@ -197,57 +208,47 @@ export default function ExecutionPage() {
 
   return (
     <DashboardLayout>
-      <div
-        className="space-y-5 animate-fade-in"
-        onClick={() => setOpenMenu(null)}
-      >
+      <div className="space-y-5 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Execution</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Execution
+            </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               Track your daily actions
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-full">
-              <FaFire className="text-orange-500 w-3.5 h-3.5" />
-              <span className="text-sm font-bold text-orange-600">
-                {goals.length} day streak
-              </span>
-            </div>
+          <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded-full">
+            <FaFire className="text-orange-500 w-3.5 h-3.5" />
+            <span className="text-sm font-bold text-orange-600">
+              {goals.length} active
+            </span>
           </div>
         </div>
 
         {/* Today Focus */}
         {todayFocus.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm">◆</span>
+                  <FaCheck className="text-white w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-gray-900">Today Focus</h2>
+                  <h2 className="font-bold text-gray-900 dark:text-white text-sm">
+                    Today's Focus
+                  </h2>
                   <p className="text-xs text-gray-400">
-                    Complete one action for each active goal
+                    One action per active goal
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">
-                  {new Date().toLocaleDateString("en-IN", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-                <span
-                  className={`text-xs font-bold px-3 py-1 rounded-full ${todayCompleted === todayFocus.length ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
-                >
-                  {todayCompleted} / {todayFocus.length} Completed
-                </span>
-              </div>
+              <span
+                className={`text-xs font-bold px-3 py-1 rounded-full ${todayCompleted === todayFocus.length ? "bg-green-100 text-green-700" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"}`}
+              >
+                {todayCompleted}/{todayFocus.length} done
+              </span>
             </div>
             <div className="space-y-2">
               {todayFocus.map(({ goal, day }) => {
@@ -256,35 +257,32 @@ export default function ExecutionPage() {
                 return (
                   <div
                     key={goal._id}
-                    className={`flex items-center gap-4 p-3.5 rounded-xl transition-all ${isDone ? "bg-green-50" : "bg-gray-50 hover:bg-gray-100"}`}
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all ${isDone ? "bg-green-50 dark:bg-green-950/20" : "bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"}`}
                   >
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
                       style={{ background: `${goal.color || "#6366f1"}20` }}
                     >
                       {CATEGORY_ICONS[goal.category] || "🎯"}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-semibold ${isDone ? "line-through text-gray-400" : "text-gray-800"}`}
-                        style={{
-                          color: isDone ? undefined : goal.color || "#6366f1",
-                        }}
+                        className={`text-sm font-semibold truncate ${isDone ? "line-through text-gray-400" : "text-gray-800 dark:text-white"}`}
                       >
                         {goal.title}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Day {day.dayNumber} of 21 • {day.title}
+                      <p className="text-xs text-gray-400">
+                        Day {day.dayNumber}/21 · {day.title}
                       </p>
                     </div>
                     <button
                       onClick={() => completeDay(goal._id, day.dayNumber)}
-                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400 hover:bg-green-50"}`}
+                      className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400"}`}
                     >
                       {isDone ? (
-                        <FaCheck className="text-white w-4 h-4" />
+                        <FaCheck className="text-white w-3.5 h-3.5" />
                       ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300" />
                       )}
                     </button>
                   </div>
@@ -292,8 +290,9 @@ export default function ExecutionPage() {
               })}
               {todayCompleted === todayFocus.length &&
                 todayFocus.length > 0 && (
-                  <p className="text-center text-sm text-green-600 font-medium pt-1">
-                    ✨ Great! You're building your future, one action at a time.
+                  <p className="text-center text-xs text-green-600 font-medium pt-1">
+                    ✨ All done! You're building your future, one action at a
+                    time.
                   </p>
                 )}
             </div>
@@ -302,9 +301,11 @@ export default function ExecutionPage() {
 
         {/* Active Goals Overview */}
         {goals.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-900">Active Goals Overview</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white text-sm">
+                Active Goals
+              </h2>
               <a
                 href="/goals"
                 className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline"
@@ -312,16 +313,16 @@ export default function ExecutionPage() {
                 Edit Goals <FaArrowRight className="w-2.5 h-2.5" />
               </a>
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-3 gap-3">
               {goals.map((goal) => {
-                const completed =
+                const done =
                   goal.dayActivities?.filter((d) => d.status === "Completed")
                     .length || 0;
-                const pct = Math.round((completed / 21) * 100);
+                const pct = Math.round((done / 21) * 100);
                 return (
                   <div
                     key={goal._id}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-sm ${selectedGoal?._id === goal._id ? "border-indigo-300 bg-indigo-50/30" : "border-gray-100 hover:border-indigo-200"}`}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-sm ${selectedGoal?._id === goal._id ? "border-indigo-300 bg-indigo-50/30 dark:bg-indigo-950/20" : "border-gray-100 dark:border-gray-800 hover:border-indigo-200"}`}
                     onClick={() =>
                       setSelectedGoal(
                         selectedGoal?._id === goal._id ? null : goal,
@@ -329,16 +330,16 @@ export default function ExecutionPage() {
                     }
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xl">
+                      <span className="text-lg">
                         {CATEGORY_ICONS[goal.category] || "🎯"}
                       </span>
-                      <p className="font-semibold text-sm text-gray-900 truncate">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
                         {goal.title}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <CircleProgress
-                        completed={completed}
+                        completed={done}
                         total={21}
                         color={goal.color || "#6366f1"}
                       />
@@ -349,16 +350,12 @@ export default function ExecutionPage() {
                         >
                           {pct}%
                         </p>
-                        <p className="text-xs text-gray-500">Completed</p>
-                        <p
-                          className="text-xs font-semibold mt-1"
-                          style={{ color: goal.color || "#6366f1" }}
-                        >
-                          {completed} days completed
+                        <p className="text-xs text-gray-500">
+                          Day {done} of 21
                         </p>
                       </div>
                     </div>
-                    <div className="mt-3 w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="mt-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
                       <div
                         className="h-1.5 rounded-full transition-all"
                         style={{
@@ -374,16 +371,17 @@ export default function ExecutionPage() {
           </div>
         )}
 
-        {/* 21-Day Plan Detail for Selected Goal */}
+        {/* 21-Day Plan */}
         {selectedGoal && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
+            {/* Plan header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">
                   {CATEGORY_ICONS[selectedGoal.category] || "🎯"}
                 </span>
                 <div>
-                  <h2 className="font-bold text-gray-900">
+                  <h2 className="font-bold text-gray-900 dark:text-white text-sm">
                     {selectedGoal.title}
                   </h2>
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
@@ -392,15 +390,20 @@ export default function ExecutionPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-400">
-                  {selectedGoal.description}
+                <p className="text-xs text-gray-400">21-Day Plan</p>
+                <p className="text-sm font-bold text-indigo-600">
+                  Day{" "}
+                  {selectedGoal.dayActivities?.filter(
+                    (d) => d.status === "Completed",
+                  ).length || 0}{" "}
+                  of 21
                 </p>
               </div>
             </div>
 
-            {/* View Switcher */}
-            <div className="flex items-center gap-3 mb-5">
-              <span className="text-sm text-gray-500 font-medium">View:</span>
+            {/* View switcher */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-gray-400 font-medium">View:</span>
               <div className="flex gap-1">
                 {(
                   [
@@ -412,38 +415,32 @@ export default function ExecutionPage() {
                   <button
                     key={v}
                     onClick={() => setPlanView(v as any)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${planView === v ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 text-gray-500 hover:border-indigo-300"}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${planView === v ? "bg-indigo-600 text-white border-indigo-600" : "border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300"}`}
                   >
                     <Icon className="w-3 h-3" /> {label}
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* 21-Day Progress header */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-700 text-sm">
-                21-Day Progress
-              </h3>
-              <div className="flex gap-3 text-xs text-gray-500">
+              {/* Legend */}
+              <div className="ml-auto flex gap-3 text-xs text-gray-400">
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 bg-green-500 rounded-full inline-block" />
-                  Completed
+                  <span className="w-2 h-2 bg-green-500 rounded-full inline-block" />
+                  Done
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 bg-red-400 rounded-full inline-block" />
+                  <span className="w-2 h-2 bg-red-400 rounded-full inline-block" />
                   Missed
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 bg-gray-300 rounded-full inline-block" />
+                  <span className="w-2 h-2 bg-gray-300 rounded-full inline-block" />
                   Upcoming
                 </span>
               </div>
             </div>
 
-            {/* GRID VIEW (default per image 3) */}
+            {/* GRID VIEW */}
             {planView === "grid" && (
-              <div className="grid grid-cols-7 gap-2.5">
+              <div className="grid grid-cols-7 gap-2">
                 {selectedGoal.dayActivities?.map((day) => {
                   const isDone = day.status === "Completed";
                   const isMissed = day.status === "Missed";
@@ -454,33 +451,24 @@ export default function ExecutionPage() {
                       onClick={() =>
                         completeDay(selectedGoal._id, day.dayNumber)
                       }
-                      title={`Day ${day.dayNumber} — ${fmtDate(day.dueDate)}`}
-                      className={`aspect-square rounded-full flex flex-col items-center justify-center text-sm font-bold relative transition-all hover:scale-105 border-2 ${
+                      title={`Day ${day.dayNumber} · ${fmtDate(day.dueDate)}`}
+                      className={`w-full h-9 rounded-lg flex items-center justify-center text-xs font-bold relative transition-all hover:scale-105 border ${
                         isDone
-                          ? "bg-green-500 border-green-500 text-white shadow-sm"
+                          ? "bg-green-500 border-green-500 text-white"
                           : isMissed
-                            ? "bg-red-100 border-red-300 text-red-600"
+                            ? "bg-red-50 border-red-200 text-red-500"
                             : isToday
                               ? "bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-1"
-                              : "bg-white border-gray-200 text-gray-500 hover:border-indigo-300"
+                              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300"
                       }`}
                     >
-                      {day.dayNumber}
-                      {isDone && (
-                        <span className="absolute bottom-0.5 text-xs leading-none">
-                          ✓
-                        </span>
-                      )}
-                      {isMissed && (
-                        <FaTimes className="absolute bottom-1 text-red-400 w-2.5 h-2.5" />
-                      )}
-                      {isToday && (
-                        <span className="absolute -bottom-5 text-xs text-indigo-600 font-semibold whitespace-nowrap">
-                          Today
-                        </span>
+                      {isDone ? (
+                        <FaCheck className="w-2.5 h-2.5" />
+                      ) : (
+                        day.dayNumber
                       )}
                       {day.dayNumber === 21 && (
-                        <span className="absolute -top-1 -right-1 text-yellow-500 text-xs">
+                        <span className="absolute -top-1 -right-1 text-xs">
                           🏁
                         </span>
                       )}
@@ -492,7 +480,7 @@ export default function ExecutionPage() {
 
             {/* LIST VIEW */}
             {planView === "list" && (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
                 {selectedGoal.dayActivities?.map((day) => {
                   const isDone = day.status === "Completed";
                   const isMissed = day.status === "Missed";
@@ -500,40 +488,33 @@ export default function ExecutionPage() {
                   return (
                     <div
                       key={day.dayNumber}
-                      className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                        isToday
-                          ? "bg-indigo-50 border border-indigo-100 ring-1 ring-indigo-200"
-                          : isDone
-                            ? "bg-green-50"
-                            : "bg-gray-50 hover:bg-gray-100"
-                      }`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${isToday ? "bg-indigo-50 dark:bg-indigo-950/30 ring-1 ring-indigo-200" : isDone ? "bg-green-50 dark:bg-green-950/20" : "bg-gray-50 dark:bg-gray-800 hover:bg-gray-100"}`}
                     >
                       <button
                         onClick={() =>
                           completeDay(selectedGoal._id, day.dayNumber)
                         }
-                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                          isDone
-                            ? "bg-green-500 border-green-500"
-                            : isMissed
-                              ? "bg-red-100 border-red-300"
-                              : "border-gray-300 hover:border-green-400"
-                        }`}
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? "bg-green-500 border-green-500" : isMissed ? "bg-red-100 border-red-300" : "border-gray-300 hover:border-green-400"}`}
                       >
-                        {isDone && <FaCheck className="text-white w-3 h-3" />}
+                        {isDone && (
+                          <FaCheck className="text-white w-2.5 h-2.5" />
+                        )}
                         {isMissed && (
-                          <FaTimes className="text-red-500 w-3 h-3" />
+                          <FaTimes className="text-red-500 w-2.5 h-2.5" />
                         )}
                       </button>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p
-                          className={`text-sm font-medium ${isDone ? "line-through text-gray-400" : "text-gray-800"}`}
+                          className={`text-xs font-medium ${isDone ? "line-through text-gray-400" : "text-gray-800 dark:text-white"}`}
                         >
-                          Day {day.dayNumber} {day.title}
+                          Day {day.dayNumber} · {day.title}
                           {isToday && (
-                            <span className="ml-2 text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">
+                            <span className="ml-2 bg-indigo-600 text-white px-1.5 py-0.5 rounded text-xs">
                               Today
                             </span>
+                          )}
+                          {day.dayNumber === 21 && (
+                            <span className="ml-1">🏁</span>
                           )}
                         </p>
                         <p className="text-xs text-gray-400">
@@ -541,18 +522,10 @@ export default function ExecutionPage() {
                         </p>
                       </div>
                       <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${
-                          isDone
-                            ? "bg-green-100 text-green-700"
-                            : isMissed
-                              ? "bg-red-100 text-red-600"
-                              : isToday
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-gray-100 text-gray-500"
-                        }`}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${isDone ? "bg-green-100 text-green-700" : isMissed ? "bg-red-100 text-red-600" : isToday ? "bg-amber-100 text-amber-700" : "bg-gray-100 dark:bg-gray-700 text-gray-500"}`}
                       >
                         {isDone
-                          ? "✓ Completed"
+                          ? "Done"
                           : isMissed
                             ? "Missed"
                             : isToday
@@ -565,10 +538,11 @@ export default function ExecutionPage() {
               </div>
             )}
 
-            {/* CALENDAR VIEW */}
+            {/* CALENDAR VIEW — compact, clean */}
             {planView === "calendar" && (
               <div>
-                <div className="flex items-center justify-between mb-4">
+                {/* Month nav */}
+                <div className="flex items-center justify-between mb-3">
                   <button
                     onClick={() =>
                       setCalMonth(
@@ -579,11 +553,11 @@ export default function ExecutionPage() {
                         ),
                       )
                     }
-                    className="p-2 hover:bg-gray-100 rounded-lg"
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                   >
-                    <FaChevronLeft className="w-3 h-3" />
+                    <FaChevronLeft className="w-3 h-3 text-gray-500" />
                   </button>
-                  <span className="font-semibold text-gray-800">
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white">
                     {calMonth.toLocaleDateString("en-US", {
                       month: "long",
                       year: "numeric",
@@ -599,46 +573,53 @@ export default function ExecutionPage() {
                         ),
                       )
                     }
-                    className="p-2 hover:bg-gray-100 rounded-lg"
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                   >
-                    <FaChevronRight className="w-3 h-3" />
+                    <FaChevronRight className="w-3 h-3 text-gray-500" />
                   </button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                    (d) => (
-                      <div
-                        key={d}
-                        className="text-center text-xs font-medium text-gray-400 py-1"
-                      >
-                        {d}
-                      </div>
-                    ),
-                  )}
+
+                {/* Day headers */}
+                <div className="grid grid-cols-7 mb-1">
+                  {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+                    <div
+                      key={d}
+                      className="text-center text-xs font-semibold text-gray-400 py-1"
+                    >
+                      {d}
+                    </div>
+                  ))}
                 </div>
+
+                {/* Calendar grid — compact cells */}
                 <div className="grid grid-cols-7 gap-1">
                   {calDays().map((date, i) => {
-                    if (!date) return <div key={i} />;
+                    if (!date) return <div key={i} className="h-8" />;
                     const status = dayStatusForCal(date, selectedGoal);
                     const isT = date.toISOString().slice(0, 10) === today();
                     return (
                       <div
                         key={i}
-                        className={`aspect-square flex items-center justify-center rounded-full text-xs relative ${
-                          isT ? "ring-2 ring-indigo-400 font-bold" : ""
-                        } ${
-                          status === "Completed"
-                            ? "bg-green-500 text-white"
-                            : status === "Missed"
-                              ? "bg-red-100 text-red-600"
-                              : status
-                                ? "bg-indigo-100 text-indigo-700"
-                                : "text-gray-600"
-                        }`}
+                        className={`h-8 flex items-center justify-center rounded-lg text-xs font-medium relative transition-all
+                          ${isT ? "ring-2 ring-indigo-400 ring-offset-1" : ""}
+                          ${
+                            status === "Completed"
+                              ? "bg-green-500 text-white"
+                              : status === "Missed"
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-600"
+                                : status
+                                  ? "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700"
+                                  : isT
+                                    ? "text-indigo-700 dark:text-indigo-300 font-bold"
+                                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          }`}
                       >
                         {date.getDate()}
                         {status === "Completed" && (
-                          <span className="absolute -bottom-0.5 right-0 text-xs leading-none">
+                          <span
+                            className="absolute bottom-0 right-0.5 text-white"
+                            style={{ fontSize: "8px" }}
+                          >
                             ✓
                           </span>
                         )}
@@ -649,20 +630,20 @@ export default function ExecutionPage() {
               </div>
             )}
 
-            <p className="text-xs text-center text-green-600 font-medium mt-5">
+            <p className="text-xs text-center text-green-600 font-medium mt-4">
               ⭐ Consistency is your superpower. Don't break the chain!
             </p>
           </div>
         )}
 
-        {/* Backlog Goals */}
+        {/* Backlog */}
         {backlog.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-900">
-                Backlog Goals{" "}
-                <span className="text-gray-400 font-normal text-sm">
-                  (Not Started)
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-gray-900 dark:text-white text-sm">
+                Backlog{" "}
+                <span className="text-gray-400 font-normal">
+                  ({backlog.length})
                 </span>
               </h2>
               <a
@@ -676,27 +657,27 @@ export default function ExecutionPage() {
               {backlog.slice(0, 3).map((goal) => (
                 <div
                   key={goal._id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-all"
+                  className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
                       style={{ background: `${goal.color || "#6366f1"}15` }}
                     >
                       {CATEGORY_ICONS[goal.category] || "🎯"}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-white">
                         {goal.title}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-400 truncate max-w-xs">
                         {goal.description}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => activateGoal(goal._id)}
-                    className="text-xs font-semibold border border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
+                    className="text-xs font-semibold border border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ml-3"
                   >
                     Activate
                   </button>
@@ -708,18 +689,17 @@ export default function ExecutionPage() {
 
         {/* Empty state */}
         {goals.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+          <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
             <p className="text-4xl mb-3">⚡</p>
-            <p className="font-semibold text-gray-700 text-lg">
+            <p className="font-semibold text-gray-700 dark:text-white">
               No active goals yet
             </p>
             <p className="text-sm text-gray-400 mt-1 mb-4">
-              Go to Intent (Goals) and activate up to 3 goals to start your
-              21-day execution plan
+              Go to Goals and activate up to 3 to start your 21-day plan
             </p>
             <a
               href="/goals"
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all"
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all"
             >
               Go to Goals <FaArrowRight className="w-3 h-3" />
             </a>

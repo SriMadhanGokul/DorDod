@@ -1,431 +1,760 @@
-import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { api } from "@/utils/api";
+import { useState, useEffect, useCallback } from "react";
+import { api } from "../utils/api";
 import toast from "react-hot-toast";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import {
   FaPlus,
-  FaTimes,
   FaFire,
-  FaTrash,
   FaTrophy,
   FaCheck,
+  FaClock,
+  FaLock,
+  FaEdit,
+  FaTrash,
+  FaTimes,
+  FaArrowUp,
+  FaArrowDown,
+  FaWallet,
 } from "react-icons/fa";
 
-interface Habit {
+interface Routine {
   _id: string;
   name: string;
-  days: boolean[];
-  fromGoal?: string;
+  description?: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  category: string;
+  icon: string;
+  color: string;
+  completedToday: boolean;
+  completedAt?: string;
+  inWindow: boolean;
+  windowPassed: boolean;
+  windowUpcoming: boolean;
+  createdToday: boolean;
+  streak: number;
+  longestStreak: number;
+  totalPoints: number;
+}
+interface Summary {
+  total: number;
+  completed: number;
+  missed: number;
+  todayPoints: number;
+  totalPoints: number;
+  weeklyPoints: number;
+  totalGained: number;
+  totalLost: number;
+  currentPoints: number;
+}
+interface WeekDay {
+  date: string;
+  completed: number;
+  total: number;
+  perfect: boolean;
 }
 
-function getStreaks(days: boolean[]) {
-  let current = 0,
-    best = 0,
-    temp = 0;
-  for (let i = days.length - 1; i >= 0; i--) {
-    if (days[i]) current++;
-    else break;
-  }
-  for (const d of days) {
-    if (d) {
-      temp++;
-      best = Math.max(best, temp);
-    } else temp = 0;
-  }
-  return { current, best };
+const CATEGORIES = [
+  "Health",
+  "Fitness",
+  "Learning",
+  "Mindfulness",
+  "Career",
+  "Personal",
+  "Social",
+  "Other",
+];
+const EMOJIS = [
+  "⭐",
+  "💪",
+  "📚",
+  "🧘",
+  "🎯",
+  "🔥",
+  "🏃",
+  "✍️",
+  "🎨",
+  "🎵",
+  "💡",
+  "🌱",
+  "⚡",
+  "🏆",
+  "🧠",
+  "❤️",
+];
+const COLORS = [
+  "#6366f1",
+  "#8b5cf6",
+  "#ec4899",
+  "#f43f5e",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#a855f7",
+];
+
+function fmt12(t: string) {
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+function getTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+function getDayLabel(dateStr: string) {
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+    new Date(dateStr + "T00:00:00").getDay()
+  ];
 }
 
-const STREAK_MSG = (streak: number, missed: boolean) => {
-  if (missed)
-    return {
-      msg: "💔 You missed today... but tomorrow is YOUR comeback story. Rise again!",
-      color: "text-destructive",
-    };
-  if (streak === 0)
-    return {
-      msg: "💪 Start today! The hardest step is always the first.",
-      color: "text-foreground-muted",
-    };
-  if (streak === 1)
-    return {
-      msg: "✨ Day 1 done! Every legend started exactly here.",
-      color: "text-yellow-500",
-    };
-  if (streak < 3)
-    return {
-      msg: "🌱 Growing strong! Keep this momentum going!",
-      color: "text-yellow-500",
-    };
-  if (streak < 7)
-    return {
-      msg: "🔥 On a roll! You're building something real.",
-      color: "text-orange-500",
-    };
-  if (streak === 7)
-    return {
-      msg: "🔥🔥 7-DAY STREAK! You just earned 50 bonus XP! You're unstoppable!",
-      color: "text-red-500",
-    };
-  if (streak < 14)
-    return {
-      msg: "💥 Over a week strong! Most people quit by now. NOT YOU.",
-      color: "text-red-500",
-    };
-  if (streak === 14)
-    return {
-      msg: "💥💥 14 DAYS! You're in the top 5% of people. 100 XP bonus! 🏆",
-      color: "text-purple-500",
-    };
-  if (streak < 21)
-    return {
-      msg: "👑 Almost there... 21-day legend incoming!",
-      color: "text-purple-500",
-    };
-  return {
-    msg: "👑 21 DAYS! You didn't just build a habit — you built CHARACTER! 200 XP! 🎊",
-    color: "text-primary",
-  };
-};
-
-export default function HabitsPage() {
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    api
-      .get("/habits")
-      .then((r) => setHabits(r.data.data || []))
-      .catch(() => toast.error("Failed to load"))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const create = async () => {
-    if (!name.trim()) return toast.error("Enter a habit name");
-    setSaving(true);
-    try {
-      const res = await api.post("/habits", {
-        name,
-        days: Array(21).fill(false),
-      });
-      setHabits((p) => [res.data.data, ...p]);
-      setName("");
-      setShowModal(false);
-      toast.success("🔥 Habit created! Day 1 starts NOW!");
-    } catch {
-      toast.error("Failed");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const toggle = async (habitId: string, dayIdx: number) => {
-    const prev = habits;
-    const updated = habits.map((h) =>
-      h._id === habitId
-        ? { ...h, days: h.days.map((d, i) => (i === dayIdx ? !d : d)) }
-        : h,
-    );
-    setHabits(updated);
-
-    const habit = updated.find((h) => h._id === habitId)!;
-    const isDone = habit.days[dayIdx];
-    const { current } = getStreaks(habit.days);
-
-    try {
-      await api.patch(`/habits/${habitId}/toggle`, { dayIndex: dayIdx });
-      if (isDone) {
-        const msg = STREAK_MSG(current, false);
-        toast.success(msg.msg, { duration: 4000, icon: "🔥" });
-      } else {
-        toast("💔 Unchecked. Don't give up — every day matters!", {
-          icon: "😢",
-          duration: 3000,
-        });
-      }
-    } catch {
-      setHabits(prev);
-      toast.error("Failed to update");
-    }
-  };
-
-  const del = async (id: string) => {
-    try {
-      await api.delete(`/habits/${id}`);
-      setHabits((p) => p.filter((h) => h._id !== id));
-      toast.success("Habit deleted");
-    } catch {
-      toast.error("Failed to delete");
-    }
-  };
-
-  const totalDone = habits.reduce(
-    (s, h) => s + h.days.filter(Boolean).length,
-    0,
-  );
-  const totalDays = habits.reduce((s, h) => s + h.days.length, 0);
-  const overallPct =
-    totalDays > 0 ? Math.round((totalDone / totalDays) * 100) : 0;
-  const bestOverall = Math.max(
-    0,
-    ...habits.map((h) => getStreaks(h.days).best),
-  );
-
-  if (loading)
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+function StatCard({
+  label,
+  value,
+  icon,
+  colorClass,
+  sub,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  colorClass: string;
+  sub?: string;
+}) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          {label}
+        </span>
+        <div
+          className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${colorClass}`}
+        >
+          {icon}
         </div>
-      </DashboardLayout>
-    );
+      </div>
+      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+        {value}
+      </div>
+      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+function RoutineModal({
+  routine,
+  onClose,
+  onSave,
+  count,
+}: {
+  routine?: Routine | null;
+  onClose: () => void;
+  onSave: () => void;
+  count: number;
+}) {
+  const [form, setForm] = useState({
+    name: routine?.name || "",
+    description: routine?.description || "",
+    scheduledStart: routine?.scheduledStart || "06:00",
+    scheduledEnd: routine?.scheduledEnd || "07:00",
+    category: routine?.category || "Personal",
+    icon: routine?.icon || "⭐",
+    color: routine?.color || "#6366f1",
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) return toast.error("Name required.");
+    if (form.scheduledStart >= form.scheduledEnd)
+      return toast.error("Start must be before end.");
+    if (!routine && count >= 12) return toast.error("Max 12 habits.");
+    setLoading(true);
+    try {
+      const tz = getTimezone();
+      if (routine) {
+        await api.put(`/routines/${routine._id}`, form);
+        toast.success("Updated!");
+      } else {
+        await api.post(`/routines?timezone=${tz}`, { ...form, timezone: tz });
+        toast.success("Created!");
+      }
+      onSave();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">21-Day Habits 🔥</h1>
-            <p className="text-foreground-muted mt-1">
-              Build the person you want to become — one day at a time
-            </p>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="font-bold text-gray-900 dark:text-white">
+            {routine ? "Edit Habit" : "New Habit"}
+          </h2>
           <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1"
           >
-            <FaPlus /> New Habit
+            <FaTimes />
           </button>
         </div>
-
-        {/* Stats */}
-        {habits.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              {
-                val: habits.length,
-                label: "🔥 Active Habits",
-                color: "text-primary",
-              },
-              {
-                val: `${overallPct}%`,
-                label: "✅ Completion Rate",
-                color: "text-success",
-              },
-              {
-                val: totalDone,
-                label: "📅 Days Completed",
-                color: "text-secondary",
-              },
-              {
-                val: `${bestOverall}🔥`,
-                label: "🏆 Best Streak",
-                color: "text-destructive",
-              },
-            ].map((s, i) => (
-              <div key={i} className="stat-card text-center">
-                <p className={`text-2xl font-black ${s.color}`}>{s.val}</p>
-                <p className="text-xs text-foreground-muted mt-1">{s.label}</p>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+              Name *
+            </label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Morning Workout"
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+              Description
+            </label>
+            <input
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder="Optional..."
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {(["scheduledStart", "scheduledEnd"] as const).map((field, i) => (
+              <div key={field}>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+                  {i === 0 ? "Start Time *" : "End Time *"}
+                </label>
+                <input
+                  type="time"
+                  value={form[field]}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, [field]: e.target.value }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
             ))}
           </div>
-        )}
-
-        {habits.length === 0 && (
-          <div className="text-center py-16 text-foreground-muted">
-            <FaFire className="text-5xl mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">No habits yet</p>
-            <p className="text-sm mt-1 max-w-sm mx-auto">
-              It takes 21 days to build a habit. Start today and your future
-              self will thank you.
-            </p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="btn-primary mt-4 mx-auto flex items-center gap-2"
-            >
-              <FaPlus /> Start Your First Habit
-            </button>
-          </div>
-        )}
-
-        {/* Habit cards */}
-        <div className="space-y-5">
-          {habits.map((habit) => {
-            const done = habit.days.filter(Boolean).length;
-            const pct = Math.round((done / 21) * 100);
-            const { current, best } = getStreaks(habit.days);
-            const completed = done === 21;
-            const streakInfo = STREAK_MSG(current, false);
-            const todayIdx = Math.min(done, 20); // approximate "today" as next unchecked
-            const lastChecked = habit.days.lastIndexOf(true);
-            const missedToday =
-              lastChecked < habit.days.filter(Boolean).length - 1;
-
-            return (
-              <div
-                key={habit._id}
-                className={`card-elevated ${completed ? "border-2 border-yellow-400 bg-gradient-to-r from-yellow-50/30 to-orange-50/30" : ""}`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold">{habit.name}</h3>
-                      {completed && (
-                        <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                          <FaTrophy className="w-2.5 h-2.5" /> Legend!
-                        </span>
-                      )}
-                      {habit.fromGoal && (
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                          🎯 {habit.fromGoal}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span
-                        className={`text-sm font-bold flex items-center gap-1 ${streakInfo.color}`}
-                      >
-                        <FaFire
-                          className={current >= 7 ? "animate-pulse" : ""}
-                        />{" "}
-                        {current} day streak
-                      </span>
-                      <span className="text-xs text-foreground-muted">
-                        Best: {best} 🏆
-                      </span>
-                      <span className="text-xs text-foreground-muted">
-                        {done}/21 done
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => del(habit._id)}
-                    className="text-foreground-muted hover:text-destructive p-1 shrink-0"
-                  >
-                    <FaTrash className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mb-3">
-                  <div className="w-full bg-muted rounded-full h-3">
-                    <div
-                      className={`h-3 rounded-full transition-all duration-700 ${
-                        completed
-                          ? "bg-gradient-to-r from-yellow-400 to-orange-400"
-                          : pct > 60
-                            ? "bg-gradient-to-r from-primary to-secondary"
-                            : "bg-primary"
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs text-foreground-muted">
-                      {pct}% complete
-                    </span>
-                    <span className="text-xs text-foreground-muted">
-                      {21 - done} days left
-                    </span>
-                  </div>
-                </div>
-
-                {/* 21-day grid */}
-                <div className="grid grid-cols-7 gap-1.5 mb-3">
-                  {habit.days.map((isDone, i) => (
-                    <button
-                      key={i}
-                      onClick={() => toggle(habit._id, i)}
-                      title={`Day ${i + 1}`}
-                      className={`aspect-square rounded-lg text-xs font-bold transition-all hover:scale-110 active:scale-95 relative ${
-                        isDone
-                          ? "bg-gradient-to-b from-yellow-400 to-orange-500 text-white shadow-sm"
-                          : "bg-muted text-foreground-muted hover:bg-accent"
-                      }`}
-                    >
-                      {isDone ? <FaCheck className="mx-auto w-3 h-3" /> : i + 1}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Emotional message */}
-                <div
-                  className={`text-sm font-medium text-center py-2 px-3 rounded-xl ${
-                    current >= 21
-                      ? "bg-yellow-50 text-yellow-700"
-                      : current >= 7
-                        ? "bg-red-50 text-red-600"
-                        : current > 0
-                          ? "bg-orange-50 text-orange-600"
-                          : "bg-muted text-foreground-muted"
-                  }`}
-                >
-                  {streakInfo.msg}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Add Habit Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <FaFire className="text-destructive" /> New 21-Day Habit
-                  </h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    21 days. That's all it takes to change your life.
-                  </p>
-                </div>
-                <button onClick={() => setShowModal(false)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <input
-                  placeholder="What habit will you build?"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && create()}
-                  className="input-field"
-                  autoFocus
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    "Practice coding daily",
-                    "Read 30 minutes",
-                    "Exercise 20 mins",
-                    "Learn something new",
-                    "Meditate 10 mins",
-                    "Drink 8 glasses water",
-                  ].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setName(s)}
-                      className={`text-xs px-3 py-2.5 rounded-xl border text-left transition-all ${name === s ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40"}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+          <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+            ⏰ Habits added today won't receive penalties — starts from
+            tomorrow.
+          </p>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              Category
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map((c) => (
                 <button
-                  onClick={create}
-                  disabled={saving || !name.trim()}
-                  className="btn-primary w-full disabled:opacity-50 py-3"
+                  key={c}
+                  onClick={() => setForm((f) => ({ ...f, category: c }))}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${form.category === c ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}
                 >
-                  {saving ? "Creating..." : "🔥 Start 21-Day Challenge"}
+                  {c}
                 </button>
-              </div>
+              ))}
             </div>
           </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              Icon
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => setForm((f) => ({ ...f, icon: e }))}
+                  className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${form.icon === e ? "bg-indigo-100 dark:bg-indigo-900 ring-2 ring-indigo-500" : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200"}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+              Color
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setForm((f) => ({ ...f, color: c }))}
+                  style={{ background: c }}
+                  className={`w-7 h-7 rounded-full transition-all ${form.color === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : ""}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="p-5 pt-0 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+          >
+            {loading ? "Saving..." : routine ? "Save Changes" : "Create Habit"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HabitCard({
+  routine,
+  onComplete,
+  onEdit,
+  onDelete,
+}: {
+  routine: Routine;
+  onComplete: (id: string) => void;
+  onEdit: (r: Routine) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [doing, setDoing] = useState(false);
+  const go = async () => {
+    if (doing || routine.completedToday || !routine.inWindow) return;
+    setDoing(true);
+    await onComplete(routine._id);
+    setDoing(false);
+  };
+
+  const badge = routine.completedToday ? (
+    <span className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+      <FaCheck className="text-xs" />
+      Done
+    </span>
+  ) : routine.windowPassed ? (
+    <span className="text-xs font-semibold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+      Missed −3pts
+    </span>
+  ) : routine.createdToday && !routine.inWindow ? (
+    <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+      Added today
+    </span>
+  ) : routine.inWindow ? (
+    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-full animate-pulse">
+      ● Now
+    </span>
+  ) : (
+    <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+      Upcoming
+    </span>
+  );
+
+  return (
+    <div
+      className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all hover:shadow-md ${routine.windowPassed && !routine.completedToday ? "opacity-60" : ""}`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+          style={{
+            background: routine.color + "20",
+            border: `2px solid ${routine.color}40`,
+          }}
+        >
+          {routine.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
+                {routine.name}
+              </h3>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <FaClock className="text-gray-400 text-xs" />
+                <span className="text-xs text-gray-500">
+                  {fmt12(routine.scheduledStart)} –{" "}
+                  {fmt12(routine.scheduledEnd)}
+                </span>
+              </div>
+            </div>
+            {badge}
+          </div>
+          {routine.description && (
+            <p className="text-xs text-gray-400 mt-1 truncate">
+              {routine.description}
+            </p>
+          )}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <FaFire className="text-orange-400 text-xs" />
+                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  {routine.streak}d
+                </span>
+              </div>
+              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                {routine.category}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onEdit(routine)}
+                className="text-gray-400 hover:text-indigo-500 p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+              >
+                <FaEdit className="text-xs" />
+              </button>
+              <button
+                onClick={() => onDelete(routine._id)}
+                className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              >
+                <FaTrash className="text-xs" />
+              </button>
+              {routine.completedToday ? (
+                <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
+                  <FaCheck className="text-white text-sm" />
+                </div>
+              ) : routine.windowPassed ? (
+                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                  <FaTimes className="text-gray-400 text-sm" />
+                </div>
+              ) : routine.inWindow ? (
+                <button
+                  onClick={go}
+                  disabled={doing}
+                  className="w-9 h-9 rounded-full border-2 border-indigo-500 flex items-center justify-center hover:bg-indigo-500 group transition-all"
+                >
+                  <FaCheck className="text-indigo-500 group-hover:text-white text-sm transition-colors" />
+                </button>
+              ) : (
+                <div className="w-9 h-9 rounded-full border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center opacity-40">
+                  <FaLock className="text-gray-400 text-xs" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HabitsContent() {
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [summary, setSummary] = useState<Summary>({
+    total: 0,
+    completed: 0,
+    missed: 0,
+    todayPoints: 0,
+    totalPoints: 0,
+    weeklyPoints: 0,
+    totalGained: 0,
+    totalLost: 0,
+    currentPoints: 0,
+  });
+  const [weeklyGrid, setWeeklyGrid] = useState<WeekDay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editRoutine, setEditRoutine] = useState<Routine | null>(null);
+  const tz = getTimezone();
+
+  const load = useCallback(async () => {
+    try {
+      // Always apply penalties first so missed stats reflect immediately
+      try {
+        await api.post("/routines/apply-penalties", { timezone: tz });
+      } catch {}
+      const [lr, sr] = await Promise.all([
+        api.get(`/routines?timezone=${tz}`),
+        api.get(`/routines/summary?timezone=${tz}`),
+      ]);
+      setRoutines(lr.data.routines);
+      setSummary({ ...lr.data.summary, ...sr.data });
+      setWeeklyGrid(sr.data.weeklyGrid || []);
+    } catch {
+      toast.error("Failed to load habits.");
+    } finally {
+      setLoading(false);
+    }
+  }, [tz]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+  // Refresh every 60s to catch newly passed windows
+  useEffect(() => {
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const handleComplete = async (id: string) => {
+    try {
+      const { data } = await api.patch(`/routines/${id}/complete`, {
+        timezone: tz,
+      });
+      let msg = `+5 points!`;
+      if (data.dailyBonus) msg += ` +${data.dailyBonus} daily bonus! 🎉`;
+      if (data.weeklyBonus) msg += ` +${data.weeklyBonus} perfect week! 🏆`;
+      toast.success(msg);
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Delete this habit?")) return;
+    try {
+      await api.delete(`/routines/${id}`);
+      toast.success("Deleted.");
+      load();
+    } catch {
+      toast.error("Failed to delete.");
+    }
+  };
+
+  const progress =
+    summary.total > 0
+      ? Math.round((summary.completed / summary.total) * 100)
+      : 0;
+
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+      </div>
+    );
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Daily Habits
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditRoutine(null);
+            setShowModal(true);
+          }}
+          disabled={summary.total >= 12}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
+        >
+          <FaPlus className="text-xs" /> Add Habit
+        </button>
+      </div>
+
+      {/* 4-stat dashboard */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard
+          label="Current Points"
+          value={summary.currentPoints}
+          icon={<FaWallet />}
+          colorClass="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600"
+          sub="Your balance"
+        />
+        <StatCard
+          label="Total Gained"
+          value={`+${summary.totalGained}`}
+          icon={<FaArrowUp />}
+          colorClass="bg-green-100 dark:bg-green-900/40 text-green-600"
+          sub="All time earned"
+        />
+        <StatCard
+          label="Total Lost"
+          value={`-${summary.totalLost}`}
+          icon={<FaArrowDown />}
+          colorClass="bg-red-100 dark:bg-red-900/40 text-red-500"
+          sub="Penalties paid"
+        />
+        <StatCard
+          label="This Week"
+          value={summary.weeklyPoints}
+          icon={<FaFire />}
+          colorClass="bg-amber-100 dark:bg-amber-900/40 text-amber-600"
+          sub="Resets Monday"
+        />
+      </div>
+
+      {/* Progress bar */}
+      {summary.total > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+              Today's Progress
+            </span>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-green-600 font-semibold">
+                {summary.completed} done
+              </span>
+              {summary.missed > 0 && (
+                <span className="text-red-500 font-semibold">
+                  {summary.missed} missed
+                </span>
+              )}
+              <span className="font-bold text-indigo-600">{progress}%</span>
+            </div>
+          </div>
+          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3">
+            <div
+              className="h-3 rounded-full transition-all duration-700"
+              style={{
+                width: `${progress}%`,
+                background: progress === 100 ? "#22c55e" : "#6366f1",
+              }}
+            />
+          </div>
+          {progress === 100 && (
+            <p className="text-xs text-green-600 mt-2 font-semibold text-center">
+              🎉 All done! +10 bonus earned!
+            </p>
+          )}
+          {summary.todayPoints !== 0 && (
+            <p
+              className={`text-xs mt-1.5 text-center font-medium ${summary.todayPoints >= 0 ? "text-indigo-500" : "text-red-500"}`}
+            >
+              Today: {summary.todayPoints >= 0 ? "+" : ""}
+              {summary.todayPoints} pts
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Weekly grid */}
+      {weeklyGrid.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            This Week
+          </h3>
+          <div className="grid grid-cols-7 gap-1.5">
+            {weeklyGrid.map((day) => {
+              const isToday =
+                day.date === new Date().toLocaleDateString("en-CA");
+              const pct = day.total > 0 ? day.completed / day.total : 0;
+              return (
+                <div
+                  key={day.date}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span
+                    className={`text-xs ${isToday ? "font-bold text-indigo-600" : "text-gray-400"}`}
+                  >
+                    {getDayLabel(day.date)}
+                  </span>
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all
+                    ${day.perfect ? "bg-green-500 text-white" : pct > 0 ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700" : isToday ? "bg-gray-100 dark:bg-gray-800 text-gray-500 ring-2 ring-indigo-400" : "bg-gray-100 dark:bg-gray-800 text-gray-400"}`}
+                  >
+                    {day.perfect
+                      ? "✓"
+                      : day.completed > 0
+                        ? day.completed
+                        : "·"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400 mt-2 text-center">
+            Perfect week = +25 bonus 🏆
+          </p>
+        </div>
+      )}
+
+      {/* Habits */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Your Habits ({summary.total}/12)
+          </h2>
+          <span className="text-xs text-gray-400">Sorted by time</span>
+        </div>
+        {routines.length === 0 ? (
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-12 text-center">
+            <div className="text-5xl mb-3">🌱</div>
+            <p className="text-gray-500 text-sm">No habits yet.</p>
+            <button
+              onClick={() => {
+                setEditRoutine(null);
+                setShowModal(true);
+              }}
+              className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+            >
+              + Add First Habit
+            </button>
+          </div>
+        ) : (
+          routines.map((r) => (
+            <HabitCard
+              key={r._id}
+              routine={r}
+              onComplete={handleComplete}
+              onEdit={(r) => {
+                setEditRoutine(r);
+                setShowModal(true);
+              }}
+              onDelete={handleDelete}
+            />
+          ))
         )}
       </div>
+
+      {/* Rules */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/50">
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <FaTrophy className="text-amber-500" /> Points Rules
+        </h3>
+        <div className="space-y-2 text-xs">
+          {[
+            ["Complete a habit", "+5", "text-green-600"],
+            ["All habits done today", "+10 bonus", "text-green-600"],
+            ["Perfect week (all 7 days)", "+25 🏆", "text-amber-500"],
+            ["Missed habit (window closed)", "−3", "text-red-500"],
+            ["Habits added today", "No penalty", "text-blue-500"],
+          ].map(([label, pts, cls]) => (
+            <div key={label} className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">{label}</span>
+              <span className={`font-bold ${cls}`}>{pts}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {showModal && (
+        <RoutineModal
+          routine={editRoutine}
+          onClose={() => {
+            setShowModal(false);
+            setEditRoutine(null);
+          }}
+          onSave={load}
+          count={summary.total}
+        />
+      )}
+    </div>
+  );
+}
+
+export default function HabitsPage() {
+  return (
+    <DashboardLayout>
+      <HabitsContent />
     </DashboardLayout>
   );
 }

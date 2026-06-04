@@ -7,7 +7,7 @@ require("dotenv").config();
 const { passport, initializePassport } = require("./utils/passport");
 initializePassport();
 
-// ── Existing routes ────────────────────────────────────────────────────────────
+// ── Routes ─────────────────────────────────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const goalRoutes = require("./routes/goalRoutes");
@@ -26,13 +26,11 @@ const documentRoutes = require("./routes/documentRoutes");
 const frameOfMindRoutes = require("./routes/frameOfMindRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const customSkillRoutes = require("./routes/customSkillRoutes");
-
 const xpRoutes = require("./routes/xpRoutes");
 const friendsRoutes = require("./routes/friendsRoutes");
-
-// ── New routes ─────────────────────────────────────────────────────────────────
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
+const routineRoutes = require("./routes/routineRoutes"); // ← NEW
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -71,6 +69,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
+const { initFirebase } = require("./utils/firebase");
+initFirebase();
+
 // ── Register all routes ────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
@@ -91,23 +92,12 @@ app.use("/api/friends", friendsRoutes);
 app.use("/api/guidance", require("./routes/guidanceRoutes"));
 app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/documents", documentRoutes);
-
-
-
-
-
-
-
 app.use("/api/frame-of-mind", frameOfMindRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
-app.use("/api/activities", activityRoutes);
-app.use("/api/xp", xpRoutes);
-app.use("/api/friends", friendsRoutes);
-app.use("/api/guidance", require("./routes/guidanceRoutes"));
-app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/search", searchRoutes);
 app.use("/api/notifications", notifUserRoutes);
+app.use("/api/routines", routineRoutes); // ← NEW
 
 // ── Inline routes ──────────────────────────────────────────────────────────────
 app.patch("/api/auth/change-password", protect, changePassword);

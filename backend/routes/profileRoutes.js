@@ -1,60 +1,21 @@
-const express = require("express");
-const router = express.Router();
+const express  = require('express');
+const router   = express.Router();
+const protect  = require('../utils/protect');
+const { uploadAvatar: uploadAvatarMiddleware } = require('../utils/uploadMiddleware');
 const {
-  updateProfile,
-  updateNotifications,
-  getProfessionalProfile,
-  manageWorkExperience,
-  manageEducation,
-  manageLanguages,
-  manageCertifications,
-  manageFunctionalSkills,
-  manageTechnicalSkills,
-  manageHonorsAwards,
-} = require("../controllers/profileController");
-const protect = require("../utils/protect");
+  updateProfile, uploadAvatar, getProfileScore, updateNotifications,
+  getProfessionalProfile, manageProfessionalSection, updateProfessionalItem, deleteProfessionalItem,
+} = require('../controllers/profileController');
 
 router.use(protect);
 
-router.put("/", updateProfile);
-router.put("/notifications", updateNotifications);
-
-// Professional profile
-router.get("/professional", getProfessionalProfile);
-router.route("/professional/work").post(manageWorkExperience);
-router
-  .route("/professional/work/:itemId")
-  .put(manageWorkExperience)
-  .delete(manageWorkExperience);
-router.route("/professional/education").post(manageEducation);
-router
-  .route("/professional/education/:itemId")
-  .put(manageEducation)
-  .delete(manageEducation);
-router.route("/professional/languages").post(manageLanguages);
-router
-  .route("/professional/languages/:itemId")
-  .put(manageLanguages)
-  .delete(manageLanguages);
-router.route("/professional/certifications").post(manageCertifications);
-router
-  .route("/professional/certifications/:itemId")
-  .put(manageCertifications)
-  .delete(manageCertifications);
-router.route("/professional/functional-skills").post(manageFunctionalSkills);
-router
-  .route("/professional/functional-skills/:itemId")
-  .put(manageFunctionalSkills)
-  .delete(manageFunctionalSkills);
-router.route("/professional/technical-skills").post(manageTechnicalSkills);
-router
-  .route("/professional/technical-skills/:itemId")
-  .put(manageTechnicalSkills)
-  .delete(manageTechnicalSkills);
-router.route("/professional/honors").post(manageHonorsAwards);
-router
-  .route("/professional/honors/:itemId")
-  .put(manageHonorsAwards)
-  .delete(manageHonorsAwards);
+router.put('/',                                        updateProfile);
+router.post('/avatar',    uploadAvatarMiddleware.single('avatar'), uploadAvatar);
+router.get('/score',                                   getProfileScore);
+router.put('/notifications',                           updateNotifications);
+router.get('/professional',                            getProfessionalProfile);
+router.post('/professional/:section',                  manageProfessionalSection);
+router.put('/professional/:section/:itemId',           updateProfessionalItem);
+router.delete('/professional/:section/:itemId',        deleteProfessionalItem);
 
 module.exports = router;

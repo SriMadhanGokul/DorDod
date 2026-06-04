@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
@@ -106,11 +107,10 @@ const CircleProgress = ({
   total: number;
   color: string;
 }) => {
-  const size = 80;
-  const r = 32;
-  const circ = 2 * Math.PI * r;
-  const pct = total > 0 ? completed / total : 0;
-  const off = circ - pct * circ;
+  const size = 80,
+    r = 32,
+    circ = 2 * Math.PI * r;
+  const off = circ - (total > 0 ? completed / total : 0) * circ;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
@@ -158,6 +158,160 @@ const EMPTY_FORM = {
   color: "#6366f1",
 };
 
+// ─── GoalFormFields is OUTSIDE GoalsPage to prevent remount on every keystroke ───
+function GoalFormFields({ f, setF }: { f: any; setF: any }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Goal Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          value={f.title}
+          onChange={(e) => setF((p: any) => ({ ...p, title: e.target.value }))}
+          placeholder="What do you want to achieve?"
+          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Goal Type
+          </label>
+          <select
+            value={f.goalType}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, goalType: e.target.value }))
+            }
+            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          >
+            <option value="">Please select</option>
+            <option value="Personal">Personal</option>
+            <option value="Professional">Professional</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Category <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={f.category}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, category: e.target.value }))
+            }
+            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          >
+            <option value="">Please select</option>
+            {[
+              "Career",
+              "Fitness",
+              "Financial",
+              "Intellectual",
+              "Spiritual",
+              "Family",
+              "Social",
+              "Other",
+            ].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Description
+        </label>
+        <textarea
+          value={f.description}
+          onChange={(e) =>
+            setF((p: any) => ({ ...p, description: e.target.value }))
+          }
+          placeholder="Describe your goal..."
+          rows={2}
+          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Priority
+          </label>
+          <select
+            value={f.priority}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, priority: e.target.value }))
+            }
+            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          >
+            <option value="">Please select</option>
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Color
+          </label>
+          <div className="flex gap-1.5 mt-1 flex-wrap">
+            {GOAL_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setF((p: any) => ({ ...p, color: c }))}
+                className={`w-7 h-7 rounded-full transition-all ${f.color === c ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : ""}`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Start Date
+          </label>
+          <input
+            type="date"
+            value={f.startDate}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, startDate: e.target.value }))
+            }
+            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            End Date
+          </label>
+          <input
+            type="date"
+            value={f.expectedEndDate}
+            onChange={(e) =>
+              setF((p: any) => ({ ...p, expectedEndDate: e.target.value }))
+            }
+            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Measurement Criteria <span className="text-red-500">*</span>
+        </label>
+        <input
+          value={f.measurementCriteria}
+          onChange={(e) =>
+            setF((p: any) => ({ ...p, measurementCriteria: e.target.value }))
+          }
+          placeholder="How will you measure success?"
+          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [meta, setMeta] = useState<any>({});
@@ -172,6 +326,7 @@ export default function GoalsPage() {
   );
   const [calMonth, setCalMonth] = useState(new Date());
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const load = async () => {
     try {
@@ -192,7 +347,6 @@ export default function GoalsPage() {
   const backlog = goals.filter((g) => g.status === "Not Started");
   const completed = goals.filter((g) => g.status === "Completed");
 
-  // Today's focus — one activity per active goal (today's day)
   const todayFocus = inProgress
     .map((goal) => {
       const todayStr = today();
@@ -200,7 +354,6 @@ export default function GoalsPage() {
         (d) => d.dueDate?.slice(0, 10) === todayStr,
       );
       if (!todayDay) {
-        // Find first incomplete upcoming day
         const next = goal.dayActivities?.find((d) => d.status === "Upcoming");
         return next ? { goal, day: next } : null;
       }
@@ -295,175 +448,23 @@ export default function GoalsPage() {
     }
   };
 
-  const completeTodayActivity = async (goal: Goal, day: DayActivity) => {
-    await completeDay(goal._id, day.dayNumber);
-  };
-
-  // Calendar helpers
   const calDays = () => {
-    const yr = calMonth.getFullYear();
-    const mo = calMonth.getMonth();
-    const first = new Date(yr, mo, 1);
-    const last = new Date(yr, mo + 1, 0);
+    const yr = calMonth.getFullYear(),
+      mo = calMonth.getMonth();
+    const first = new Date(yr, mo, 1),
+      last = new Date(yr, mo + 1, 0);
     const days: (Date | null)[] = Array(first.getDay()).fill(null);
     for (let d = 1; d <= last.getDate(); d++) days.push(new Date(yr, mo, d));
     return days;
   };
+
   const dayStatusForCalendar = (date: Date, goal: Goal) => {
     const ds = date.toISOString().slice(0, 10);
-    const act = goal.dayActivities?.find((d) => d.dueDate?.slice(0, 10) === ds);
-    return act?.status || null;
+    return (
+      goal.dayActivities?.find((d) => d.dueDate?.slice(0, 10) === ds)?.status ||
+      null
+    );
   };
-
-  // GoalFormFields
-  const GoalFormFields = ({ f, setF }: { f: any; setF: any }) => (
-    <div className="space-y-3">
-      <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Goal Title <span className="text-red-500">*</span>
-        </label>
-        <input
-          value={f.title}
-          onChange={(e) => setF((p: any) => ({ ...p, title: e.target.value }))}
-          placeholder="What do you want to achieve?"
-          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Goal Type
-          </label>
-          <select
-            value={f.goalType}
-            onChange={(e) =>
-              setF((p: any) => ({ ...p, goalType: e.target.value }))
-            }
-            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-          >
-            <option value="">Please select</option>
-            <option value="Personal">Personal</option>
-            <option value="Professional">Professional</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Category <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={f.category}
-            onChange={(e) =>
-              setF((p: any) => ({ ...p, category: e.target.value }))
-            }
-            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-          >
-            <option value="">Please select</option>
-            {[
-              "Career",
-              "Fitness",
-              "Financial",
-              "Intellectual",
-              "Spiritual",
-              "Family",
-              "Social",
-              "Other",
-            ].map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Description
-        </label>
-        <textarea
-          value={f.description}
-          onChange={(e) =>
-            setF((p: any) => ({ ...p, description: e.target.value }))
-          }
-          placeholder="Describe your goal..."
-          rows={2}
-          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none resize-none"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Priority
-          </label>
-          <select
-            value={f.priority}
-            onChange={(e) =>
-              setF((p: any) => ({ ...p, priority: e.target.value }))
-            }
-            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-          >
-            <option value="">Please select</option>
-            <option>High</option>
-            <option>Medium</option>
-            <option>Low</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Color
-          </label>
-          <div className="flex gap-1.5 mt-1 flex-wrap">
-            {GOAL_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => setF((p: any) => ({ ...p, color: c }))}
-                className={`w-7 h-7 rounded-full transition-all ${f.color === c ? "ring-2 ring-offset-1 ring-gray-400 scale-110" : ""}`}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Start Date
-          </label>
-          <input
-            type="date"
-            value={f.startDate}
-            onChange={(e) =>
-              setF((p: any) => ({ ...p, startDate: e.target.value }))
-            }
-            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            End Date
-          </label>
-          <input
-            type="date"
-            value={f.expectedEndDate}
-            onChange={(e) =>
-              setF((p: any) => ({ ...p, expectedEndDate: e.target.value }))
-            }
-            className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-          />
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Measurement Criteria <span className="text-red-500">*</span>
-        </label>
-        <input
-          value={f.measurementCriteria}
-          onChange={(e) =>
-            setF((p: any) => ({ ...p, measurementCriteria: e.target.value }))
-          }
-          placeholder="How will you measure success?"
-          className="w-full mt-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-        />
-      </div>
-    </div>
-  );
 
   if (loading)
     return (
@@ -483,7 +484,9 @@ export default function GoalsPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Goals (Intent)</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Goals (Intent)
+            </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               Set your intentions. Focus on 3. Execute daily.
             </p>
@@ -500,30 +503,30 @@ export default function GoalsPage() {
         </div>
 
         {/* Focus Capacity */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-semibold text-gray-900">Focus Capacity</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">
+                Focus Capacity
+              </h2>
               <p className="text-xs text-gray-500 mt-0.5">
                 You can have up to 3 goals in progress.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`text-sm font-bold px-3 py-1 rounded-full ${inProgress.length >= 3 ? "bg-indigo-100 text-indigo-700" : "bg-green-100 text-green-700"}`}
-              >
-                {inProgress.length} / 3 Active
-              </span>
-            </div>
+            <span
+              className={`text-sm font-bold px-3 py-1 rounded-full ${inProgress.length >= 3 ? "bg-indigo-100 text-indigo-700" : "bg-green-100 text-green-700"}`}
+            >
+              {inProgress.length} / 3 Active
+            </span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-2.5">
+          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5">
             <div
               className="bg-indigo-600 h-2.5 rounded-full transition-all duration-700"
               style={{ width: `${(inProgress.length / 3) * 100}%` }}
             />
           </div>
           {inProgress.length >= 3 && (
-            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+            <p className="text-xs text-amber-600 mt-2">
               ⚠️ Focus capacity full. Complete or move a goal to backlog to
               activate new ones.
             </p>
@@ -533,25 +536,21 @@ export default function GoalsPage() {
         {/* In-Progress Goals */}
         {inProgress.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-gray-900">
-                In-Progress Goals ({inProgress.length})
-              </h2>
-            </div>
+            <h2 className="font-semibold text-gray-900 dark:text-white mb-3">
+              In-Progress Goals ({inProgress.length})
+            </h2>
             <div className="grid md:grid-cols-3 gap-4">
               {inProgress.map((goal) => {
-                const completed =
+                const done =
                   goal.dayActivities?.filter((d) => d.status === "Completed")
                     .length || 0;
-                const pct = Math.round((completed / 21) * 100);
+                const pct = Math.round((done / 21) * 100);
                 return (
                   <div
                     key={goal._id}
-                    className={`bg-white rounded-2xl border-2 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md ${selectedGoal?._id === goal._id ? "border-indigo-400" : " border-gray-100"}`}
+                    className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-100 dark:border-gray-800 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-indigo-300"
                     onClick={() =>
-                      setSelectedGoal(
-                        selectedGoal?._id === goal._id ? null : goal,
-                      )
+                      navigate("/execution", { state: { goalId: goal._id } })
                     }
                   >
                     <div className="flex items-start justify-between mb-3">
@@ -560,7 +559,7 @@ export default function GoalsPage() {
                           {CATEGORY_ICONS[goal.category] || "🎯"}
                         </span>
                         <div>
-                          <h3 className="font-semibold text-sm text-gray-900">
+                          <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
                             {goal.title}
                           </h3>
                           <p className="text-xs text-gray-500">
@@ -581,7 +580,7 @@ export default function GoalsPage() {
                           <FaEllipsisV className="w-3.5 h-3.5" />
                         </button>
                         {openMenu === goal._id && (
-                          <div className="absolute right-0 top-7 bg-white border border-gray-100 rounded-xl shadow-lg z-20 w-36 overflow-hidden">
+                          <div className="absolute right-0 top-7 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-20 w-36 overflow-hidden">
                             <button
                               onClick={() => {
                                 setShowEdit(goal);
@@ -600,7 +599,7 @@ export default function GoalsPage() {
                                 });
                                 setOpenMenu(null);
                               }}
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
                             >
                               <FaEdit className="w-3 h-3 text-indigo-500" />{" "}
                               Edit
@@ -610,7 +609,7 @@ export default function GoalsPage() {
                                 deactivate(goal._id);
                                 setOpenMenu(null);
                               }}
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
                             >
                               📦 Move to Backlog
                             </button>
@@ -619,7 +618,7 @@ export default function GoalsPage() {
                                 del(goal._id);
                                 setOpenMenu(null);
                               }}
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-red-500"
                             >
                               <FaTrash className="w-3 h-3" /> Delete
                             </button>
@@ -629,7 +628,7 @@ export default function GoalsPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <CircleProgress
-                        completed={completed}
+                        completed={done}
                         total={21}
                         color={goal.color || "#6366f1"}
                       />
@@ -645,11 +644,11 @@ export default function GoalsPage() {
                           className="text-xs font-medium mt-1"
                           style={{ color: goal.color || "#6366f1" }}
                         >
-                          Day {completed} of 21
+                          Day {done} of 21
                         </p>
                       </div>
                     </div>
-                    <div className="mt-3 w-full bg-gray-100 rounded-full h-1.5">
+                    <div className="mt-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
                       <div
                         className="h-1.5 rounded-full transition-all"
                         style={{
@@ -667,9 +666,11 @@ export default function GoalsPage() {
 
         {/* Today's Focus */}
         {todayFocus.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900">Today's Focus</h2>
+              <h2 className="font-semibold text-gray-900 dark:text-white">
+                Today's Focus
+              </h2>
               <span className="text-xs text-gray-400">
                 One action per active goal
               </span>
@@ -678,7 +679,7 @@ export default function GoalsPage() {
               {todayFocus.map(({ goal, day }) => (
                 <div
                   key={goal._id}
-                  className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all ${day.status === "Completed" ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200 hover:border-indigo-200"}`}
+                  className={`flex items-center justify-between p-3.5 rounded-xl border-2 transition-all ${day.status === "Completed" ? "bg-green-50 border-green-200" : "bg-gray-50 dark:bg-gray-800 border-gray-200 hover:border-indigo-200"}`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span className="text-xl shrink-0">
@@ -686,12 +687,12 @@ export default function GoalsPage() {
                     </span>
                     <div className="min-w-0">
                       <p
-                        className={`text-sm font-medium truncate ${day.status === "Completed" ? "line-through text-gray-400" : "text-gray-800"}`}
+                        className={`text-sm font-medium truncate ${day.status === "Completed" ? "line-through text-gray-400" : "text-gray-800 dark:text-white"}`}
                       >
                         {day.title}
                       </p>
                       <p
-                        className="text-xs text-gray-500"
+                        className="text-xs"
                         style={{ color: goal.color || "#6366f1" }}
                       >
                         {goal.title}
@@ -699,7 +700,7 @@ export default function GoalsPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => completeTodayActivity(goal, day)}
+                    onClick={() => completeDay(goal._id, day.dayNumber)}
                     className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ml-2 transition-all ${day.status === "Completed" ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400"}`}
                   >
                     {day.status === "Completed" && (
@@ -712,290 +713,22 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {/* 21-Day Plan for Selected Goal */}
-        {selectedGoal && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">
-                  {CATEGORY_ICONS[selectedGoal.category] || "🎯"}
-                </span>
-                <div>
-                  <h2 className="font-bold text-gray-900">
-                    {selectedGoal.title}
-                  </h2>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                    In Progress
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">21-Day Plan</p>
-                  <p className="text-sm font-bold text-indigo-600">
-                    Day{" "}
-                    {selectedGoal.dayActivities?.filter(
-                      (d) => d.status === "Completed",
-                    ).length || 0}{" "}
-                    of 21
-                  </p>
-                </div>
-                <div className="w-24 bg-gray-100 rounded-full h-2">
-                  <div
-                    className="rounded-full h-2"
-                    style={{
-                      width: `${((selectedGoal.dayActivities?.filter((d) => d.status === "Completed").length || 0) / 21) * 100}%`,
-                      background: selectedGoal.color || "#6366f1",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* View Switcher */}
-            <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-5">
-              {(["list", "grid", "calendar"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setPlanView(v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${planView === v ? "bg-white shadow-sm text-indigo-600" : "text-gray-500 hover:text-gray-700"}`}
-                >
-                  {v === "list" && <FaList className="w-3 h-3" />}
-                  {v === "grid" && <FaTh className="w-3 h-3" />}
-                  {v === "calendar" && <FaCalendarAlt className="w-3 h-3" />}
-                  {v.charAt(0).toUpperCase() + v.slice(1)} View
-                </button>
-              ))}
-            </div>
-
-            {/* LIST VIEW */}
-            {planView === "list" && (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {selectedGoal.dayActivities?.map((day) => {
-                  const isDone = day.status === "Completed";
-                  const isToday = day.dueDate?.slice(0, 10) === today();
-                  return (
-                    <div
-                      key={day._id}
-                      className={`flex items-center justify-between p-3 rounded-xl transition-all ${isToday ? "bg-indigo-50 border border-indigo-100" : isDone ? "bg-green-50" : "bg-gray-50"} ${isToday ? "ring-2 ring-indigo-200" : ""}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() =>
-                            completeDay(selectedGoal._id, day.dayNumber)
-                          }
-                          className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? "bg-green-500 border-green-500" : "border-gray-300 hover:border-green-400"}`}
-                        >
-                          {isDone && <FaCheck className="text-white w-3 h-3" />}
-                          {day.status === "Missed" && (
-                            <FaTimes className="text-red-500 w-3 h-3" />
-                          )}
-                        </button>
-                        <div>
-                          <p
-                            className={`text-sm font-medium ${isDone ? "line-through text-gray-400" : "text-gray-800"}`}
-                          >
-                            Day {day.dayNumber} {day.title}
-                            {isToday && (
-                              <span className="ml-2 text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">
-                                Today
-                              </span>
-                            )}
-                            {day.dayNumber === 21 && (
-                              <FaFlag className="inline ml-1 text-yellow-500 w-3 h-3" />
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {fmtDate(day.dueDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <DayStatusBadge status={day.status} />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* GRID VIEW */}
-            {planView === "grid" && (
-              <div>
-                <div className="grid grid-cols-7 gap-2 mb-3">
-                  {selectedGoal.dayActivities?.map((day) => {
-                    const isDone = day.status === "Completed";
-                    const isMissed = day.status === "Missed";
-                    const isToday = day.dueDate?.slice(0, 10) === today();
-                    return (
-                      <button
-                        key={day.dayNumber}
-                        onClick={() =>
-                          completeDay(selectedGoal._id, day.dayNumber)
-                        }
-                        className={`aspect-square rounded-full flex flex-col items-center justify-center text-sm font-bold border-2 transition-all hover:scale-110 relative ${
-                          isDone
-                            ? "bg-green-500 border-green-500 text-white"
-                            : isMissed
-                              ? "bg-red-100 border-red-300 text-red-600"
-                              : isToday
-                                ? "bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-1"
-                                : "bg-white border-gray-200 text-gray-600 hover:border-indigo-300"
-                        }`}
-                      >
-                        {day.dayNumber}
-                        {isDone && (
-                          <span className="absolute -bottom-1 text-xs">✓</span>
-                        )}
-                        {isMissed && (
-                          <span className="absolute -bottom-1 text-xs">✗</span>
-                        )}
-                        {day.dayNumber === 21 && (
-                          <FaFlag className="absolute -top-1 -right-1 text-yellow-500 w-3 h-3" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-4 text-xs text-gray-500 mt-3">
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-green-500 rounded-full inline-block" />
-                    &nbsp;Completed
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-red-300 rounded-full inline-block" />
-                    &nbsp;Missed
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-gray-200 rounded-full inline-block" />
-                    &nbsp;Upcoming
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* CALENDAR VIEW */}
-            {planView === "calendar" && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <button
-                    onClick={() =>
-                      setCalMonth(
-                        new Date(
-                          calMonth.getFullYear(),
-                          calMonth.getMonth() - 1,
-                          1,
-                        ),
-                      )
-                    }
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <FaChevronLeft className="w-3 h-3" />
-                  </button>
-                  <span className="font-semibold text-gray-800">
-                    {calMonth.toLocaleDateString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCalMonth(
-                        new Date(
-                          calMonth.getFullYear(),
-                          calMonth.getMonth() + 1,
-                          1,
-                        ),
-                      )
-                    }
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <FaChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                    (d) => (
-                      <div
-                        key={d}
-                        className="text-center text-xs font-medium text-gray-400 py-1"
-                      >
-                        {d}
-                      </div>
-                    ),
-                  )}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {calDays().map((date, i) => {
-                    if (!date) return <div key={i} />;
-                    const status = dayStatusForCalendar(date, selectedGoal);
-                    const isT = date.toISOString().slice(0, 10) === today();
-                    return (
-                      <div
-                        key={i}
-                        className={`aspect-square flex items-center justify-center rounded-full text-sm relative transition-all ${
-                          isT ? "ring-2 ring-indigo-400" : ""
-                        } ${
-                          status === "Completed"
-                            ? "bg-green-500 text-white"
-                            : status === "Missed"
-                              ? "bg-red-100 text-red-600"
-                              : status
-                                ? "bg-indigo-100 text-indigo-600"
-                                : "text-gray-600 hover:bg-gray-100"
-                        }`}
-                      >
-                        {date.getDate()}
-                        {status === "Completed" && (
-                          <span className="absolute bottom-0.5 right-0.5 text-xs">
-                            ✓
-                          </span>
-                        )}
-                        {isT && (
-                          <span className="absolute -bottom-3 text-xs text-indigo-600 font-semibold">
-                            Today
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex gap-4 text-xs text-gray-500 mt-6">
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-green-500 rounded-full inline-block" />
-                    &nbsp;Completed
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-red-300 rounded-full inline-block" />
-                    &nbsp;Missed
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 bg-gray-200 rounded-full inline-block" />
-                    &nbsp;Upcoming
-                  </span>
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-green-600 text-center mt-4">
-              ⭐ Consistency is your superpower. Don't break the chain!
-            </p>
-          </div>
-        )}
-
-        {/* Backlog Goals */}
+        {/* Backlog */}
         {backlog.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-gray-900">
+              <h2 className="font-semibold text-gray-900 dark:text-white">
                 Backlog Goals ({backlog.length})
               </h2>
               <span className="text-xs text-gray-400">
-                All your goals. Activate up to 3 to focus.
+                Activate up to 3 to focus.
               </span>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm divide-y divide-gray-50 dark:divide-gray-800">
               {backlog.map((goal) => (
                 <div
                   key={goal._id}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50 transition-all first:rounded-t-2xl last:rounded-b-2xl"
+                  className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all first:rounded-t-2xl last:rounded-b-2xl"
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -1005,7 +738,7 @@ export default function GoalsPage() {
                       {CATEGORY_ICONS[goal.category] || "🎯"}
                     </div>
                     <div>
-                      <p className="font-semibold text-sm text-gray-900">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white">
                         {goal.title}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -1036,7 +769,7 @@ export default function GoalsPage() {
                         <FaEllipsisV className="w-3.5 h-3.5" />
                       </button>
                       {openMenu === `b${goal._id}` && (
-                        <div className="absolute right-0 top-7 bg-white border border-gray-100 rounded-xl shadow-lg z-20 w-32 overflow-hidden">
+                        <div className="absolute right-0 top-7 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-20 w-32 overflow-hidden">
                           <button
                             onClick={() => {
                               setShowEdit(goal);
@@ -1055,7 +788,7 @@ export default function GoalsPage() {
                               });
                               setOpenMenu(null);
                             }}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
                           >
                             <FaEdit className="w-3 h-3 text-indigo-500" /> Edit
                           </button>
@@ -1064,7 +797,7 @@ export default function GoalsPage() {
                               del(goal._id);
                               setOpenMenu(null);
                             }}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center gap-2 text-red-500"
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 text-red-500"
                           >
                             <FaTrash className="w-3 h-3" /> Delete
                           </button>
@@ -1078,10 +811,10 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {/* Completed Goals (collapsed) */}
+        {/* Completed */}
         {completed.length > 0 && (
-          <details className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <summary className="font-semibold text-sm text-gray-700 cursor-pointer flex items-center gap-2">
+          <details className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
+            <summary className="font-semibold text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex items-center gap-2">
               <span className="text-green-600">✅</span> Completed Goals (
               {completed.length})
             </summary>
@@ -1089,12 +822,12 @@ export default function GoalsPage() {
               {completed.map((g) => (
                 <div
                   key={g._id}
-                  className="flex items-center gap-3 p-3 bg-green-50 rounded-xl"
+                  className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/20 rounded-xl"
                 >
                   <span className="text-xl">
                     {CATEGORY_ICONS[g.category] || "🎯"}
                   </span>
-                  <p className="text-sm font-medium text-gray-700 line-through">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 line-through">
                     {g.title}
                   </p>
                   <span className="ml-auto text-xs text-green-600 font-medium">
@@ -1107,9 +840,11 @@ export default function GoalsPage() {
         )}
 
         {goals.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
+          <div className="text-center py-20 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
             <p className="text-4xl mb-3">🎯</p>
-            <p className="font-semibold text-gray-700 text-lg">No goals yet</p>
+            <p className="font-semibold text-gray-700 dark:text-white text-lg">
+              No goals yet
+            </p>
             <p className="text-sm text-gray-400 mt-1 mb-4">
               Create your first goal to begin your 21-day journey
             </p>
@@ -1125,10 +860,12 @@ export default function GoalsPage() {
         {/* CREATE MODAL */}
         {showCreate && (
           <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg my-auto shadow-2xl animate-fade-in">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg my-auto shadow-2xl">
               <div className="flex justify-between items-center mb-5">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">New Goal</h2>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    New Goal
+                  </h2>
                   <p className="text-xs text-gray-400 mt-0.5">
                     New goals go to Backlog. Activate to start 21-day plan.
                   </p>
@@ -1155,9 +892,9 @@ export default function GoalsPage() {
         {/* EDIT MODAL */}
         {showEdit && (
           <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-lg my-auto shadow-2xl animate-fade-in">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg my-auto shadow-2xl">
               <div className="flex justify-between items-center mb-5">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <FaEdit className="text-indigo-500" /> Edit Goal
                 </h2>
                 <button

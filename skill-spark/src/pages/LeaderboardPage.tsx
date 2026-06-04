@@ -1,599 +1,405 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { api } from "@/utils/api";
+import { api } from "../utils/api";
 import toast from "react-hot-toast";
+import DashboardLayout from "../components/layout/DashboardLayout";
 import {
   FaTrophy,
+  FaMedal,
   FaFire,
-  FaSearch,
-  FaUserPlus,
-  FaCheck,
-  FaTimes,
-  FaBell,
-  FaLink,
-  FaCopy,
-  FaHistory,
+  FaStar,
+  FaCrown,
+  FaArrowUp,
+  FaArrowDown,
+  FaSync,
 } from "react-icons/fa";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface LeaderEntry {
-  _id: string;
-  user: { _id: string; name: string; avatar?: string; email: string };
-  totalXP: number;
-  periodXP: number;
-  level: number;
-  levelName: string;
-  streak: number;
-}
-interface FriendReq {
-  _id: string;
-  requester: { _id: string; name: string; email: string; avatar?: string };
-}
-interface SearchUser {
-  _id: string;
+  rank: number;
+  userId: string;
   name: string;
-  email: string;
   avatar?: string;
-  friendStatus: "none" | "sent" | "received" | "friends";
+  level: number;
+  totalPoints: number;
+  weeklyPoints: number;
+  totalGained: number;
+  totalLost: number;
+  isCurrentUser: boolean;
 }
 
-const RANK_COLORS = [
-  "bg-yellow-400 text-yellow-900",
-  "bg-gray-300 text-gray-700",
-  "bg-orange-400 text-orange-900",
-];
-const LEVEL_COLORS: Record<number, string> = {
-  1: "text-orange-500",
-  2: "text-gray-500",
-  3: "text-yellow-500",
-  4: "text-blue-400",
-  5: "text-purple-500",
-};
+function RankIcon({ rank }: { rank: number }) {
+  if (rank === 1) return <FaCrown className="text-yellow-400 text-xl" />;
+  if (rank === 2) return <FaMedal className="text-slate-400 text-xl" />;
+  if (rank === 3) return <FaMedal className="text-amber-600 text-xl" />;
+  return (
+    <span className="text-sm font-bold text-gray-400 w-6 text-center">
+      #{rank}
+    </span>
+  );
+}
 
-const PERIOD_LABELS: Record<string, string> = {
-  week: "This Week",
-  month: "This Month",
-  year: "This Year",
-  all: "All Time",
-};
+function Avatar({
+  name,
+  avatar,
+  size = "md",
+}: {
+  name: string;
+  avatar?: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const sz = {
+    sm: "w-9 h-9 text-xs",
+    md: "w-11 h-11 text-sm",
+    lg: "w-16 h-16 text-xl",
+  }[size];
+  const initials =
+    name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
+  if (avatar)
+    return (
+      <img
+        src={avatar}
+        alt={name}
+        className={`${sz} rounded-full object-cover flex-shrink-0`}
+      />
+    );
+  return (
+    <div
+      className={`${sz} rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0`}
+    >
+      {initials}
+    </div>
+  );
+}
 
-export default function LeaderboardPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  const [tab, setTab] = useState<"friends" | "global">("friends");
-  const [period, setPeriod] = useState("all");
-  const [global, setGlobal] = useState<LeaderEntry[]>([]);
-  const [friends, setFriends] = useState<LeaderEntry[]>([]);
-  const [requests, setRequests] = useState<FriendReq[]>([]);
-  const [myScore, setMyScore] = useState<any>(null);
+function LeaderboardContent() {
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+  const [myRank, setMyRank] = useState<LeaderEntry | null>(null);
+  const [tab, setTab] = useState<"all" | "weekly">("all");
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [searchRes, setSearchRes] = useState<SearchUser[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadLeaderboard = async (p = period) => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
-      const [lbRes, myRes, reqRes] = await Promise.all([
-        api.get(`/xp/leaderboard?period=${p}`),
-        api.get("/xp/me"),
-        api.get("/friends/requests"),
-      ]);
-      setGlobal(lbRes.data.data.global || []);
-      setFriends(lbRes.data.data.friends || []);
-      setMyScore(myRes.data.data);
-      setRequests(reqRes.data.data || []);
+      const res = await api.get("/routines/leaderboard");
+      setLeaderboard(res.data.leaderboard);
+      setMyRank(res.data.myRank);
     } catch {
-      toast.error("Failed to load");
+      toast.error("Failed to load leaderboard.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadLeaderboard("all");
+    load();
   }, []);
 
-  const changePeriod = (p: string) => {
-    setPeriod(p);
-    loadLeaderboard(p);
-  };
+  const sorted = [...leaderboard]
+    .sort((a, b) =>
+      tab === "weekly"
+        ? b.weeklyPoints - a.weeklyPoints
+        : b.totalPoints - a.totalPoints,
+    )
+    .map((e, i) => ({ ...e, rank: i + 1 }));
 
-  useEffect(() => {
-    if (!search.trim() || search.length < 2) {
-      setSearchRes([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await api.get(
-          `/friends/search?q=${encodeURIComponent(search)}`,
-        );
-        setSearchRes(r.data.data || []);
-      } catch {
-      } finally {
-        setSearching(false);
-      }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [search]);
+  const pts = (e: LeaderEntry) =>
+    tab === "weekly" ? e.weeklyPoints : e.totalPoints;
 
-  const getInviteLink = async () => {
-    try {
-      const r = await api.get("/friends/invite-link");
-      setInviteLink(r.data.data.link);
-    } catch {
-      toast.error("Failed to generate link");
-    }
-  };
-  const copyLink = () => {
-    navigator.clipboard.writeText(inviteLink).then(() => {
-      setCopied(true);
-      toast.success("Invite link copied! 🎉");
-      setTimeout(() => setCopied(false), 3000);
-    });
-  };
-  const sendRequest = async (id: string) => {
-    try {
-      await api.post("/friends/request", { recipientId: id });
-      setSearchRes((p) =>
-        p.map((u) => (u._id === id ? { ...u, friendStatus: "sent" } : u)),
-      );
-      toast.success("Friend request sent! 🤝");
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed");
-    }
-  };
-  const accept = async (reqId: string, name: string) => {
-    try {
-      const r = await api.patch(`/friends/${reqId}/accept`);
-      setRequests((p) => p.filter((x) => x._id !== reqId));
-      toast.success(r.data.message || `You and ${name} are now friends! 🎉`);
-      loadLeaderboard(period);
-    } catch {
-      toast.error("Failed");
-    }
-  };
-  const reject = async (reqId: string) => {
-    try {
-      await api.delete(`/friends/${reqId}`);
-      setRequests((p) => p.filter((x) => x._id !== reqId));
-    } catch {}
-  };
+  const top3 = sorted.slice(0, 3);
+  const rest = sorted.slice(3);
 
-  const myId = (user as any)?.id || "";
-  const list = tab === "global" ? global : friends;
-  const myEntry = list.find((e) => e.user?._id === myId);
-  const myRank = list.findIndex((e) => e.user?._id === myId) + 1;
+  const me = sorted.find((e) => e.isCurrentUser) || myRank;
 
-  const xpKey = period === "all" ? "totalXP" : "periodXP";
-
-  const prog = (() => {
-    if (!myScore) return { pct: 0, xpToNext: 0 };
-    const T = [0, 500, 1500, 3500, 7500, 99999];
-    const next = T[myScore.level] || 99999;
-    const prev = T[myScore.level - 1] || 0;
-    const pct = Math.min(
-      100,
-      Math.round(((myScore.totalXP - prev) / (next - prev)) * 100),
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
+      </div>
     );
-    return { pct, xpToNext: next - myScore.totalXP };
-  })();
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-              Leaderboard 🏆
-            </h1>
-            <p className="text-foreground-muted mt-1">
-              Compete, grow, and celebrate with your circle
-            </p>
-          </div>
-          <button
-            onClick={() => navigate("/xp-history")}
-            className="btn-secondary text-sm flex items-center gap-2 self-start sm:self-auto"
-          >
-            <FaHistory /> My XP History
-          </button>
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Leaderboard
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Ranked by habit points across all users
+          </p>
         </div>
+        <button
+          onClick={() => load(true)}
+          disabled={refreshing}
+          className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+        >
+          <FaSync className={`text-sm ${refreshing ? "animate-spin" : ""}`} />
+        </button>
+      </div>
 
-        {/* My Score Banner */}
-        {myScore && (
-          <div className="card-elevated bg-gradient-to-r from-primary/10 via-background to-secondary/10 border-primary/20">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* My stats banner (if we have data) */}
+      {me && (
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-white">
+          <div className="flex items-center gap-3">
+            <Avatar name={me.name} avatar={me.avatar} size="md" />
+            <div className="flex-1">
+              <p className="font-bold">
+                {me.name} <span className="text-indigo-200 text-sm">(you)</span>
+              </p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <FaStar className="text-yellow-300 text-xs" />
+                <span className="text-xs text-indigo-200">
+                  Level {me.level}
+                </span>
+                <span className="text-indigo-300 mx-1">·</span>
+                <span className="text-xs text-indigo-200">Rank #{me.rank}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold">{pts(me)}</div>
+              <div className="text-xs text-indigo-200">
+                {tab === "weekly" ? "this week" : "all time"}
+              </div>
+            </div>
+          </div>
+          {/* My gains / losses */}
+          <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-white/20">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                <FaArrowUp className="text-green-300 text-xs" />
+              </div>
               <div>
-                <p className="text-xs text-foreground-muted uppercase tracking-wide">
-                  Your Level
-                </p>
-                <p
-                  className={`text-2xl font-black ${LEVEL_COLORS[myScore.level] || "text-foreground"}`}
-                >
-                  {myScore.levelName}
-                </p>
-                <p className="text-sm text-foreground-muted">
-                  {myScore.totalXP.toLocaleString()} XP total
-                </p>
+                <div className="text-sm font-bold">+{me.totalGained}</div>
+                <div className="text-xs text-indigo-200">Total earned</div>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-foreground-muted">Streak</p>
-                <p className="text-3xl font-black text-destructive">
-                  {myScore.streak} 🔥
-                </p>
-                <p className="text-xs text-foreground-muted">
-                  Best: {myScore.bestStreak}
-                </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                <FaArrowDown className="text-red-300 text-xs" />
               </div>
-              <div className="text-center">
-                <p className="text-xs text-foreground-muted">Your Rank</p>
-                <p className="text-3xl font-black text-secondary">
-                  {myRank > 0 ? `#${myRank}` : "—"}
-                </p>
-                <p className="text-xs text-foreground-muted capitalize">
-                  {tab}
-                </p>
-              </div>
-              <div className="min-w-[150px]">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-foreground-muted">Next level</span>
-                  <span className="font-medium">{prog.pct}%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-3">
-                  <div
-                    className="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all duration-700"
-                    style={{ width: `${prog.pct}%` }}
-                  />
-                </div>
-                <p className="text-xs text-foreground-muted mt-1">
-                  {prog.xpToNext > 0
-                    ? `${prog.xpToNext.toLocaleString()} XP to go`
-                    : "👑 Max level!"}
-                </p>
+              <div>
+                <div className="text-sm font-bold">-{me.totalLost}</div>
+                <div className="text-xs text-indigo-200">Penalties paid</div>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Friend Requests */}
-        {requests.length > 0 && (
-          <div className="card-elevated border-l-4 border-l-primary">
-            <h3 className="font-semibold flex items-center gap-2 mb-3">
-              <FaBell className="text-primary" /> Friend Requests
-              <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">
-                {requests.length}
-              </span>
-            </h3>
-            <div className="space-y-2">
-              {requests.map((r) => (
-                <div
-                  key={r._id}
-                  className="flex items-center justify-between gap-3 p-3 bg-muted rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    {r.requester.avatar ? (
-                      <img
-                        src={r.requester.avatar}
-                        className="w-9 h-9 rounded-full object-cover"
-                        alt=""
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm">
-                        {r.requester.name?.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {r.requester.name}
-                      </p>
-                      <p className="text-xs text-foreground-muted">
-                        {r.requester.email}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => accept(r._id, r.requester.name)}
-                      className="text-xs bg-success/10 text-success hover:bg-success hover:text-white border border-success/30 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium"
-                    >
-                      <FaCheck className="w-2.5 h-2.5" /> Accept
-                    </button>
-                    <button
-                      onClick={() => reject(r._id)}
-                      className="text-xs bg-muted hover:bg-destructive/10 hover:text-destructive border border-border px-2.5 py-1.5 rounded-lg transition-all"
-                    >
-                      <FaTimes className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Tab switcher */}
+      <div className="flex bg-gray-100 dark:bg-gray-800 rounded-2xl p-1">
+        {(["all", "weekly"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === t ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700"}`}
+          >
+            {t === "all" ? "All Time" : "This Week"}
+          </button>
+        ))}
+      </div>
 
-        {/* Find Friends */}
-        <div className="card-elevated">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <FaUserPlus className="text-secondary" /> Find & Add Friends
-          </h3>
-          <div className="relative mb-3">
-            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-muted w-3.5 h-3.5" />
-            <input
-              placeholder="Search by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-field pl-11"
-            />
-          </div>
-          {searching && (
-            <p className="text-xs text-foreground-muted mb-2">Searching...</p>
-          )}
-          {searchRes.length > 0 && (
-            <div className="space-y-2 mb-4">
-              {searchRes.map((u) => (
-                <div
-                  key={u._id}
-                  className="flex items-center justify-between p-3 bg-muted rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    {u.avatar ? (
-                      <img
-                        src={u.avatar}
-                        className="w-8 h-8 rounded-full object-cover"
-                        alt=""
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-white font-bold text-sm">
-                        {u.name?.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium">{u.name}</p>
-                      <p className="text-xs text-foreground-muted">{u.email}</p>
-                    </div>
-                  </div>
-                  <button
-                    disabled={u.friendStatus !== "none"}
-                    onClick={() => sendRequest(u._id)}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
-                      u.friendStatus === "friends"
-                        ? "bg-success/10 text-success"
-                        : u.friendStatus === "sent"
-                          ? "bg-muted text-foreground-muted cursor-default"
-                          : "bg-primary text-primary-foreground hover:opacity-90"
-                    }`}
-                  >
-                    {u.friendStatus === "friends"
-                      ? "✓ Friends"
-                      : u.friendStatus === "sent"
-                        ? "✓ Sent"
-                        : "+ Add"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="border-t border-border pt-3">
-            <p className="text-xs text-foreground-muted mb-2">
-              Or share your invite link:
-            </p>
-            {!inviteLink ? (
-              <button
-                onClick={getInviteLink}
-                className="text-sm flex items-center gap-2 text-primary hover:underline"
+      {/* Podium top 3 */}
+      {top3.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-6">
+          <div className="flex items-end justify-center gap-4">
+            {/* 2nd */}
+            {top3[1] && (
+              <div
+                className={`flex flex-col items-center gap-2 flex-1 pb-2 ${top3[1].isCurrentUser ? "ring-2 ring-indigo-500 rounded-2xl p-2" : ""}`}
               >
-                <FaLink className="w-3 h-3" /> Generate invite link
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  value={inviteLink}
-                  className="input-field text-xs flex-1"
-                />
-                <button
-                  onClick={copyLink}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 shrink-0 ${copied ? "bg-success text-white" : "btn-secondary"}`}
-                >
-                  {copied ? (
-                    <FaCheck className="w-3 h-3" />
-                  ) : (
-                    <FaCopy className="w-3 h-3" />
-                  )}
-                  {copied ? "Copied!" : "Copy"}
-                </button>
+                <Avatar name={top3[1].name} avatar={top3[1].avatar} size="md" />
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[72px]">
+                    {top3[1].name.split(" ")[0]}
+                  </div>
+                  <div className="text-sm font-bold text-slate-500">
+                    {pts(top3[1])} pts
+                  </div>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-t-xl h-14 flex items-center justify-center">
+                  <FaMedal className="text-slate-400 text-2xl" />
+                </div>
+              </div>
+            )}
+            {/* 1st */}
+            {top3[0] && (
+              <div
+                className={`flex flex-col items-center gap-2 flex-1 ${top3[0].isCurrentUser ? "ring-2 ring-indigo-500 rounded-2xl p-2" : ""}`}
+              >
+                <FaCrown className="text-yellow-400 text-xl" />
+                <Avatar name={top3[0].name} avatar={top3[0].avatar} size="lg" />
+                <div className="text-center">
+                  <div className="text-sm font-bold text-gray-900 dark:text-white truncate max-w-[80px]">
+                    {top3[0].name.split(" ")[0]}
+                  </div>
+                  <div className="font-bold text-amber-500">
+                    {pts(top3[0])} pts
+                  </div>
+                </div>
+                <div className="w-full bg-gradient-to-t from-amber-400 to-yellow-300 rounded-t-xl h-24 flex items-center justify-center shadow-sm shadow-amber-200">
+                  <FaTrophy className="text-white text-3xl drop-shadow" />
+                </div>
+              </div>
+            )}
+            {/* 3rd */}
+            {top3[2] && (
+              <div
+                className={`flex flex-col items-center gap-2 flex-1 pb-2 ${top3[2].isCurrentUser ? "ring-2 ring-indigo-500 rounded-2xl p-2" : ""}`}
+              >
+                <Avatar name={top3[2].name} avatar={top3[2].avatar} size="md" />
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[72px]">
+                    {top3[2].name.split(" ")[0]}
+                  </div>
+                  <div className="text-sm font-bold text-amber-600">
+                    {pts(top3[2])} pts
+                  </div>
+                </div>
+                <div className="w-full bg-amber-100 dark:bg-amber-900/30 rounded-t-xl h-8 flex items-center justify-center">
+                  <FaMedal className="text-amber-600 text-xl" />
+                </div>
               </div>
             )}
           </div>
         </div>
+      )}
 
-        {/* Period selector + Tab switcher */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="flex gap-2">
-            {(["friends", "global"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t ? "bg-primary text-primary-foreground shadow-md" : "bg-muted text-foreground-muted hover:bg-accent"}`}
-              >
-                {t === "friends" ? "👥 Friend Circle" : "🌍 Global Top 20"}
-              </button>
-            ))}
+      {/* Remaining list */}
+      {rest.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Rankings
+            </span>
+            <span className="text-xs text-gray-400">{sorted.length} users</span>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {Object.entries(PERIOD_LABELS).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => changePeriod(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === key ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground-muted hover:bg-accent"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Period banner */}
-        {period !== "all" && (
-          <div className="flex items-center gap-2 p-3 bg-secondary/10 border border-secondary/20 rounded-xl text-secondary text-sm font-medium">
-            📅 Showing XP earned: <strong>{PERIOD_LABELS[period]}</strong>
-          </div>
-        )}
-
-        {/* Leaderboard */}
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : list.length === 0 ? (
-          <div className="text-center py-12 text-foreground-muted">
-            <FaTrophy className="text-5xl mx-auto mb-3 opacity-20" />
-            <p className="font-medium text-lg">
-              {tab === "friends" ? "Add friends to compete!" : "No entries yet"}
-            </p>
-            <p className="text-sm mt-1">
-              {tab === "friends"
-                ? "Search above or share your invite link"
-                : "Complete goals and habits to earn XP"}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {list.map((entry, i) => {
-              const isMe = entry.user?._id === myId;
-              const xp = (entry as any)[xpKey] ?? entry.totalXP;
-              return (
-                <div
-                  key={entry._id || i}
-                  className={`card-elevated flex items-center gap-4 transition-all ${isMe ? "border-2 border-primary bg-primary/5 shadow-md" : ""} ${i === 0 ? "border-yellow-400/50" : ""}`}
-                >
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${RANK_COLORS[i] || "bg-muted text-foreground-muted"}`}
+          {rest.map((entry, idx) => (
+            <div
+              key={entry.userId}
+              className={`flex items-center gap-3 px-4 py-3.5 transition-colors ${entry.isCurrentUser ? "bg-indigo-50 dark:bg-indigo-950/30" : idx % 2 === 0 ? "" : "bg-gray-50/50 dark:bg-gray-800/20"} ${idx < rest.length - 1 ? "border-b border-gray-50 dark:border-gray-800/50" : ""}`}
+            >
+              <div className="w-7 flex items-center justify-center flex-shrink-0">
+                <RankIcon rank={entry.rank} />
+              </div>
+              <Avatar name={entry.name} avatar={entry.avatar} size="sm" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-sm font-semibold truncate ${entry.isCurrentUser ? "text-indigo-700 dark:text-indigo-300" : "text-gray-900 dark:text-white"}`}
                   >
-                    {i === 0
-                      ? "🥇"
-                      : i === 1
-                        ? "🥈"
-                        : i === 2
-                          ? "🥉"
-                          : `#${i + 1}`}
-                  </div>
-                  {entry.user?.avatar ? (
-                    <img
-                      src={entry.user.avatar}
-                      className="w-10 h-10 rounded-full object-cover shrink-0"
-                      alt=""
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-white font-bold shrink-0">
-                      {entry.user?.name?.charAt(0).toUpperCase() || "?"}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-sm truncate">
-                        {entry.user?.name || "Unknown"}
-                      </p>
-                      {isMe && (
-                        <span className="text-xs text-primary font-bold">
-                          (You)
-                        </span>
-                      )}
-                      <span
-                        className={`text-xs font-medium shrink-0 ${LEVEL_COLORS[entry.level] || ""}`}
-                      >
-                        {entry.levelName}
+                    {entry.name}
+                    {entry.isCurrentUser && (
+                      <span className="ml-1 text-xs text-indigo-400">
+                        (you)
                       </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-destructive font-medium">
-                        <FaFire className="inline mr-0.5" /> {entry.streak} day
-                        streak
-                      </span>
-                      {period !== "all" && (
-                        <span className="text-xs text-foreground-muted">
-                          All time: {entry.totalXP.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-1">
+                    <FaArrowUp className="text-green-400 text-xs" />
+                    <span className="text-xs text-gray-400">
+                      +{entry.totalGained}
+                    </span>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-black text-xl text-primary">
-                      {xp.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-foreground-muted">
-                      {period === "all"
-                        ? "Total XP"
-                        : `${PERIOD_LABELS[period]} XP`}
-                    </p>
+                  <div className="flex items-center gap-1">
+                    <FaArrowDown className="text-red-400 text-xs" />
+                    <span className="text-xs text-gray-400">
+                      -{entry.totalLost}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FaStar className="text-amber-400 text-xs" />
+                    <span className="text-xs text-gray-400">
+                      Lv.{entry.level}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Level guide */}
-        <div className="card-elevated">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            🏅 Level Guide
-            <button
-              onClick={() => navigate("/xp-history")}
-              className="text-xs text-primary hover:underline ml-auto font-normal"
-            >
-              See how to earn XP →
-            </button>
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {[
-              {
-                name: "🥉 Bronze",
-                xp: "0 – 499",
-                color: "text-orange-500",
-                bg: "bg-orange-50",
-              },
-              {
-                name: "🥈 Silver",
-                xp: "500 – 1,499",
-                color: "text-gray-500",
-                bg: "bg-gray-50",
-              },
-              {
-                name: "🥇 Gold",
-                xp: "1,500 – 3,499",
-                color: "text-yellow-500",
-                bg: "bg-yellow-50",
-              },
-              {
-                name: "💎 Platinum",
-                xp: "3,500 – 7,499",
-                color: "text-blue-400",
-                bg: "bg-blue-50",
-              },
-              {
-                name: "👑 Diamond",
-                xp: "7,500+",
-                color: "text-purple-500",
-                bg: "bg-purple-50",
-              },
-            ].map((l, i) => (
-              <div key={i} className={`${l.bg} rounded-xl p-3 text-center`}>
-                <p className={`font-bold text-sm ${l.color}`}>{l.name}</p>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {l.xp} XP
-                </p>
               </div>
-            ))}
+              <div className="text-right flex-shrink-0">
+                <div
+                  className={`text-sm font-bold ${entry.isCurrentUser ? "text-indigo-600" : "text-gray-900 dark:text-white"}`}
+                >
+                  {pts(entry)}
+                </div>
+                <div className="text-xs text-gray-400">pts</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {sorted.length === 0 && (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">🏆</div>
+          <p className="text-gray-500 dark:text-gray-400 font-medium">
+            No rankings yet
+          </p>
+          <p className="text-sm text-gray-400 mt-1">
+            Complete habits to appear on the leaderboard!
+          </p>
+        </div>
+      )}
+
+      {/* My rank if outside top list */}
+      {myRank && !leaderboard.find((e) => e.isCurrentUser) && (
+        <div className="bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl border border-indigo-200 dark:border-indigo-900 p-4">
+          <p className="text-xs font-semibold text-indigo-500 mb-2 uppercase tracking-wide text-center">
+            Your Position
+          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
+              #{myRank.rank}
+            </span>
+            <Avatar name={myRank.name} avatar={myRank.avatar} size="sm" />
+            <div className="flex-1">
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                {myRank.name}
+              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <FaArrowUp className="text-green-400 text-xs" />+
+                  {myRank.totalGained}
+                </span>
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <FaArrowDown className="text-red-400 text-xs" />-
+                  {myRank.totalLost}
+                </span>
+              </div>
+            </div>
+            <span className="text-sm font-bold text-indigo-600">
+              {pts(myRank)} pts
+            </span>
           </div>
         </div>
+      )}
+
+      {/* Motivational footer */}
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-4 text-center text-white">
+        <FaFire className="mx-auto text-2xl text-orange-300 mb-2" />
+        <p className="text-sm font-semibold">Build streaks, climb the ranks!</p>
+        <p className="text-xs text-indigo-200 mt-1">
+          +5 per habit · +10 daily · +25 perfect week · −3 penalty
+        </p>
       </div>
+    </div>
+  );
+}
+
+export default function LeaderboardPage() {
+  return (
+    <DashboardLayout>
+      <LeaderboardContent />
     </DashboardLayout>
   );
 }

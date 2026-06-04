@@ -24,23 +24,24 @@ import {
   FaSun,
   FaMoon,
   FaMedal,
+  FaFire,
 } from "react-icons/fa";
 
 const navItems = [
   { to: "/dashboard", icon: FaChartBar, label: "Overview" },
   { to: "/profile", icon: FaUserCircle, label: "Identity" },
-  { to: "/frame-of-mind", icon: FaSmile, label: "Mind State" },
+  // { to: "/frame-of-mind", icon: FaSmile, label: "Mind State" }, // Hidden — handled in Overview
   { to: "/goals", icon: FaBullseye, label: "Intent" },
   { to: "/skills", icon: FaLightbulb, label: "Capabilities" },
   { to: "/development-plan", icon: FaRocket, label: "Growth Plan" },
-  // { to: '/habits',           icon: FaCalendarCheck, label: 'Behavior' }, // HIDDEN per client req
+  { to: "/habits", icon: FaFire, label: "Habits" },
   { to: "/execution", icon: FaTasks, label: "Execution" },
   { to: "/achievements", icon: FaTrophy, label: "Outcomes" },
   { to: "/insights", icon: FaChartLine, label: "Insights" },
+  { to: "/leaderboard", icon: FaMedal, label: "Leaderboard" },
   { to: "/guidance", icon: FaMedal, label: "Guidance" },
   { to: "/learning", icon: FaBook, label: "Knowledge" },
   { to: "/network", icon: FaUsers, label: "Network" },
-  // { to: '/leaderboard',      icon: FaMedal,         label: 'Progress Board' }, // HIDDEN per client req
   { to: "/resources", icon: FaFileAlt, label: "Resources" },
 ];
 
