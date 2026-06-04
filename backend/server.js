@@ -38,6 +38,7 @@ const {
   updateProfilePicture,
 } = require("./controllers/profilePictureController");
 const { sendWeeklyEmails } = require("./controllers/weeklyEmailController");
+const { uploadAvatar } = require("./utils/uploadMiddleware");
 const protect = require("./utils/protect");
 const adminProtect = require("./middleware/adminMiddleware");
 
@@ -101,7 +102,12 @@ app.use("/api/routines", routineRoutes); // ← NEW
 
 // ── Inline routes ──────────────────────────────────────────────────────────────
 app.patch("/api/auth/change-password", protect, changePassword);
-app.patch("/api/profile/picture", protect, updateProfilePicture);
+app.patch(
+  "/api/profile/picture",
+  protect,
+  uploadAvatar.single("avatar"),
+  updateProfilePicture,
+);
 app.post("/api/admin/send-weekly-emails", adminProtect, sendWeeklyEmails);
 
 // ── Health + error handling ────────────────────────────────────────────────────

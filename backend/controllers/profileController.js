@@ -1,6 +1,6 @@
 const User                = require('../models/User');
 const ProfessionalProfile = require('../models/ProfessionalProfile');
-const { uploadToFirebase, deleteFromFirebase } = require('../utils/firebase');
+const { uploadToCloudinary, deleteFromCloudinary, getPublicIdFromUrl } = require('../utils/cloudinary');
 
 const sanitizeUser = (user) => ({
   id: user._id, name: user.name, email: user.email,
@@ -11,6 +11,7 @@ const sanitizeUser = (user) => ({
   dateOfBirth: user.dateOfBirth, maritalStatus: user.maritalStatus,
   nationality: user.nationality, country: user.country,
   state: user.state, city: user.city, currentCity: user.currentCity,
+  currentCountry: user.currentCountry,
   pincode: user.pincode, bio: user.bio, avatar: user.avatar,
   subscription: user.subscription, notifications: user.notifications,
   hasPassword: user.hasPassword, isGoogleUser: user.isGoogleUser,
@@ -20,10 +21,12 @@ const sanitizeUser = (user) => ({
 // ── PUT /api/profile ──────────────────────────────────────────────────────────
 const updateProfile = async (req, res) => {
   try {
-    const allowed = ['firstName','middleName','lastName','preferredFullName','bio',
+    const allowed = [
+      'firstName','middleName','lastName','preferredFullName','bio',
       'contactNumber','gender','dateOfBirth','maritalStatus','nationality',
       'countryOfBirth','placeOfBirth','country','state','city','currentCity',
-      'currentCountry','pincode'];
+      'currentCountry','pincode',
+    ];
     const updates = {};
     allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
     const src = { ...req.body };
@@ -33,62 +36,70 @@ const updateProfile = async (req, res) => {
     const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true });
     res.status(200).json({ success: true, message: 'Profile updated!', user: sanitizeUser(user) });
   } catch (err) {
+    console.error('updateProfile error:', err);
     res.status(500).json({ success: false, message: 'Failed to update profile' });
   }
 };
 
-// ── POST /api/profile/avatar — Upload profile picture to Firebase ─────────────
+// ── POST /api/profile/avatar — Upload profile picture to Cloudinary ───────────
 const uploadAvatar = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
     const user = await User.findById(req.user.id);
 
-    // Delete old avatar from Firebase if exists
-    if (user.avatar && user.avatar.includes('storage.googleapis.com')) {
-      await deleteFromFirebase(user.avatar).catch(() => {});
+    // Delete old avatar from Cloudinary if it exists
+    if (user.avatar && user.avatar.includes('cloudinary.com')) {
+      const oldPublicId = getPublicIdFromUrl(user.avatar);
+      if (oldPublicId) await deleteFromCloudinary(oldPublicId, 'image');
     }
 
-    // Upload new avatar to Firebase
-    const { url } = await uploadToFirebase(
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype,
-      `avatars/${req.user.id}`
-    );
+    // Upload new avatar to Cloudinary
+    const { url } = await uploadToCloudinary(req.file.buffer, {
+      folder:        `avatars/${req.user.id}`,
+      resource_type: 'image',
+      transformation: [
+        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+        { quality: 'auto', fetch_format: 'auto' },
+      ],
+    });
 
     user.avatar = url;
     await user.save();
 
-    res.status(200).json({ success: true, message: 'Profile picture updated!', avatar: url, user: sanitizeUser(user) });
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture updated!',
+      avatar: url,
+      user: sanitizeUser(user),
+    });
   } catch (err) {
     console.error('uploadAvatar error:', err);
     res.status(500).json({ success: false, message: 'Failed to upload profile picture' });
   }
 };
 
-// ── GET /api/profile/score — Profile completeness score ──────────────────────
+// ── GET /api/profile/score ────────────────────────────────────────────────────
 const getProfileScore = async (req, res) => {
   try {
     const user    = await User.findById(req.user.id);
     const profile = await ProfessionalProfile.findOne({ user: req.user.id });
 
-    // Personal fields (50 points total)
     const personalFields = [
-      { field: 'firstName',         points: 5,  label: 'First Name'        },
-      { field: 'lastName',          points: 5,  label: 'Last Name'         },
-      { field: 'contactNumber',     points: 3,  label: 'Contact Number'    },
-      { field: 'gender',            points: 3,  label: 'Gender'            },
-      { field: 'dateOfBirth',       points: 3,  label: 'Date of Birth'     },
-      { field: 'nationality',       points: 2,  label: 'Nationality'       },
-      { field: 'country',           points: 3,  label: 'Country'           },
-      { field: 'state',             points: 2,  label: 'State'             },
-      { field: 'city',              points: 2,  label: 'City'              },
-      { field: 'pincode',           points: 2,  label: 'Pincode'           },
-      { field: 'bio',               points: 5,  label: 'Bio'               },
-      { field: 'avatar',            points: 8,  label: 'Profile Picture'   },
-      { field: 'maritalStatus',     points: 2,  label: 'Marital Status'    },
-      { field: 'preferredFullName', points: 5,  label: 'Preferred Name'    },
+      { field: 'firstName',         points: 5,  label: 'First Name'      },
+      { field: 'lastName',          points: 5,  label: 'Last Name'       },
+      { field: 'contactNumber',     points: 3,  label: 'Contact Number'  },
+      { field: 'gender',            points: 3,  label: 'Gender'          },
+      { field: 'dateOfBirth',       points: 3,  label: 'Date of Birth'   },
+      { field: 'nationality',       points: 2,  label: 'Nationality'     },
+      { field: 'country',           points: 3,  label: 'Country'         },
+      { field: 'state',             points: 2,  label: 'State'           },
+      { field: 'city',              points: 2,  label: 'City'            },
+      { field: 'pincode',           points: 2,  label: 'Pincode'         },
+      { field: 'bio',               points: 5,  label: 'Bio'             },
+      { field: 'avatar',            points: 8,  label: 'Profile Picture' },
+      { field: 'maritalStatus',     points: 2,  label: 'Marital Status'  },
+      { field: 'preferredFullName', points: 5,  label: 'Preferred Name'  },
     ];
 
     let personalScore = 0;
@@ -101,27 +112,25 @@ const getProfileScore = async (req, res) => {
       }
     });
 
-    // Professional fields (50 points total)
     let professionalScore = 0;
     const professionalMissing = [];
-
     if (profile) {
-      if (profile.workExperience?.length > 0)  { professionalScore += 15; } else professionalMissing.push({ label: 'Work Experience', points: 15 });
-      if (profile.education?.length > 0)        { professionalScore += 12; } else professionalMissing.push({ label: 'Education', points: 12 });
-      if (profile.languages?.length > 0)        { professionalScore += 5;  } else professionalMissing.push({ label: 'Language Skills', points: 5 });
-      if (profile.certifications?.length > 0)   { professionalScore += 8;  } else professionalMissing.push({ label: 'Certifications', points: 8 });
-      if (profile.technicalSkills?.length > 0)  { professionalScore += 5;  } else professionalMissing.push({ label: 'Technical Skills', points: 5 });
-      if (profile.functionalSkills?.length > 0) { professionalScore += 3;  } else professionalMissing.push({ label: 'Functional Skills', points: 3 });
-      if (profile.honorsAwards?.length > 0)     { professionalScore += 2;  } else professionalMissing.push({ label: 'Honors / Awards', points: 2 });
+      if (profile.workExperience?.length > 0)  { professionalScore += 15; } else professionalMissing.push({ label: 'Work Experience',   points: 15 });
+      if (profile.education?.length > 0)        { professionalScore += 12; } else professionalMissing.push({ label: 'Education',         points: 12 });
+      if (profile.languages?.length > 0)        { professionalScore += 5;  } else professionalMissing.push({ label: 'Language Skills',   points: 5  });
+      if (profile.certifications?.length > 0)   { professionalScore += 8;  } else professionalMissing.push({ label: 'Certifications',    points: 8  });
+      if (profile.technicalSkills?.length > 0)  { professionalScore += 5;  } else professionalMissing.push({ label: 'Technical Skills',  points: 5  });
+      if (profile.functionalSkills?.length > 0) { professionalScore += 3;  } else professionalMissing.push({ label: 'Functional Skills', points: 3  });
+      if (profile.honorsAwards?.length > 0)     { professionalScore += 2;  } else professionalMissing.push({ label: 'Honors / Awards',   points: 2  });
     } else {
       professionalMissing.push(
-        { label: 'Work Experience', points: 15 },
-        { label: 'Education', points: 12 },
-        { label: 'Language Skills', points: 5 },
-        { label: 'Certifications', points: 8 },
-        { label: 'Technical Skills', points: 5 },
-        { label: 'Functional Skills', points: 3 },
-        { label: 'Honors / Awards', points: 2 },
+        { label: 'Work Experience',   points: 15 },
+        { label: 'Education',         points: 12 },
+        { label: 'Language Skills',   points: 5  },
+        { label: 'Certifications',    points: 8  },
+        { label: 'Technical Skills',  points: 5  },
+        { label: 'Functional Skills', points: 3  },
+        { label: 'Honors / Awards',   points: 2  },
       );
     }
 
@@ -131,13 +140,14 @@ const getProfileScore = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        totalScore,
-        personalScore,
-        professionalScore,
-        label,
-        personalMissing,
-        professionalMissing,
-        breakdown: { personal: personalFields.map(f => ({ ...f, done: !!(user[f.field] && user[f.field].toString().trim() !== '') })) },
+        totalScore, personalScore, professionalScore, label,
+        personalMissing, professionalMissing,
+        breakdown: {
+          personal: personalFields.map(f => ({
+            ...f,
+            done: !!(user[f.field] && user[f.field].toString().trim() !== ''),
+          })),
+        },
       },
     });
   } catch (err) {
@@ -172,88 +182,89 @@ const getProfessionalProfile = async (req, res) => {
   }
 };
 
-// ── POST /api/profile/professional/:section ───────────────────────────────────
-const manageProfessionalSection = async (req, res) => {
+// ── Generic section handler ───────────────────────────────────────────────────
+const updateProfessionalSection = async (req, res, section) => {
   try {
-    const { section } = req.params;
-    const sectionMap = {
-      'work':              'workExperience',
-      'education':         'education',
-      'languages':         'languages',
-      'certifications':    'certifications',
-      'technical-skills':  'technicalSkills',
-      'functional-skills': 'functionalSkills',
-      'honors':            'honorsAwards',
-    };
-    const key = sectionMap[section];
-    if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
-
     let profile = await ProfessionalProfile.findOne({ user: req.user.id });
     if (!profile) profile = await ProfessionalProfile.create({ user: req.user.id });
 
     if (req.method === 'POST') {
-      profile[key].push(req.body);
+      profile[section].push(req.body);
+      await profile.save();
+      return res.status(201).json({ success: true, message: 'Entry added!', data: profile });
     }
-    await profile.save();
-    res.status(200).json({ success: true, data: profile });
+    if (req.method === 'PUT') {
+      const item = profile[section].id(req.params.itemId);
+      if (!item) return res.status(404).json({ success: false, message: 'Entry not found' });
+      Object.keys(req.body).forEach(k => { item[k] = req.body[k]; });
+      await profile.save();
+      return res.status(200).json({ success: true, message: 'Entry updated!', data: profile });
+    }
+    if (req.method === 'DELETE') {
+      profile[section] = profile[section].filter(i => i._id.toString() !== req.params.itemId);
+      await profile.save();
+      return res.status(200).json({ success: true, message: 'Entry deleted!', data: profile });
+    }
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to update section' });
+    console.error(`updateProfessionalSection(${section}) error:`, err);
+    res.status(500).json({ success: false, message: 'Operation failed' });
   }
 };
 
-// ── PUT /api/profile/professional/:section/:itemId ────────────────────────────
+// ── Section shortcuts ─────────────────────────────────────────────────────────
+const manageProfessionalSection = (req, res) => {
+  const sectionMap = {
+    'work': 'workExperience', 'education': 'education',
+    'languages': 'languages', 'certifications': 'certifications',
+    'technical-skills': 'technicalSkills', 'functional-skills': 'functionalSkills',
+    'honors': 'honorsAwards',
+  };
+  const key = sectionMap[req.params.section];
+  if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
+  return updateProfessionalSection(req, res, key);
+};
+
 const updateProfessionalItem = async (req, res) => {
-  try {
-    const { section, itemId } = req.params;
-    const sectionMap = {
-      'work': 'workExperience', 'education': 'education',
-      'languages': 'languages', 'certifications': 'certifications',
-      'technical-skills': 'technicalSkills', 'functional-skills': 'functionalSkills',
-      'honors': 'honorsAwards',
-    };
-    const key = sectionMap[section];
-    if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
-
-    const profile = await ProfessionalProfile.findOne({ user: req.user.id });
-    if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
-
-    const item = profile[key].id(itemId);
-    if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
-
-    Object.keys(req.body).forEach(k => { item[k] = req.body[k]; });
-    profile.markModified(key);
-    await profile.save();
-    res.status(200).json({ success: true, data: profile });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to update item' });
-  }
+  const sectionMap = {
+    'work': 'workExperience', 'education': 'education',
+    'languages': 'languages', 'certifications': 'certifications',
+    'technical-skills': 'technicalSkills', 'functional-skills': 'functionalSkills',
+    'honors': 'honorsAwards',
+  };
+  const key = sectionMap[req.params.section];
+  if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
+  req.params.itemId = req.params.id;
+  req.method = 'PUT';
+  return updateProfessionalSection(req, res, key);
 };
 
-// ── DELETE /api/profile/professional/:section/:itemId ─────────────────────────
 const deleteProfessionalItem = async (req, res) => {
-  try {
-    const { section, itemId } = req.params;
-    const sectionMap = {
-      'work': 'workExperience', 'education': 'education',
-      'languages': 'languages', 'certifications': 'certifications',
-      'technical-skills': 'technicalSkills', 'functional-skills': 'functionalSkills',
-      'honors': 'honorsAwards',
-    };
-    const key = sectionMap[section];
-    if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
-
-    const profile = await ProfessionalProfile.findOne({ user: req.user.id });
-    if (!profile) return res.status(404).json({ success: false, message: 'Profile not found' });
-
-    profile[key] = profile[key].filter(item => item._id.toString() !== itemId);
-    await profile.save();
-    res.status(200).json({ success: true, data: profile });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Failed to delete item' });
-  }
+  const sectionMap = {
+    'work': 'workExperience', 'education': 'education',
+    'languages': 'languages', 'certifications': 'certifications',
+    'technical-skills': 'technicalSkills', 'functional-skills': 'functionalSkills',
+    'honors': 'honorsAwards',
+  };
+  const key = sectionMap[req.params.section];
+  if (!key) return res.status(400).json({ success: false, message: 'Invalid section' });
+  req.params.itemId = req.params.id;
+  req.method = 'DELETE';
+  return updateProfessionalSection(req, res, key);
 };
+
+// Also export section-named functions for routes that use them directly
+const manageWorkExperience   = (req, res) => updateProfessionalSection(req, res, 'workExperience');
+const manageEducation        = (req, res) => updateProfessionalSection(req, res, 'education');
+const manageLanguages        = (req, res) => updateProfessionalSection(req, res, 'languages');
+const manageCertifications   = (req, res) => updateProfessionalSection(req, res, 'certifications');
+const manageTechnicalSkills  = (req, res) => updateProfessionalSection(req, res, 'technicalSkills');
+const manageFunctionalSkills = (req, res) => updateProfessionalSection(req, res, 'functionalSkills');
+const manageHonorsAwards     = (req, res) => updateProfessionalSection(req, res, 'honorsAwards');
 
 module.exports = {
   updateProfile, uploadAvatar, getProfileScore, updateNotifications,
-  getProfessionalProfile, manageProfessionalSection, updateProfessionalItem, deleteProfessionalItem,
+  getProfessionalProfile, manageProfessionalSection,
+  updateProfessionalItem, deleteProfessionalItem,
+  manageWorkExperience, manageEducation, manageLanguages,
+  manageCertifications, manageTechnicalSkills, manageFunctionalSkills, manageHonorsAwards,
 };
