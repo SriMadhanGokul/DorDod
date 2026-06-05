@@ -176,7 +176,7 @@ function GoalFormFields({ f, setF }: { f: any; setF: any }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Goal Type
+            Goal Type <span className="text-red-500">*</span>
           </label>
           <select
             value={f.goalType}
@@ -219,7 +219,7 @@ function GoalFormFields({ f, setF }: { f: any; setF: any }) {
       </div>
       <div>
         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Description
+          Description <span className="text-red-500">*</span>
         </label>
         <textarea
           value={f.description}
@@ -234,7 +234,7 @@ function GoalFormFields({ f, setF }: { f: any; setF: any }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Priority
+            Priority <span className="text-red-500">*</span>
           </label>
           <select
             value={f.priority}
@@ -362,8 +362,15 @@ export default function GoalsPage() {
     .filter(Boolean) as { goal: Goal; day: DayActivity }[];
 
   const create = async () => {
-    if (!form.title.trim()) return toast.error("Title is required");
+    if (!form.title.trim()) return toast.error("Goal title is required");
+    if (!form.goalType) return toast.error("Goal type is required");
     if (!form.category) return toast.error("Category is required");
+    if (!form.description.trim()) return toast.error("Description is required");
+    if (!form.priority) return toast.error("Priority is required");
+    if (!form.startDate) return toast.error("Start date is required");
+    if (!form.expectedEndDate) return toast.error("End date is required");
+    if (form.startDate >= form.expectedEndDate)
+      return toast.error("End date must be after start date");
     if (!form.measurementCriteria.trim())
       return toast.error("Measurement criteria is required");
     setSaving(true);
@@ -438,13 +445,42 @@ export default function GoalsPage() {
   };
 
   const completeDay = async (goalId: string, dayNumber: number) => {
+    // Find the goal and day to check the due date
+    const goal = goals.find((g) => g._id === goalId);
+    if (goal) {
+      const day = goal.dayActivities?.find((d) => d.dayNumber === dayNumber);
+      if (day) {
+        const todayStr = today();
+        const dueStr = day.dueDate?.slice(0, 10);
+        if (dueStr && dueStr > todayStr) {
+          toast(
+            "⏳ You can't mark a future day yet. Come back on " +
+              new Date(dueStr + "T00:00:00").toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+              }) +
+              "!",
+            { icon: "📅" },
+          );
+          return;
+        }
+        if (dueStr && dueStr < todayStr && day.status !== "Completed") {
+          toast("⚠️ This day has already passed. Past days cannot be marked.", {
+            icon: "🔒",
+          });
+          return;
+        }
+      }
+    }
     try {
       const res = await api.patch(`/goals/${goalId}/day/${dayNumber}/complete`);
       setGoals((p) => p.map((g) => (g._id === goalId ? res.data.data : g)));
       if (selectedGoal?._id === goalId) setSelectedGoal(res.data.data);
       toast.success(res.data.message);
-    } catch {
-      toast.error("Failed");
+    } catch (e: any) {
+      toast.error(
+        e.response?.data?.message || "Could not mark this day complete",
+      );
     }
   };
 

@@ -30,7 +30,10 @@ const xpRoutes = require("./routes/xpRoutes");
 const friendsRoutes = require("./routes/friendsRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const notifUserRoutes = require("./routes/notificationUserRoutes");
-const routineRoutes = require("./routes/routineRoutes"); // ← NEW
+const routineRoutes = require("./routes/routineRoutes");
+const expenseRoutes = require("./routes/expenseRoutes");
+const growthScoreRoutes = require("./routes/growthScoreRoutes");
+const financialRoutes = require("./routes/financialRoutes"); // ✅ FINANCIAL ROUTES
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -74,7 +77,12 @@ const { initFirebase } = require("./utils/firebase");
 initFirebase();
 
 // ── Register all routes ────────────────────────────────────────────────────────
+// Authentication & User
 app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/notifications", notifUserRoutes);
+
+// Learning & Skills
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/habits", habitRoutes);
@@ -82,23 +90,34 @@ app.use("/api/skills", skillRoutes);
 app.use("/api/skill-path", skillPathRoutes);
 app.use("/api/devplan", devPlanRoutes);
 app.use("/api/learning", learningRoutes);
-app.use("/api/profile", profileRoutes);
+app.use("/api/custom-skills", customSkillRoutes);
+
+// Analytics & Growth
 app.use("/api/analytics", analyticsRoutes);
-app.use("/api/community", communityRoutes);
-app.use("/api/scorecard", scoreCardRoutes);
+app.use("/api/growth-score", growthScoreRoutes);
 app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
+app.use("/api/scorecard", scoreCardRoutes);
 app.use("/api/xp", xpRoutes);
+
+// Financial Management ✅ NEW
+app.use("/api/expenses", expenseRoutes);
+app.use("/api/financial", financialRoutes);
+
+// Community & Social
+app.use("/api/community", communityRoutes);
 app.use("/api/friends", friendsRoutes);
-app.use("/api/guidance", require("./routes/guidanceRoutes"));
-app.use("/api/checkin", require("./routes/checkInRoutes"));
+
+// Additional Features
 app.use("/api/documents", documentRoutes);
 app.use("/api/frame-of-mind", frameOfMindRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/custom-skills", customSkillRoutes);
+app.use("/api/routines", routineRoutes);
+app.use("/api/guidance", require("./routes/guidanceRoutes"));
+app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/search", searchRoutes);
-app.use("/api/notifications", notifUserRoutes);
-app.use("/api/routines", routineRoutes); // ← NEW
+
+// Admin
+app.use("/api/admin", adminRoutes);
 
 // ── Inline routes ──────────────────────────────────────────────────────────────
 app.patch("/api/auth/change-password", protect, changePassword);
@@ -114,14 +133,21 @@ app.post("/api/admin/send-weekly-emails", adminProtect, sendWeeklyEmails);
 app.get("/api/health", (req, res) =>
   res.json({ success: true, message: "DoR-DoD API 🚀" }),
 );
+
+// 404 handler
 app.use((req, res) =>
   res
     .status(404)
     .json({ success: false, message: `Route ${req.originalUrl} not found` }),
 );
+
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ success: false, message: "Server error" });
+  console.error("❌ Error:", err);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Server error",
+  });
 });
 
 // ── Connect & start ────────────────────────────────────────────────────────────
@@ -133,6 +159,7 @@ mongoose
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`🌐 Allowed Origins: ${allowedOrigins.join(", ")}`);
+      console.log("📊 Financial routes loaded: /api/financial, /api/expenses");
     });
   })
   .catch((err) => {

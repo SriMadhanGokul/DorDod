@@ -143,14 +143,43 @@ export default function ExecutionPage() {
   }, []);
 
   const completeDay = async (goalId: string, dayNumber: number) => {
+    // Check if the day is today before calling API
+    const goal = goals.find((g) => g._id === goalId);
+    if (goal) {
+      const day = goal.dayActivities?.find(
+        (d: any) => d.dayNumber === dayNumber,
+      );
+      if (day) {
+        const todayStr = today();
+        const dueStr = day.dueDate?.slice(0, 10);
+        if (dueStr && dueStr > todayStr) {
+          toast(
+            "⏳ This day isn't due yet. Come back on " +
+              new Date(dueStr + "T00:00:00").toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+              }) +
+              "!",
+            { icon: "📅" },
+          );
+          return;
+        }
+        if (dueStr && dueStr < todayStr && day.status !== "Completed") {
+          toast("🔒 This day has already passed and cannot be marked.", {
+            icon: "⚠️",
+          });
+          return;
+        }
+      }
+    }
     try {
       const res = await api.patch(`/goals/${goalId}/day/${dayNumber}/complete`);
       const updated = res.data.data;
       setGoals((p) => p.map((g) => (g._id === goalId ? updated : g)));
       if (selectedGoal?._id === goalId) setSelectedGoal(updated);
       toast.success(res.data.message);
-    } catch {
-      toast.error("Failed");
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || "Could not mark this day");
     }
   };
 
@@ -445,21 +474,38 @@ export default function ExecutionPage() {
                   const isDone = day.status === "Completed";
                   const isMissed = day.status === "Missed";
                   const isToday = day.dueDate?.slice(0, 10) === today();
+                  const isFuture = day.dueDate?.slice(0, 10) > today();
+                  const isPast =
+                    day.dueDate?.slice(0, 10) < today() && !isDone && !isMissed;
                   return (
                     <button
                       key={day.dayNumber}
                       onClick={() =>
                         completeDay(selectedGoal._id, day.dayNumber)
                       }
-                      title={`Day ${day.dayNumber} · ${fmtDate(day.dueDate)}`}
-                      className={`w-full h-9 rounded-lg flex items-center justify-center text-xs font-bold relative transition-all hover:scale-105 border ${
+                      title={
+                        isDone
+                          ? `Day ${day.dayNumber} — Completed ✓`
+                          : isFuture
+                            ? `Day ${day.dayNumber} — Available on ${fmtDate(day.dueDate)}`
+                            : isMissed
+                              ? `Day ${day.dayNumber} — Missed`
+                              : isToday
+                                ? `Day ${day.dayNumber} — Due today!`
+                                : `Day ${day.dayNumber}`
+                      }
+                      className={`w-full h-9 rounded-lg flex items-center justify-center text-xs font-bold relative transition-all border ${
                         isDone
                           ? "bg-green-500 border-green-500 text-white"
                           : isMissed
-                            ? "bg-red-50 border-red-200 text-red-500"
+                            ? "bg-red-50 border-red-200 text-red-400 cursor-not-allowed"
                             : isToday
-                              ? "bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-1"
-                              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300"
+                              ? "bg-indigo-600 border-indigo-600 text-white ring-2 ring-indigo-300 ring-offset-1 hover:scale-105"
+                              : isFuture
+                                ? "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-300 cursor-not-allowed"
+                                : isPast
+                                  ? "bg-orange-50 border-orange-200 text-orange-400 cursor-not-allowed"
+                                  : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300 hover:scale-105"
                       }`}
                     >
                       {isDone ? (
@@ -470,6 +516,11 @@ export default function ExecutionPage() {
                       {day.dayNumber === 21 && (
                         <span className="absolute -top-1 -right-1 text-xs">
                           🏁
+                        </span>
+                      )}
+                      {isFuture && !isDone && (
+                        <span className="absolute -top-1 -right-1 text-xs">
+                          🔒
                         </span>
                       )}
                     </button>

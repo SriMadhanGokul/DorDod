@@ -25,6 +25,8 @@ import {
   FaMoon,
   FaMedal,
   FaFire,
+  FaWallet,
+  FaMoneyBill,
 } from "react-icons/fa";
 
 const navItems = [
@@ -38,6 +40,8 @@ const navItems = [
   { to: "/execution", icon: FaTasks, label: "Execution" },
   { to: "/achievements", icon: FaTrophy, label: "Outcomes" },
   { to: "/insights", icon: FaChartLine, label: "Insights" },
+  { to: "/growth-score", icon: FaChartBar, label: "Growth Score" },
+  { to: "/financial", icon: FaMoneyBill, label: "Finance" },
   { to: "/leaderboard", icon: FaMedal, label: "Leaderboard" },
   { to: "/guidance", icon: FaMedal, label: "Guidance" },
   { to: "/learning", icon: FaBook, label: "Knowledge" },
