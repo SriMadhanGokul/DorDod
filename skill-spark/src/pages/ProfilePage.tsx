@@ -156,7 +156,6 @@ const Sel = ({ label, value, onChange, options, required = false }: any) => (
   </div>
 );
 
-// Proficiency select with proper label
 const ProfSel = ({
   label,
   value,
@@ -228,7 +227,6 @@ export default function ProfilePage() {
   const [loadingProf, setLoadingProf] = useState(false);
   const [expandedSec, setExpSec] = useState<string | null>("work");
 
-  // Add forms
   const EMPTY_WORK = {
     isCurrent: false,
     organizationName: "",
@@ -267,7 +265,6 @@ export default function ProfilePage() {
   const [newFSkill, setNewFSkill] = useState({ ...EMPTY_SKILL });
   const [newHonor, setNewHonor] = useState({ ...EMPTY_HONOR });
 
-  // Edit work state — stored as object keyed by _id
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null);
   const [editWF, setEditWF] = useState<any>({});
 
@@ -280,32 +277,56 @@ export default function ProfilePage() {
   const [savingPw, setSavingPw] = useState(false);
   const [downloadingResume, setDownloadingResume] = useState(false);
 
+  // Apply a user object to the personal form (handles all fields)
+  const applyUser = (u: any) => {
+    if (!u) return;
+    setAvatar(u.avatar || "");
+    setPersonal({
+      firstName: u.firstName || "",
+      middleName: u.middleName || "",
+      lastName: u.lastName || "",
+      preferredFullName: u.preferredFullName || "",
+      contactNumber: u.contactNumber || "",
+      gender: u.gender || "",
+      dateOfBirth: u.dateOfBirth ? String(u.dateOfBirth).substring(0, 10) : "",
+      maritalStatus: u.maritalStatus || "",
+      nationality: u.nationality || "",
+      country: u.country || "",
+      state: u.state || "",
+      city: u.city || "",
+      currentCity: u.currentCity || "",
+      pincode: u.pincode || "",
+      bio: u.bio || "",
+    });
+    if (u.notifications) setNotifications(u.notifications);
+  };
+
+  // Load profile on mount — tries /profile, falls back to /auth/me,
+  // and handles both { user } and { data } response shapes.
   useEffect(() => {
-    api
-      .get("/auth/me")
-      .then((res) => {
-        const u = res.data.user;
-        setAvatar(u.avatar || "");
-        setPersonal({
-          firstName: u.firstName || "",
-          middleName: u.middleName || "",
-          lastName: u.lastName || "",
-          preferredFullName: u.preferredFullName || "",
-          contactNumber: u.contactNumber || "",
-          gender: u.gender || "",
-          dateOfBirth: u.dateOfBirth ? u.dateOfBirth.substring(0, 10) : "",
-          maritalStatus: u.maritalStatus || "",
-          nationality: u.nationality || "",
-          country: u.country || "",
-          state: u.state || "",
-          city: u.city || "",
-          currentCity: u.currentCity || "",
-          pincode: u.pincode || "",
-          bio: u.bio || "",
-        });
-        if (u.notifications) setNotifications(u.notifications);
-      })
-      .catch(() => {});
+    const loadPersonal = async () => {
+      try {
+        const res = await api.get("/profile");
+        const u = res.data.user || res.data.data;
+        if (u) {
+          applyUser(u);
+          return;
+        }
+      } catch (err) {
+        console.warn("GET /profile failed, falling back to /auth/me", err);
+      }
+
+      try {
+        const res = await api.get("/auth/me");
+        const u = res.data.user || res.data.data;
+        if (u) applyUser(u);
+        else console.error("/auth/me returned no user object:", res.data);
+      } catch (err) {
+        console.error("Failed to load profile from both endpoints", err);
+      }
+    };
+
+    loadPersonal();
     loadScore();
   }, []);
 
@@ -319,7 +340,8 @@ export default function ProfilePage() {
     try {
       const res = await api.get("/profile/score");
       setScoreData(res.data.data);
-    } catch {
+    } catch (err) {
+      console.error("loadScore failed", err);
     } finally {
       setLoadingScore(false);
     }
@@ -366,18 +388,21 @@ export default function ProfilePage() {
     if (!personal.lastName.trim()) return toast.error("Last name is required");
     setSavingP(true);
     try {
-      await api.put("/profile", personal);
+      const res = await api.put("/profile", personal);
+      // Re-apply the saved user so the view reflects exactly what's stored
+      const u = res.data.user || res.data.data;
+      if (u) applyUser(u);
       setEditP(false);
       toast.success("Profile updated!");
       loadScore();
-    } catch {
-      toast.error("Failed to save");
+    } catch (err: any) {
+      console.error("savePersonal failed", err);
+      toast.error(err.response?.data?.message || "Failed to save");
     } finally {
       setSavingP(false);
     }
   };
 
-  // Always re-fetch fresh profile from server after any change
   const refreshProf = async () => {
     try {
       const r = await api.get("/profile/professional");
@@ -462,12 +487,12 @@ export default function ProfilePage() {
     </button>
   );
 
-  // Resume download
   const downloadResume = async () => {
     setDownloadingResume(true);
     try {
       if (!prof) await loadProfessional();
-      const u = await api.get("/auth/me").then((r) => r.data.user);
+      const r = await api.get("/profile").catch(() => api.get("/auth/me"));
+      const u = r.data.user || r.data.data;
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -475,24 +500,6 @@ export default function ProfilePage() {
       });
       const pageW = 210;
       const margin = 18;
-      let y = 20;
-      const checkPage = (needed = 15) => {
-        if (y + needed > 270) {
-          doc.addPage();
-          y = 20;
-        }
-      };
-      const addSection = (title: string) => {
-        y += 4;
-        doc.setFillColor(59, 130, 246);
-        doc.rect(margin, y - 4, pageW - margin * 2, 7, "F");
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text(title, margin + 2, y + 0.5);
-        y += 6;
-        doc.setTextColor(30, 30, 30);
-      };
       doc.setFillColor(30, 58, 95);
       doc.rect(0, 0, 210, 38, "F");
       doc.setFontSize(22);
@@ -526,7 +533,6 @@ export default function ProfilePage() {
           32,
         );
       }
-      y = 48;
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
@@ -540,7 +546,8 @@ export default function ProfilePage() {
       }
       doc.save(`${fullName.replace(/\s+/g, "_")}_Resume.pdf`);
       toast.success("Resume downloaded!");
-    } catch {
+    } catch (err) {
+      console.error("downloadResume failed", err);
       toast.error("Failed to generate resume");
     } finally {
       setDownloadingResume(false);
@@ -554,11 +561,9 @@ export default function ProfilePage() {
           Identity
         </h1>
 
-        {/* ── USER CARD ─────────────────────────────────────────────────── */}
+        {/* USER CARD */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
-          {/* Top row: avatar + info + score + download */}
           <div className="flex flex-wrap items-start gap-4">
-            {/* Avatar */}
             <div className="relative shrink-0">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-4 border-white shadow-md">
                 {avatar ? (
@@ -594,7 +599,6 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* Name + email */}
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {(user as any)?.name ||
@@ -609,7 +613,6 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            {/* Score ring + Download — stacked on mobile */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {scoreData && !loadingScore && (
                 <ScoreRing
@@ -628,7 +631,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Profile completeness */}
           {scoreData && scoreData.totalScore < 100 && (
             <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -694,7 +696,7 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* ── PERSONAL TAB ─────────────────────────────────────────────── */}
+        {/* PERSONAL TAB */}
         {tab === "personal" && (
           <div className="space-y-4">
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
@@ -884,7 +886,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Notifications */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
               <h3 className="font-bold text-gray-900 dark:text-white mb-4">
                 Notifications
@@ -937,7 +938,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ── PROFESSIONAL TAB ─────────────────────────────────────────── */}
+        {/* PROFESSIONAL TAB */}
         {tab === "professional" && (
           <div className="space-y-3">
             {loadingProf && (
@@ -947,7 +948,7 @@ export default function ProfilePage() {
             )}
             {prof && (
               <>
-                {/* ── WORK EXPERIENCE ───────────────────────────────────── */}
+                {/* WORK EXPERIENCE */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                   <SecHead
                     id="work"
@@ -1102,7 +1103,6 @@ export default function ProfilePage() {
                           )}
                         </div>
                       ))}
-                      {/* Add new work */}
                       <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
                           Add New
@@ -1215,7 +1215,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* ── EDUCATION ─────────────────────────────────────────── */}
+                {/* EDUCATION */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                   <SecHead
                     id="edu"
@@ -1318,7 +1318,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* ── LANGUAGE SKILLS ───────────────────────────────────── */}
+                {/* LANGUAGE SKILLS */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                   <SecHead
                     id="lang"
@@ -1409,7 +1409,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* ── CERTIFICATIONS ────────────────────────────────────── */}
+                {/* CERTIFICATIONS */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                   <SecHead
                     id="cert"
@@ -1518,7 +1518,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* ── TECHNICAL + FUNCTIONAL SKILLS ─────────────────────── */}
+                {/* TECHNICAL + FUNCTIONAL SKILLS */}
                 {(["tech", "func"] as const).map((type) => {
                   const isT = type === "tech";
                   const key = isT ? "technicalSkills" : "functionalSkills";
@@ -1602,7 +1602,7 @@ export default function ProfilePage() {
                   );
                 })}
 
-                {/* ── HONORS ────────────────────────────────────────────── */}
+                {/* HONORS */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                   <SecHead
                     id="honors"
@@ -1697,7 +1697,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* ── SECURITY TAB ─────────────────────────────────────────────── */}
+        {/* SECURITY TAB */}
         {tab === "security" && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
             <h3 className="font-bold text-gray-900 dark:text-white mb-5 flex items-center gap-2">

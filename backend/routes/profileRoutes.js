@@ -4,6 +4,7 @@ const protect = require("../utils/protect");
 const { uploadAvatar: uploadAvatarMw } = require("../utils/uploadMiddleware");
 
 const {
+  getProfile, // <-- NEW
   updateProfile,
   uploadAvatar,
   getProfileScore,
@@ -24,6 +25,7 @@ const {
 router.use(protect);
 
 // Personal
+router.get("/", getProfile); // <-- NEW: fetch full sanitized profile
 router.put("/", updateProfile);
 router.post("/avatar", uploadAvatarMw.single("avatar"), uploadAvatar);
 router.get("/score", getProfileScore);
@@ -62,7 +64,7 @@ router.post("/professional/honors", (req, res) => {
   manageHonorsAwards(req, res);
 });
 
-// Professional — PUT (update item) — param is :itemId
+// Professional — PUT (update item)
 router.put("/professional/work/:itemId", (req, res) => {
   req.params.section = "work";
   req.params.id = req.params.itemId;
@@ -99,7 +101,7 @@ router.put("/professional/honors/:itemId", (req, res) => {
   updateProfessionalItem(req, res);
 });
 
-// Professional — DELETE (delete item) — param is :itemId
+// Professional — DELETE (delete item)
 router.delete("/professional/work/:itemId", (req, res) => {
   req.params.section = "work";
   req.params.id = req.params.itemId;

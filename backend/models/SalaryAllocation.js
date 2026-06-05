@@ -1,55 +1,32 @@
 const mongoose = require("mongoose");
 
-const salaryAllocationSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
+// Stores the full salary plan including the per-category breakdown
+// so the frontend can rebuild the tracker exactly on reload.
+const categorySchema = new mongoose.Schema(
+  {
+    key: String, // essentials, savings, emergencyFund, lifestyle, investments, debt
+    label: String,
+    percentage: Number,
+    targetAmount: Number,
+    color: String,
+    icon: String,
   },
-  monthlySalary: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  essentials: {
-    type: Number,
-    default: 0,
-  },
-  savings: {
-    type: Number,
-    default: 0,
-  },
-  emergencyFund: {
-    type: Number,
-    default: 0,
-  },
-  lifestyle: {
-    type: Number,
-    default: 0,
-  },
-  investments: {
-    type: Number,
-    default: 0,
-  },
-  debt: {
-    type: Number,
-    default: 0,
-  },
-  planType: {
-    type: String,
-    enum: ["50/30/20", "aggressive", "debt-focused", "lifestyle", "custom"],
-    default: "custom",
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { _id: false },
+);
 
-salaryAllocationSchema.index({ userId: 1 });
+const salaryAllocationSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
+    monthlySalary: { type: Number, default: 0 },
+    selectedPlan: { type: String, default: null }, // plan1..plan4 or "custom"
+    categories: [categorySchema],
+  },
+  { timestamps: true },
+);
 
 module.exports = mongoose.model("SalaryAllocation", salaryAllocationSchema);

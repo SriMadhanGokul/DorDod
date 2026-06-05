@@ -34,6 +34,22 @@ const sanitizeUser = (user) => ({
   role: user.role || "user",
 });
 
+// ── GET /api/profile — return the full sanitized user ─────────────────────────
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    res.status(200).json({ success: true, user: sanitizeUser(user) });
+  } catch (err) {
+    console.error("getProfile error:", err);
+    res.status(500).json({ success: false, message: "Failed to load profile" });
+  }
+};
+
 // ── PUT /api/profile ──────────────────────────────────────────────────────────
 const updateProfile = async (req, res) => {
   try {
@@ -70,13 +86,11 @@ const updateProfile = async (req, res) => {
       new: true,
       runValidators: true,
     });
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Profile updated!",
-        user: sanitizeUser(user),
-      });
+    res.status(200).json({
+      success: true,
+      message: "Profile updated!",
+      user: sanitizeUser(user),
+    });
   } catch (err) {
     console.error("updateProfile error:", err);
     res
@@ -95,13 +109,11 @@ const uploadAvatar = async (req, res) => {
 
     const user = await User.findById(req.user.id);
 
-    // Delete old avatar from Cloudinary if it exists
     if (user.avatar && user.avatar.includes("cloudinary.com")) {
       const oldPublicId = getPublicIdFromUrl(user.avatar);
       if (oldPublicId) await deleteFromCloudinary(oldPublicId, "image");
     }
 
-    // Upload new avatar to Cloudinary
     const { url } = await uploadToCloudinary(req.file.buffer, {
       folder: `avatars/${req.user.id}`,
       resource_type: "image",
@@ -246,13 +258,11 @@ const updateNotifications = async (req, res) => {
       { $set: updates },
       { new: true },
     );
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Preferences saved!",
-        notifications: user.notifications,
-      });
+    res.status(200).json({
+      success: true,
+      message: "Preferences saved!",
+      notifications: user.notifications,
+    });
   } catch (err) {
     res
       .status(500)
@@ -387,6 +397,7 @@ const manageHonorsAwards = (req, res) =>
   updateProfessionalSection(req, res, "honorsAwards");
 
 module.exports = {
+  getProfile, // ✅ NEW
   updateProfile,
   uploadAvatar,
   getProfileScore,
