@@ -42,6 +42,7 @@ import XPHistoryPage from "./pages/XPHistoryPage";
 import GrowthScorePage from "./pages/GrowthScorePage";
 import ExpenseTrackerPage from "./pages/ExpenseTrackerPage";
 import FinancialDashboard from "./pages/FinancialDashboard";
+import ScopePage from "./pages/ScopePage";
 
 // ─── Admin Pages ──────────────────────────────────────────────────────────────
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -237,6 +238,15 @@ const App = () => (
               element={
                 <Protected>
                   <GrowthScorePage />
+                </Protected>
+              }
+            />
+            {/* ─── SCOP ───────────────────────────────────────────────────── */}
+            <Route
+              path="/scop"
+              element={
+                <Protected>
+                  <ScopePage />
                 </Protected>
               }
             />

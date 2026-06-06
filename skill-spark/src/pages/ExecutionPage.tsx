@@ -237,7 +237,7 @@ export default function ExecutionPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-5 max-w-4xl mx-auto">
+      <div className="space-y-5 max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

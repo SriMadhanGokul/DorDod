@@ -6,14 +6,13 @@ import toast from "react-hot-toast";
 import {
   FaCheck,
   FaFire,
-  FaArrowUp,
-  FaArrowDown,
   FaTag,
   FaShareAlt,
   FaPlus,
   FaTimes,
   FaLock,
 } from "react-icons/fa";
+import { GrowthScoreSection } from "./GrowthScorePage";
 
 const QUOTES = [
   "We don't become what we want. We become what we REPEAT.",
@@ -25,7 +24,6 @@ const QUOTES = [
 const getDailyQuote = () =>
   QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 
-// States for check-in
 const STATES = [
   {
     value: "Calm",
@@ -190,7 +188,6 @@ export default function DashboardPage() {
   const quote = getDailyQuote();
   const realRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── SLOT STATE ────────────────────────────────────────────────────────────
   const [slots, setSlots] = useState<
     { slot: string; state: string; note: string; time: string }[]
   >([]);
@@ -202,7 +199,6 @@ export default function DashboardPage() {
   const [showCheckInForm, setShowCheckInForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // ── SCORE STATE ───────────────────────────────────────────────────────────
   const [alignScore, setAlignScore] = useState(0);
   const [alignLabel, setAlignLabel] = useState("Misaligned");
   const [awareness, setAwareness] = useState(0);
@@ -210,7 +206,6 @@ export default function DashboardPage() {
   const [penalty, setPenalty] = useState(0);
   const [breakdown, setBreakdown] = useState<any>(null);
 
-  // ── OTHER STATE ───────────────────────────────────────────────────────────
   const [weeklyLoops, setWeeklyLoops] = useState<any[]>([]);
   const [awarenessStreak, setStreak] = useState(0);
   const [realization, setRealization] = useState("");
@@ -221,7 +216,7 @@ export default function DashboardPage() {
   const [suggestedAction, setSuggested] = useState<{ text: string } | null>(
     null,
   );
-  const [loopType, setLoopType] = useState("None");
+  const [, setLoopType] = useState("None");
   const [todayActivity, setTodayActivity] = useState<any>(null);
   const [guidanceDone, setGuidanceDone] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -247,8 +242,6 @@ export default function DashboardPage() {
         api.get("/checkin/slot-status"),
         api.get("/goals"),
       ]);
-
-      // Dashboard data
       const d = dashRes.data.data;
       setStreak(d.awarenessStreak || 0);
       setWeeklyLoops(d.weeklyLoops || []);
@@ -269,14 +262,10 @@ export default function DashboardPage() {
         if (ci.realization) setRealSaved(true);
         if (ci.loopType && ci.loopType !== "None") setLoopType(ci.loopType);
       }
-
-      // Slot status
       const s = slotRes.data.data;
       setUsedSlots(s.usedSlots || []);
       setCurrentSlot(s.currentSlot || "Morning");
       setCanCheckIn(s.canCheckIn);
-
-      // Today's goal activity
       const activeGoals = (goalRes.data.data || []).filter(
         (g: any) => g.status === "In Progress",
       );
@@ -305,8 +294,6 @@ export default function DashboardPage() {
         avoidingText: noteText,
       });
       const d = res.data.data;
-
-      // Update slots display
       setSlots((prev) => [
         ...prev,
         {
@@ -320,8 +307,6 @@ export default function DashboardPage() {
         },
       ]);
       setUsedSlots((prev) => [...prev, d.currentSlot || currentSlot]);
-
-      // Update score
       if (d.alignmentBreakdown) {
         setAlignScore(d.alignmentBreakdown.score || 0);
         setAlignLabel(d.alignmentLabel?.label || "Misaligned");
@@ -333,23 +318,17 @@ export default function DashboardPage() {
       if (d.insight) setInsight(d.insight);
       if (d.suggestedAction) setSuggested(d.suggestedAction);
       if (d.checkIn?.loopType) setLoopType(d.checkIn.loopType);
-
-      // Refresh slot status
       const slotRes = await api.get("/checkin/slot-status");
       const s = slotRes.data.data;
       setUsedSlots(s.usedSlots || []);
       setCurrentSlot(s.currentSlot || "Morning");
       setCanCheckIn(s.canCheckIn);
-
       setSelectedState("");
       setNoteText("");
       setShowCheckInForm(false);
-
-      // Refresh streak
       const dashRes = await api.get("/checkin/dashboard");
       setStreak(dashRes.data.data.awarenessStreak || 0);
       setWeeklyLoops(dashRes.data.data.weeklyLoops || []);
-
       toast.success(`✅ ${d.currentSlot || currentSlot} check-in saved!`);
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Failed to save check-in");
@@ -401,7 +380,6 @@ export default function DashboardPage() {
       setTodayActivity((p: any) =>
         p ? { ...p, day: { ...p.day, status: "Completed" } } : p,
       );
-      // Refresh score
       const dashRes = await api.get("/checkin/dashboard");
       const scoreData = dashRes.data.data.alignmentScore;
       if (scoreData) {
@@ -447,11 +425,14 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-5 animate-fade-in max-w-3xl mx-auto">
+      <div className="space-y-5 animate-fade-in max-w-6xl mx-auto">
+        {/* ── PAGE TITLE ─────────────────────────────────────────────────── */}
+        
+
         {/* Greeting */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-gray-900">
               Good{" "}
               {new Date().getHours() < 12
                 ? "Morning"
@@ -459,7 +440,7 @@ export default function DashboardPage() {
                   ? "Afternoon"
                   : "Evening"}
               , {(user as any)?.name?.split(" ")[0]} 👋
-            </h1>
+            </h2>
             <p className="text-sm text-gray-500 mt-0.5">
               Here's your alignment overview
             </p>
@@ -558,24 +539,16 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* Slots display — show all 3 slots with status */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             {(["Morning", "Midday", "Evening"] as const).map((slotName) => {
               const cfg = SLOT_CONFIG[slotName];
               const doneSlot = slots.find((s) => s.slot === slotName);
               const isUsed = usedSlots.includes(slotName);
               const isCurrent = currentSlot === slotName && !isUsed;
-
               return (
                 <div
                   key={slotName}
-                  className={`rounded-xl p-3 border-2 text-center transition-all ${
-                    isUsed
-                      ? "bg-green-50 border-green-300"
-                      : isCurrent
-                        ? `${cfg.bg} border-current`
-                        : "bg-gray-50 border-gray-100 opacity-60"
-                  }`}
+                  className={`rounded-xl p-3 border-2 text-center transition-all ${isUsed ? "bg-green-50 border-green-300" : isCurrent ? `${cfg.bg} border-current` : "bg-gray-50 border-gray-100 opacity-60"}`}
                 >
                   <p className="text-xl mb-1">{cfg.emoji}</p>
                   <p
@@ -616,7 +589,6 @@ export default function DashboardPage() {
             })}
           </div>
 
-          {/* Show today's check-in notes */}
           {slots.length > 0 && (
             <div className="mb-4 p-3 bg-gray-50 rounded-xl">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -632,13 +604,7 @@ export default function DashboardPage() {
                         {s.slot}
                       </span>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          ["Calm", "Focused", "Energized"].includes(s.state)
-                            ? "bg-green-100 text-green-700"
-                            : ["Stressed", "Distracted"].includes(s.state)
-                              ? "bg-red-100 text-red-700"
-                              : "bg-yellow-100 text-yellow-700"
-                        }`}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${["Calm", "Focused", "Energized"].includes(s.state) ? "bg-green-100 text-green-700" : ["Stressed", "Distracted"].includes(s.state) ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}
                       >
                         {s.state}
                       </span>
@@ -657,7 +623,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Check-in Form — show only if current slot available */}
           {!allSlotsUsed && canCheckIn && (
             <>
               {!showCheckInForm ? (
@@ -665,8 +630,7 @@ export default function DashboardPage() {
                   onClick={() => setShowCheckInForm(true)}
                   className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
                 >
-                  <FaPlus className="w-3 h-3" />
-                  Check in for {currentSlot}
+                  <FaPlus className="w-3 h-3" /> Check in for {currentSlot}
                   <span className="text-xs opacity-80">
                     (
                     {SLOT_CONFIG[currentSlot as keyof typeof SLOT_CONFIG]?.time}
@@ -725,7 +689,6 @@ export default function DashboardPage() {
             </>
           )}
 
-          {/* All slots used */}
           {allSlotsUsed && (
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
               <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0">
@@ -742,7 +705,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Current slot not available yet */}
           {!allSlotsUsed && !canCheckIn && (
             <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
               <FaLock className="text-amber-500 w-4 h-4 shrink-0" />
@@ -769,7 +731,6 @@ export default function DashboardPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="font-bold text-gray-900 mb-4">Today's Actions</h2>
             <div className="space-y-2">
-              {/* Check-in status */}
               <div
                 className={`flex items-center justify-between p-3 rounded-xl ${hasDoneAnyCheckIn ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
               >
@@ -791,8 +752,6 @@ export default function DashboardPage() {
                   {slots.length} done
                 </span>
               </div>
-
-              {/* Reflection */}
               <div
                 className={`flex items-center justify-between p-3 rounded-xl ${realizationSaved ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
               >
@@ -827,8 +786,6 @@ export default function DashboardPage() {
                   </span>
                 )}
               </div>
-
-              {/* Today's activity */}
               {todayActivity && (
                 <div
                   className={`flex items-center justify-between p-3 rounded-xl ${todayActivity.day.status === "Completed" ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
@@ -1033,13 +990,7 @@ export default function DashboardPage() {
               {weeklyLoops.map((loop, i) => (
                 <div
                   key={i}
-                  className={`flex items-center justify-between p-3 rounded-xl border ${
-                    loop.severity === "High"
-                      ? "bg-red-50 border-red-100"
-                      : loop.severity === "Medium"
-                        ? "bg-amber-50 border-amber-100"
-                        : "bg-yellow-50 border-yellow-100"
-                  }`}
+                  className={`flex items-center justify-between p-3 rounded-xl border ${loop.severity === "High" ? "bg-red-50 border-red-100" : loop.severity === "Medium" ? "bg-amber-50 border-amber-100" : "bg-yellow-50 border-yellow-100"}`}
                 >
                   <p
                     className={`text-sm font-medium ${loop.severity === "High" ? "text-red-700" : loop.severity === "Medium" ? "text-amber-700" : "text-yellow-700"}`}
@@ -1069,26 +1020,10 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Quick nav — only when no check-in done */}
-        {!hasDoneAnyCheckIn && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: "Intent", emoji: "🎯", path: "/goals" },
-              { label: "Execution", emoji: "⚡", path: "/execution" },
-              { label: "Knowledge", emoji: "📚", path: "/learning" },
-              { label: "Growth Plan", emoji: "📈", path: "/development-plan" },
-            ].map((a, i) => (
-              <a
-                key={i}
-                href={a.path}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 font-medium text-sm transition-all text-gray-700"
-              >
-                <span className="text-2xl">{a.emoji}</span>
-                <span>{a.label}</span>
-              </a>
-            ))}
-          </div>
-        )}
+        {/* ── GROWTH SCORE SECTION (merged in below overview) ──────────────── */}
+        <div className="pt-2 border-t border-gray-100">
+          <GrowthScoreSection />
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -269,7 +269,7 @@ export default function Networkpage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-5 animate-fade-in max-w-2xl mx-auto" onClick={() => setOpenMenu(null)}>
+      <div className="space-y-5 animate-fade-in max-w-6xl mx-auto" onClick={() => setOpenMenu(null)}>
 
         {/* Header */}
         <div className="flex justify-between items-center">

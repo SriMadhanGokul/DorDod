@@ -34,6 +34,7 @@ const routineRoutes = require("./routes/routineRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const growthScoreRoutes = require("./routes/growthScoreRoutes");
 const financialRoutes = require("./routes/financialRoutes"); // ✅ FINANCIAL ROUTES
+const scopeRoutes = require("./routes/scopeRoutes");
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -115,6 +116,7 @@ app.use("/api/routines", routineRoutes);
 app.use("/api/guidance", require("./routes/guidanceRoutes"));
 app.use("/api/checkin", require("./routes/checkInRoutes"));
 app.use("/api/search", searchRoutes);
+app.use("/api/scop", scopeRoutes);
 
 // Admin
 app.use("/api/admin", adminRoutes);
