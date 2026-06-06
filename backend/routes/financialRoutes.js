@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const protect = require("../utils/protect");
-const financialController = require("../controllers/financialController");
+const financialController = require("../controllers/financialcontroller");
 
 // All financial routes require authentication (same pattern as profileRoutes)
 router.use(protect);
