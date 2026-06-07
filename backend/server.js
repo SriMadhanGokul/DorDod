@@ -53,6 +53,7 @@ const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:3000",
   "https://dordod-2.onrender.com",
+  "https://teal-salmon-657864.hostingersite.com/login",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
