@@ -1,31 +1,21 @@
 const Scope = require("../models/Scope");
-const User = require("../models/User");
 
-// GET current SCOP — auto-create if missing
-exports.getScope = async (req, res) => {
+// NOTE: uses req.user.id to match your profile + financial controllers.
+
+// ── GET /api/scop — fetch the user's SCOP worksheet (creates blank if none) ───
+const getScope = async (req, res) => {
   try {
     let scope = await Scope.findOne({ user: req.user.id });
-    if (!scope) {
-      scope = new Scope({
-        user: req.user.id,
-        strengths: "",
-        constraints: "",
-        opportunities: "",
-        patterns: "",
-        keyInsight: "",
-        myFocus: "",
-        myNextStep: "",
-      });
-      await scope.save();
-    }
-    res.json({ success: true, data: scope });
+    if (!scope) scope = await Scope.create({ user: req.user.id });
+    res.status(200).json({ success: true, data: scope });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("getScope error:", err);
+    res.status(500).json({ success: false, message: "Failed to load SCOP" });
   }
 };
 
-// POST save/update SCOP
-exports.saveScope = async (req, res) => {
+// ── POST /api/scop — save / update the worksheet ──────────────────────────────
+const saveScope = async (req, res) => {
   try {
     const {
       strengths,
@@ -37,105 +27,75 @@ exports.saveScope = async (req, res) => {
       myNextStep,
     } = req.body;
 
-    if (
-      !strengths?.trim() ||
-      !constraints?.trim() ||
-      !opportunities?.trim() ||
-      !patterns?.trim()
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, message: "All SCOP sections are required" });
+    const update = { user: req.user.id };
+    if (strengths !== undefined) update.strengths = strengths;
+    if (constraints !== undefined) update.constraints = constraints;
+    if (opportunities !== undefined) update.opportunities = opportunities;
+    if (patterns !== undefined) update.patterns = patterns;
+    if (keyInsight !== undefined) update.keyInsight = keyInsight;
+    if (myFocus !== undefined) update.myFocus = myFocus;
+    if (myNextStep !== undefined) update.myNextStep = myNextStep;
+
+    const scope = await Scope.findOneAndUpdate({ user: req.user.id }, update, {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({ success: true, data: scope });
+  } catch (err) {
+    console.error("saveScope error:", err);
+    res.status(500).json({ success: false, message: "Failed to save SCOP" });
+  }
+};
+
+// ── GET /api/scop/history — fetch follow-up history ──────────────────────────────
+const getScopeHistory = async (req, res) => {
+  try {
+    const scope = await Scope.findOne({ user: req.user.id });
+    if (!scope || !scope.followUps) {
+      return res.status(200).json({ success: true, data: [] });
     }
+    res.status(200).json({
+      success: true,
+      data: scope.followUps.sort((a, b) => new Date(b.date) - new Date(a.date)),
+    });
+  } catch (err) {
+    console.error("getScopeHistory error:", err);
+    res.status(500).json({ success: false, message: "Failed to load history" });
+  }
+};
+
+// ── POST /api/scop/follow-up — add follow-up entry ──────────────────────────────
+const addFollowUp = async (req, res) => {
+  try {
+    const { status, notes } = req.body;
 
     let scope = await Scope.findOne({ user: req.user.id });
     if (!scope) {
-      scope = new Scope({ user: req.user.id });
+      scope = await Scope.create({ user: req.user.id });
     }
 
-    // Update fields
-    scope.strengths = strengths.trim();
-    scope.constraints = constraints.trim();
-    scope.opportunities = opportunities.trim();
-    scope.patterns = patterns.trim();
-    scope.keyInsight = keyInsight?.trim() || "";
-    scope.myFocus = myFocus?.trim() || "";
-    scope.myNextStep = myNextStep?.trim() || "";
-    scope.lastUpdated = new Date();
+    if (!scope.followUps) scope.followUps = [];
+    scope.followUps.push({
+      date: new Date(),
+      status,
+      notes,
+    });
 
     await scope.save();
 
-    // Optionally update user's profile to note SCOP completion
-    await User.findByIdAndUpdate(req.user.id, {
-      scopeLastCompleted: new Date(),
+    res.status(200).json({
+      success: true,
+      message: "Follow-up added successfully",
+      data: scope,
     });
-
-    res.json({ success: true, data: scope });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("addFollowUp error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to add follow-up" });
   }
 };
 
-// GET SCOP history — past submissions
-exports.getScopeHistory = async (req, res) => {
-  try {
-    const scopes = await Scope.find({ user: req.user.id })
-      .select(
-        "strengths constraints opportunities patterns keyInsight myFocus myNextStep lastUpdated createdAt",
-      )
-      .sort({ createdAt: -1 })
-      .limit(10);
-
-    res.json({ success: true, data: scopes });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// POST generate follow-up questions (optional AI integration)
-// If using Claude API, this could generate reflective prompts based on user input
-exports.generateFollowUpQuestions = async (req, res) => {
-  try {
-    const { strengths, constraints, opportunities, patterns } = req.body;
-
-    // Placeholder: could integrate with Claude API to generate AI questions
-    // For now, return structured reflection prompts based on user input
-
-    const followUpQuestions = {
-      strengths: [
-        "How can you leverage these strengths even more?",
-        "Which strength could you teach to someone else?",
-        "What would become possible if you doubled down on this strength?",
-      ],
-      constraints: [
-        "What's one small step to reduce this constraint?",
-        "Who could help you navigate this?",
-        "Is this constraint fixed, or can it change?",
-      ],
-      opportunities: [
-        "Which opportunity excites you most?",
-        "What would you need to pursue this?",
-        "How soon could you start?",
-      ],
-      patterns: [
-        "What triggers this pattern?",
-        "How would breaking this pattern change things?",
-        "What would you do instead?",
-      ],
-    };
-
-    res.json({ success: true, data: followUpQuestions });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// DELETE SCOP (reset)
-exports.deleteScope = async (req, res) => {
-  try {
-    await Scope.findOneAndDelete({ user: req.user.id });
-    res.json({ success: true, message: "SCOP deleted" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
+module.exports = { getScope, saveScope, getScopeHistory, addFollowUp };

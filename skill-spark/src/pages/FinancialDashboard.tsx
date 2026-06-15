@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -1400,86 +1399,82 @@ export default function FinancialDashboard() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      </DashboardLayout>
+      <div className="flex justify-center py-24">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-6xl">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Financial Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your money with complete control
-          </p>
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
-                  activeTab === tab.id
-                    ? "bg-indigo-600 text-white"
-                    : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-indigo-300"
-                }`}
-              >
-                <Icon className="w-4 h-4" /> {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div>
-          {activeTab === "overview" && (
-            <OverviewTab
-              monthlySalary={monthlySalary}
-              categories={categories}
-              emergencyFundBalance={emergencyFundBalance}
-              goals={goals}
-            />
-          )}
-          {activeTab === "salary" && (
-            <SalaryTab
-              monthlySalary={monthlySalary}
-              categories={categories}
-              selectedPlan={selectedPlan}
-              onSetSalary={handleSetSalary}
-              onSelectPlan={handleSelectPlan}
-              onChangePlan={handleChangePlan}
-              onChangeSalary={handleChangeSalary}
-            />
-          )}
-          {activeTab === "savings" && (
-            <SavingsTab
-              categories={categories}
-              emergencyFundBalance={emergencyFundBalance}
-              emergencyTarget={emergencyTarget}
-              onAddFunds={handleAddFunds}
-              onSetTarget={handleSetTarget}
-            />
-          )}
-          {activeTab === "expenses" && (
-            <ExpensesTab
-              expenses={expenses}
-              categories={categories}
-              onAdded={loadData}
-            />
-          )}
-          {activeTab === "goals" && (
-            <GoalsTab goals={goals} onChanged={loadData} />
-          )}
-        </div>
+    <div className="space-y-6 max-w-6xl">
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Financial Dashboard
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage your money with complete control
+        </p>
       </div>
-    </DashboardLayout>
+
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                activeTab === tab.id
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-indigo-300"
+              }`}
+            >
+              <Icon className="w-4 h-4" /> {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        {activeTab === "overview" && (
+          <OverviewTab
+            monthlySalary={monthlySalary}
+            categories={categories}
+            emergencyFundBalance={emergencyFundBalance}
+            goals={goals}
+          />
+        )}
+        {activeTab === "salary" && (
+          <SalaryTab
+            monthlySalary={monthlySalary}
+            categories={categories}
+            selectedPlan={selectedPlan}
+            onSetSalary={handleSetSalary}
+            onSelectPlan={handleSelectPlan}
+            onChangePlan={handleChangePlan}
+            onChangeSalary={handleChangeSalary}
+          />
+        )}
+        {activeTab === "savings" && (
+          <SavingsTab
+            categories={categories}
+            emergencyFundBalance={emergencyFundBalance}
+            emergencyTarget={emergencyTarget}
+            onAddFunds={handleAddFunds}
+            onSetTarget={handleSetTarget}
+          />
+        )}
+        {activeTab === "expenses" && (
+          <ExpensesTab
+            expenses={expenses}
+            categories={categories}
+            onAdded={loadData}
+          />
+        )}
+        {activeTab === "goals" && (
+          <GoalsTab goals={goals} onChanged={loadData} />
+        )}
+      </div>
+    </div>
   );
 }

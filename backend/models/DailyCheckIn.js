@@ -1,87 +1,67 @@
 const mongoose = require("mongoose");
 
-const checkInSlotSchema = new mongoose.Schema(
+const DailyCheckInSchema = new mongoose.Schema(
   {
-    slot: {
-      type: String,
-      enum: ["Morning", "Midday", "Evening"],
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
+      index: true,
     },
-    state: {
-      type: String,
-      enum: [
-        "Calm",
-        "Focused",
-        "Stressed",
-        "Distracted",
-        "Energized",
-        "Clear",
-        "Confused",
-        "Avoiding",
-        "Anxious",
-      ],
+    date: {
+      type: Date,
       required: true,
+      default: () => new Date().toISOString().split("T")[0],
+      index: true,
     },
-    note: { type: String, default: "" },
-    time: { type: String, default: "" }, // e.g. "09:10 AM"
-    recordedAt: { type: Date, default: Date.now },
-  },
-  { _id: true },
-);
-
-const dailyCheckInSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    date: { type: String, required: true }, // 'YYYY-MM-DD'
-
-    // Up to 3 check-ins per day (Morning / Midday / Evening)
-    slots: { type: [checkInSlotSchema], default: [] },
-
-    // Latest state (last slot's state — used for insight engine)
-    dailyState: {
+    mood: {
       type: String,
-      enum: [
-        "Calm",
-        "Focused",
-        "Stressed",
-        "Distracted",
-        "Energized",
-        "Clear",
-        "Confused",
-        "Avoiding",
-        "Anxious",
-      ],
-      default: "Focused",
+      enum: ["great", "good", "neutral", "bad", "terrible"],
+      default: "neutral",
     },
-    avoidingText: { type: String, default: "" },
-    mattersTodayText: { type: String, default: "" },
-
-    // Derived
-    avoidanceFlag: { type: Boolean, default: false },
-    loopType: {
+    energy: {
+      type: Number,
+      min: 1,
+      max: 10,
+      default: 5,
+    },
+    focus: {
+      type: Number,
+      min: 1,
+      max: 10,
+      default: 5,
+    },
+    notes: {
       type: String,
-      enum: ["Avoidance", "Overthinking", "Inconsistency", "None"],
-      default: "None",
+      trim: true,
     },
-    loopSeverity: {
+    // ✅ NEW: Realization/insight from the day
+    realization: {
       type: String,
-      enum: ["Low", "Medium", "High", "None"],
-      default: "None",
+      trim: true,
     },
-    clarityScore: { type: Number, default: 0 },
-
-    // Realization
-    realization: { type: String, default: "" },
-    realizationTags: { type: [String], default: [] },
-
-    // Post-guidance
-    guidanceSessionDone: { type: Boolean, default: false },
-    guidanceGoalUpdate: { type: String, default: "" },
-    guidanceBehaviorSugg: { type: String, default: "" },
-    guidanceInsight: { type: String, default: "" },
+    // ✅ NEW: Guidance updates throughout the day
+    guidanceUpdates: [
+      {
+        content: {
+          type: String,
+          required: true,
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    completed: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true },
 );
 
-dailyCheckInSchema.index({ user: 1, date: 1 }, { unique: true });
-module.exports = mongoose.model("DailyCheckIn", dailyCheckInSchema);
+// Ensure one check-in per user per day
+DailyCheckInSchema.index({ userId: 1, date: 1 }, { unique: true });
+
+module.exports = mongoose.model("DailyCheckIn", DailyCheckInSchema);

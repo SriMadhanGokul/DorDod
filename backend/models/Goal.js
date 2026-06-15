@@ -1,85 +1,100 @@
 const mongoose = require("mongoose");
 
-const dayActivitySchema = new mongoose.Schema(
+const GoalSchema = new mongoose.Schema(
   {
-    dayNumber: { type: Number, required: true }, // 1-21
-    title: { type: String, required: true },
-    description: { type: String, default: "" },
-    dueDate: { type: Date, default: null },
-    status: {
-      type: String,
-      enum: ["Upcoming", "Completed", "Missed", "Late", "Paused"],
-      default: "Upcoming",
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
-    isPaused: { type: Boolean, default: false },
-    completedAt: { type: Date, default: null },
-  },
-  { _id: true },
-);
-
-const subGoalSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    description: { type: String, default: "" },
-    status: { type: String, default: "Not Started" },
-    expectedDueDate: { type: Date },
-    measurementCriteria: { type: String, default: "" },
-  },
-  { _id: true },
-);
-
-const goalSchema = new mongoose.Schema(
-  {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    title: { type: String, required: [true, "Title is required"], trim: true },
-    description: { type: String, default: "" },
+    title: {
+      type: String,
+      required: [true, "Please provide a title"],
+      trim: true,
+      maxlength: 200,
+    },
+    description: {
+      type: String,
+      required: [true, "Please provide a description"],
+      trim: true,
+    },
     category: {
       type: String,
-      enum: [
-        "Spiritual",
-        "Fitness",
-        "Family",
-        "Career",
-        "Financial",
-        "Social",
-        "Intellectual",
-        "Other",
-      ],
-      required: [true, "Category is required"],
-    },
-    goalType: {
-      type: String,
-      enum: ["Personal", "Professional"],
+      enum: ["Career", "Personal", "Health", "Learning", "Finance", "Other"],
+      required: [true, "Please select a category"],
       default: "Personal",
+    },
+    status: {
+      type: String,
+      enum: ["active", "completed", "paused", "archived"],
+      default: "archived",
+      lowercase: true,
     },
     priority: {
       type: String,
-      enum: ["High", "Medium", "Low"],
+      enum: ["Low", "Medium", "High"],
+      required: [true, "Please select a priority"],
       default: "Medium",
     },
-    status: {
-      type: String,
-      enum: ["Not Started", "In Progress", "Completed", "On Hold"],
-      default: "Not Started",
+    progress: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
     },
-    progress: { type: Number, default: 0, min: 0, max: 100 },
-    startDate: { type: Date },
-    expectedEndDate: { type: Date },
-    measurementCriteria: { type: String, default: "" },
-    coach: { type: String, default: "" },
-    // 21-day daily activity plan (only for In-Progress goals)
-    dayActivities: { type: [dayActivitySchema], default: [] },
-    planStartDate: { type: Date, default: null },
-    subGoals: { type: [subGoalSchema], default: [] },
-    tags: { type: [String], default: [] },
-    icon: { type: String, default: "🎯" },
-    pausedDays: { type: Number, default: 0 },
-    maxPauseDays: { type: Number, default: 3 },
-    color: { type: String, default: "#6366f1" },
+    duration: {
+      type: Number,
+      min: [21, "Duration must be at least 21 days"],
+      max: [50, "Duration cannot exceed 50 days"],
+      required: [true, "Please specify a duration"],
+      default: 21,
+    },
+    targetDate: {
+      type: Date,
+    },
+    linkedHabits: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Habit",
+      },
+    ],
+
+    // ✅ NEW: Track completion status for each day
+    dayCompletion: {
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          dayNumber: Number,
+          completedAt: Date, // null = not completed, Date = when completed
+          status: {
+            type: String,
+            enum: ["pending", "completed", "missed"],
+            default: "pending",
+          },
+        },
+        { _id: false },
+      ),
+      default: new Map(),
+    },
+
+    completedAt: {
+      type: Date,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { timestamps: true },
 );
 
-goalSchema.index({ user: 1, status: 1 });
+// Indexes
+GoalSchema.index({ userId: 1, status: 1 });
+GoalSchema.index({ userId: 1, createdAt: -1 });
 
-module.exports = mongoose.model("Goal", goalSchema);
+module.exports = mongoose.model("Goal", GoalSchema);

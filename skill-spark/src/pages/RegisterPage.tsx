@@ -51,22 +51,22 @@ export default function RegisterPage() {
     }
   };
 
-  const handleSetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password.length < 6)
-      return toast.error("Password must be at least 6 characters");
-    if (password !== confirm) return toast.error("Passwords do not match");
-    setLoading(true);
-    try {
-      await api.post("/auth/set-password", { email, password });
-      await login(email, password);
-      navigate("/onboarding");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to create account");
-    } finally {
-      setLoading(false);
-    }
-  };
+ const handleSetPassword = async (e: React.FormEvent) => {
+   e.preventDefault();
+   if (password.length < 6)
+     return toast.error("Password must be at least 6 characters");
+   if (password !== confirm) return toast.error("Passwords do not match");
+   setLoading(true);
+   try {
+     await api.post("/auth/set-password", { email, password });
+     await login(email, password);
+     navigate("/onboarding"); // ✓ This is correct - after signup, go to onboarding
+   } catch (err: any) {
+     toast.error(err.response?.data?.message || "Failed to create account");
+   } finally {
+     setLoading(false);
+   }
+ };
 
   const handleResend = async () => {
     if (resendTimer > 0) return;

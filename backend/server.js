@@ -33,8 +33,13 @@ const notifUserRoutes = require("./routes/notificationUserRoutes");
 const routineRoutes = require("./routes/routineRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const growthScoreRoutes = require("./routes/growthScoreRoutes");
-const financialRoutes = require("./routes/financialRoutes"); // ✅ FINANCIAL ROUTES
+const financialRoutes = require("./routes/financialRoutes");
 const scopeRoutes = require("./routes/scopeRoutes");
+const metricsRoutes = require("./routes/metricsRoutes");
+
+// ✅ NEW: Daily Check-In & Reflection Routes
+const dailyCheckInRoutes = require("./routes/checkInRoutes");
+const dailyReflectionRoutes = require("./routes/dailyReflectionRoutes");
 
 // ── Controllers for inline routes ─────────────────────────────────────────────
 const { changePassword } = require("./controllers/changePasswordController");
@@ -54,7 +59,6 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://dordod-2.onrender.com",
   "https://teal-salmon-657864.hostingersite.com",
-
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
@@ -102,8 +106,13 @@ app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/scorecard", scoreCardRoutes);
 app.use("/api/xp", xpRoutes);
+app.use("/api/metrics", protect, metricsRoutes);
 
-// Financial Management ✅ NEW
+// ✅ NEW: Daily Check-In & Reflection Routes (with authentication)
+app.use("/api/daily-check-in", protect, dailyCheckInRoutes);
+app.use("/api/daily-reflection", protect, dailyReflectionRoutes);
+
+// Financial Management
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/financial", financialRoutes);
 
@@ -164,6 +173,9 @@ mongoose
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`🌐 Allowed Origins: ${allowedOrigins.join(", ")}`);
       console.log("📊 Financial routes loaded: /api/financial, /api/expenses");
+      console.log("📈 Metrics routes loaded: /api/metrics");
+      console.log("📋 Daily Check-In routes loaded: /api/daily-check-in");
+      console.log("📝 Daily Reflection routes loaded: /api/daily-reflection");
     });
   })
   .catch((err) => {

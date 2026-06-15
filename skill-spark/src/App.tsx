@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // ─── Public Pages ─────────────────────────────────────────────────────────────
 import LandingPage from "./pages/LandingPage";
@@ -77,6 +78,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ─── Helper Component ─────────────────────────────────────────────────────────
+const ProtectedWithLayout = ({ children }: { children: React.ReactNode }) => (
+  <Protected>
+    <DashboardLayout>{children}</DashboardLayout>
+  </Protected>
+);
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -106,188 +114,222 @@ const App = () => (
             <Route
               path="/setup-password"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <SetupPasswordPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
 
-            {/* ─── User Protected Routes ──────────────────────────────────── */}
+            {/* ─── User Protected Routes WITH LAYOUT ────────────────────────── */}
+            {/* ✅ ALL PROTECTED ROUTES NOW HAVE DASHBOARDLAYOUT */}
+
             <Route
               path="/dashboard"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <DashboardPage />
-                </Protected>
-              }
-            />
-            <Route
-              path="/skills"
-              element={
-                <Protected>
-                  <SkillsPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/goals"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <GoalsPage />
-                </Protected>
-              }
-            />
-            <Route
-              path="/development-plan"
-              element={
-                <Protected>
-                  <DevPlanPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/habits"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <HabitsPage />
-                </Protected>
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/skills"
+              element={
+                <ProtectedWithLayout>
+                  <SkillsPage />
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/development-plan"
+              element={
+                <ProtectedWithLayout>
+                  <DevPlanPage />
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/learning"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <LearningPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/analytics"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <AnalyticsPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/insights"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <InsightsPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/community"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <NetworkPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/network"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <NetworkPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/profile"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ProfilePage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/scorecard"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ScoreCardPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/achievements"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <AchievementsPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/execution"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ExecutionPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/activities"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ActivitiesPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/growth-score"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <GrowthScorePage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
-            {/* ─── SCOP ───────────────────────────────────────────────────── */}
             <Route
               path="/scop"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ScopePage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/expenses"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ExpenseTrackerPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/financial"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <FinancialDashboard />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/documents"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ResourcesPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/resources"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <ResourcesPage />
-                </Protected>
+                </ProtectedWithLayout>
               }
             />
             <Route
               path="/frame-of-mind"
               element={
-                <Protected>
+                <ProtectedWithLayout>
                   <FrameOfMindPage />
-                </Protected>
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/guidance"
+              element={
+                <ProtectedWithLayout>
+                  <GuidancePage />
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedWithLayout>
+                  <OnboardingPage />
+                </ProtectedWithLayout>
+              }
+            />
+            <Route path="/execution/:goalId" element={<ExecutionPage />} />
+            <Route
+              path="/leaderboard"
+              element={
+                <ProtectedWithLayout>
+                  <LeaderboardPage />
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/xp-history"
+              element={
+                <ProtectedWithLayout>
+                  <XPHistoryPage />
+                </ProtectedWithLayout>
               }
             />
 
@@ -370,40 +412,6 @@ const App = () => (
                 <AdminRoute>
                   <SettingsPage />
                 </AdminRoute>
-              }
-            />
-
-            {/* ─── Other Protected Routes ────────────────────────────────── */}
-            <Route
-              path="/guidance"
-              element={
-                <Protected>
-                  <GuidancePage />
-                </Protected>
-              }
-            />
-            <Route
-              path="/onboarding"
-              element={
-                <Protected>
-                  <OnboardingPage />
-                </Protected>
-              }
-            />
-            <Route
-              path="/leaderboard"
-              element={
-                <Protected>
-                  <LeaderboardPage />
-                </Protected>
-              }
-            />
-            <Route
-              path="/xp-history"
-              element={
-                <Protected>
-                  <XPHistoryPage />
-                </Protected>
               }
             />
 

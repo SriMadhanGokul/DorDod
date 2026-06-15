@@ -1,187 +1,152 @@
-import { useState, useEffect, useCallback } from "react";
-import { api } from "../utils/api";
+import { useState, useEffect } from "react";
+import { api } from "@/utils/api";
 import toast from "react-hot-toast";
-import DashboardLayout from "../components/layout/DashboardLayout";
 import {
   FaPlus,
-  FaFire,
-  FaTrophy,
-  FaCheck,
-  FaClock,
-  FaLock,
   FaEdit,
   FaTrash,
   FaTimes,
-  FaArrowUp,
-  FaArrowDown,
-  FaWallet,
+  FaChevronDown,
+  FaChevronUp,
+  FaLink,
+  FaUnlink,
+  FaClock,
+  FaCheck,
+  FaHistory,
+  FaClock as FaClockIcon,
 } from "react-icons/fa";
 
-interface Routine {
+interface Habit {
   _id: string;
   name: string;
-  description?: string;
-  scheduledStart: string;
-  scheduledEnd: string;
+  description: string;
   category: string;
-  icon: string;
-  color: string;
-  completedToday: boolean;
-  completedAt?: string;
-  inWindow: boolean;
-  windowPassed: boolean;
-  windowUpcoming: boolean;
-  createdToday: boolean;
-  streak: number;
-  longestStreak: number;
-  totalPoints: number;
-}
-interface Summary {
-  total: number;
-  completed: number;
-  missed: number;
-  todayPoints: number;
-  totalPoints: number;
-  weeklyPoints: number;
-  totalGained: number;
-  totalLost: number;
-  currentPoints: number;
-}
-interface WeekDay {
-  date: string;
-  completed: number;
-  total: number;
-  perfect: boolean;
+  frequency: string;
+  timeStart?: string;
+  timeEnd?: string;
+  linkedGoal?: string;
+  linkedGoalTitle?: string;
+  tracking?: Array<{
+    date: string;
+    status: "completed" | "missed" | "pending";
+    completedAt?: string;
+  }>;
 }
 
-const CATEGORIES = [
-  "Health",
-  "Fitness",
-  "Learning",
-  "Mindfulness",
-  "Career",
-  "Personal",
-  "Social",
-  "Other",
-];
-const EMOJIS = [
-  "⭐",
-  "💪",
-  "📚",
-  "🧘",
-  "🎯",
-  "🔥",
-  "🏃",
-  "✍️",
-  "🎨",
-  "🎵",
-  "💡",
-  "🌱",
-  "⚡",
-  "🏆",
-  "🧠",
-  "❤️",
-];
-const COLORS = [
-  "#6366f1",
-  "#8b5cf6",
-  "#ec4899",
-  "#f43f5e",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#06b6d4",
-  "#3b82f6",
-  "#a855f7",
-];
-
-function fmt12(t: string) {
-  const [h, m] = t.split(":").map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
-}
-function getTimezone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-function getDayLabel(dateStr: string) {
-  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
-    new Date(dateStr + "T00:00:00").getDay()
-  ];
+interface Goal {
+  _id: string;
+  title: string;
+  status: string;
 }
 
-function StatCard({
-  label,
-  value,
-  icon,
-  colorClass,
-  sub,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  colorClass: string;
-  sub?: string;
-}) {
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-          {label}
-        </span>
-        <div
-          className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${colorClass}`}
-        >
-          {icon}
-        </div>
-      </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white">
-        {value}
-      </div>
-      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-function RoutineModal({
-  routine,
+function HabitModal({
+  habit,
+  existingHabits,
   onClose,
   onSave,
-  count,
 }: {
-  routine?: Routine | null;
+  habit?: Habit | null;
+  existingHabits: Habit[];
   onClose: () => void;
   onSave: () => void;
-  count: number;
 }) {
   const [form, setForm] = useState({
-    name: routine?.name || "",
-    description: routine?.description || "",
-    scheduledStart: routine?.scheduledStart || "06:00",
-    scheduledEnd: routine?.scheduledEnd || "07:00",
-    category: routine?.category || "Personal",
-    icon: routine?.icon || "⭐",
-    color: routine?.color || "#6366f1",
+    name: habit?.name || "",
+    description: habit?.description || "",
+    category: habit?.category || "Productivity",
+    frequency: habit?.frequency || "Daily",
+    timeStart: habit?.timeStart || "",
+    timeEnd: habit?.timeEnd || "",
+    shouldLinkGoal: !!habit?.linkedGoal,
   });
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const checkTimeOverlap = (): boolean => {
+    if (!form.timeStart || !form.timeEnd) return false;
+
+    const [startHour, startMin] = form.timeStart.split(":").map(Number);
+    const [endHour, endMin] = form.timeEnd.split(":").map(Number);
+    const formStart = startHour * 60 + startMin;
+    const formEnd = endHour * 60 + endMin;
+
+    const habitsToCheck = existingHabits.filter((h) => h._id !== habit?._id);
+
+    for (const existingHabit of habitsToCheck) {
+      if (!existingHabit.timeStart || !existingHabit.timeEnd) continue;
+
+      const [eStartHour, eStartMin] = existingHabit.timeStart
+        .split(":")
+        .map(Number);
+      const [eEndHour, eEndMin] = existingHabit.timeEnd.split(":").map(Number);
+      const existingStart = eStartHour * 60 + eStartMin;
+      const existingEnd = eEndHour * 60 + eEndMin;
+
+      if (
+        (formStart < existingEnd && formEnd > existingStart) ||
+        (formStart === existingStart && formEnd === existingEnd)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!form.name.trim()) newErrors.name = "Habit name is required";
+    if (!form.description.trim())
+      newErrors.description = "Description is required";
+    if (!form.timeStart) newErrors.timeStart = "Start time is required";
+    if (!form.timeEnd) newErrors.timeEnd = "End time is required";
+
+    if (form.timeStart && form.timeEnd) {
+      const [startHour, startMin] = form.timeStart.split(":").map(Number);
+      const [endHour, endMin] = form.timeEnd.split(":").map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      if (startMinutes >= endMinutes) {
+        newErrors.timeEnd = "End time must be after start time";
+      }
+
+      if (checkTimeOverlap()) {
+        newErrors.timeOverlap =
+          "This time slot overlaps with an existing habit";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async () => {
-    if (!form.name.trim()) return toast.error("Name required.");
-    if (form.scheduledStart >= form.scheduledEnd)
-      return toast.error("Start must be before end.");
-    if (!routine && count >= 12) return toast.error("Max 12 habits.");
+    if (!validate()) return;
+
     setLoading(true);
     try {
-      const tz = getTimezone();
-      if (routine) {
-        await api.put(`/routines/${routine._id}`, form);
-        toast.success("Updated!");
+      const payload = {
+        name: form.name,
+        description: form.description,
+        category: form.category,
+        frequency: form.frequency,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+      };
+
+      if (habit) {
+        await api.put(`/habits/${habit._id}`, payload);
+        toast.success("Habit updated!");
       } else {
-        await api.post(`/routines?timezone=${tz}`, { ...form, timezone: tz });
-        toast.success("Created!");
+        await api.post("/habits", payload);
+        toast.success("Habit created! 🎉");
       }
       onSave();
       onClose();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed.");
+      toast.error(err.response?.data?.message || "Failed to save habit");
     } finally {
       setLoading(false);
     }
@@ -189,10 +154,10 @@ function RoutineModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900">
           <h2 className="font-bold text-gray-900 dark:text-white">
-            {routine ? "Edit Habit" : "New Habit"}
+            {habit ? "Edit Habit" : "Create New Habit"}
           </h2>
           <button
             onClick={onClose}
@@ -201,101 +166,152 @@ function RoutineModal({
             <FaTimes />
           </button>
         </div>
+
         <div className="p-5 space-y-4">
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-              Name *
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+              Habit Name <span className="text-red-500">*</span>
             </label>
             <input
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="e.g. Morning Workout"
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Morning Meditation"
+              className={`w-full px-3 py-2.5 rounded-xl border ${
+                errors.name
+                  ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              } text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
+            {errors.name && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                {errors.name}
+              </p>
+            )}
           </div>
+
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-              Description
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+              Description <span className="text-red-500">*</span>
             </label>
-            <input
+            <textarea
               value={form.description}
               onChange={(e) =>
-                setForm((f) => ({ ...f, description: e.target.value }))
+                setForm({ ...form, description: e.target.value })
               }
-              placeholder="Optional..."
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Describe what you'll do during this habit..."
+              className={`w-full px-3 py-2.5 rounded-xl border ${
+                errors.description
+                  ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              } text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-20`}
             />
+            {errors.description && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                {errors.description}
+              </p>
+            )}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
-            {(["scheduledStart", "scheduledEnd"] as const).map((field, i) => (
-              <div key={field}>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
-                  {i === 0 ? "Start Time *" : "End Time *"}
-                </label>
-                <input
-                  type="time"
-                  value={form[field]}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, [field]: e.target.value }))
-                  }
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-            ⏰ Habits added today won't receive penalties — starts from
-            tomorrow.
-          </p>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
-              Category
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setForm((f) => ({ ...f, category: c }))}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${form.category === c ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"}`}
-                >
-                  {c}
-                </button>
-              ))}
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                Category
+              </label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Productivity">Productivity</option>
+                <option value="Health">Health</option>
+                <option value="Learning">Learning</option>
+                <option value="Wellness">Wellness</option>
+                <option value="Exercise">Exercise</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                Frequency
+              </label>
+              <select
+                value={form.frequency}
+                onChange={(e) =>
+                  setForm({ ...form, frequency: e.target.value })
+                }
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Daily">Daily</option>
+                <option value="Weekdays">Weekdays</option>
+                <option value="Weekends">Weekends</option>
+                <option value="3x per week">3x per week</option>
+              </select>
             </div>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
-              Icon
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setForm((f) => ({ ...f, icon: e }))}
-                  className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${form.icon === e ? "bg-indigo-100 dark:bg-indigo-900 ring-2 ring-indigo-500" : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200"}`}
-                >
-                  {e}
-                </button>
-              ))}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block flex items-center gap-1">
+                <FaClock className="text-blue-600" />
+                Start Time <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="time"
+                value={form.timeStart}
+                onChange={(e) =>
+                  setForm({ ...form, timeStart: e.target.value })
+                }
+                className={`w-full px-3 py-2.5 rounded-xl border ${
+                  errors.timeStart
+                    ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                } text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              {errors.timeStart && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {errors.timeStart}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block flex items-center gap-1">
+                <FaClock className="text-blue-600" />
+                End Time <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="time"
+                value={form.timeEnd}
+                onChange={(e) => setForm({ ...form, timeEnd: e.target.value })}
+                className={`w-full px-3 py-2.5 rounded-xl border ${
+                  errors.timeEnd
+                    ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                } text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
+              {errors.timeEnd && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {errors.timeEnd}
+                </p>
+              )}
+              {errors.timeOverlap && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {errors.timeOverlap}
+                </p>
+              )}
             </div>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
-              Color
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setForm((f) => ({ ...f, color: c }))}
-                  style={{ background: c }}
-                  className={`w-7 h-7 rounded-full transition-all ${form.color === c ? "ring-2 ring-offset-2 ring-gray-400 scale-110" : ""}`}
-                />
-              ))}
-            </div>
+
+          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+            <p className="text-xs text-green-700 dark:text-green-300">
+              ✅ <strong>Time slots are required</strong> to prevent overlaps
+              and track your day efficiently!
+            </p>
           </div>
         </div>
-        <div className="p-5 pt-0 flex gap-3">
+
+        <div className="p-5 pt-0 flex gap-3 sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -305,9 +321,9 @@ function RoutineModal({
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
-            {loading ? "Saving..." : routine ? "Save Changes" : "Create Habit"}
+            {loading ? "Saving..." : habit ? "Update Habit" : "Create Habit"}
           </button>
         </div>
       </div>
@@ -315,446 +331,627 @@ function RoutineModal({
   );
 }
 
-function HabitCard({
-  routine,
-  onComplete,
-  onEdit,
-  onDelete,
+function LinkGoalModal({
+  habit,
+  onClose,
+  onSave,
 }: {
-  routine: Routine;
-  onComplete: (id: string) => void;
-  onEdit: (r: Routine) => void;
-  onDelete: (id: string) => void;
+  habit: Habit;
+  onClose: () => void;
+  onSave: () => void;
 }) {
-  const [doing, setDoing] = useState(false);
-  const go = async () => {
-    if (doing || routine.completedToday || !routine.inWindow) return;
-    setDoing(true);
-    await onComplete(routine._id);
-    setDoing(false);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [selectedGoal, setSelectedGoal] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const loadGoals = async () => {
+      try {
+        const res = await api.get("/goals");
+        if (res.data.success) {
+          const activeGoals = res.data.data.filter(
+            (g: Goal) => g.status === "active" && g._id !== habit.linkedGoal,
+          );
+          setGoals(activeGoals);
+        }
+      } catch (err) {
+        toast.error("Failed to load goals");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGoals();
+  }, [habit.linkedGoal]);
+
+  const handleLink = async () => {
+    if (!selectedGoal) {
+      toast.error("Please select a goal");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.patch(`/habits/${habit._id}/link`, { goalId: selectedGoal });
+      toast.success("✅ Habit linked to goal!");
+      onSave();
+      onClose();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to link habit");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const badge = routine.completedToday ? (
-    <span className="text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-      <FaCheck className="text-xs" />
-      Done
-    </span>
-  ) : routine.windowPassed ? (
-    <span className="text-xs font-semibold text-red-500 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
-      Missed −3pts
-    </span>
-  ) : routine.createdToday && !routine.inWindow ? (
-    <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-      Added today
-    </span>
-  ) : routine.inWindow ? (
-    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-full animate-pulse">
-      ● Now
-    </span>
-  ) : (
-    <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-      Upcoming
-    </span>
-  );
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 transition-all hover:shadow-md ${routine.windowPassed && !routine.completedToday ? "opacity-60" : ""}`}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-          style={{
-            background: routine.color + "20",
-            border: `2px solid ${routine.color}40`,
-          }}
-        >
-          {routine.icon}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="font-bold text-gray-900 dark:text-white">
+            Link to Goal
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <FaTimes />
+          </button>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-                {routine.name}
-              </h3>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <FaClock className="text-gray-400 text-xs" />
-                <span className="text-xs text-gray-500">
-                  {fmt12(routine.scheduledStart)} –{" "}
-                  {fmt12(routine.scheduledEnd)}
-                </span>
-              </div>
+
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Select an active goal to link this habit to:
+          </p>
+
+          {goals.length === 0 ? (
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                No active goals available. Create or activate a goal first.
+              </p>
             </div>
-            {badge}
-          </div>
-          {routine.description && (
-            <p className="text-xs text-gray-400 mt-1 truncate">
-              {routine.description}
-            </p>
+          ) : (
+            <select
+              value={selectedGoal}
+              onChange={(e) => setSelectedGoal(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Select a goal --</option>
+              {goals.map((goal) => (
+                <option key={goal._id} value={goal._id}>
+                  {goal.title}
+                </option>
+              ))}
+            </select>
           )}
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <FaFire className="text-orange-400 text-xs" />
-                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                  {routine.streak}d
-                </span>
-              </div>
-              <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-                {routine.category}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => onEdit(routine)}
-                className="text-gray-400 hover:text-indigo-500 p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
-              >
-                <FaEdit className="text-xs" />
-              </button>
-              <button
-                onClick={() => onDelete(routine._id)}
-                className="text-gray-400 hover:text-red-500 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-              >
-                <FaTrash className="text-xs" />
-              </button>
-              {routine.completedToday ? (
-                <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
-                  <FaCheck className="text-white text-sm" />
-                </div>
-              ) : routine.windowPassed ? (
-                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  <FaTimes className="text-gray-400 text-sm" />
-                </div>
-              ) : routine.inWindow ? (
-                <button
-                  onClick={go}
-                  disabled={doing}
-                  className="w-9 h-9 rounded-full border-2 border-indigo-500 flex items-center justify-center hover:bg-indigo-500 group transition-all"
-                >
-                  <FaCheck className="text-indigo-500 group-hover:text-white text-sm transition-colors" />
-                </button>
-              ) : (
-                <div className="w-9 h-9 rounded-full border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center opacity-40">
-                  <FaLock className="text-gray-400 text-xs" />
-                </div>
-              )}
-            </div>
-          </div>
+        </div>
+
+        <div className="p-5 pt-0 flex gap-3 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleLink}
+            disabled={!selectedGoal || submitting}
+            className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
+          >
+            {submitting ? "Linking..." : "Link Habit"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function HabitsContent() {
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [summary, setSummary] = useState<Summary>({
-    total: 0,
-    completed: 0,
-    missed: 0,
-    todayPoints: 0,
-    totalPoints: 0,
-    weeklyPoints: 0,
-    totalGained: 0,
-    totalLost: 0,
-    currentPoints: 0,
-  });
-  const [weeklyGrid, setWeeklyGrid] = useState<WeekDay[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editRoutine, setEditRoutine] = useState<Routine | null>(null);
-  const tz = getTimezone();
+// Helper: Check if within time window
+const isWithinTimeWindow = (timeStart?: string, timeEnd?: string): boolean => {
+  if (!timeStart || !timeEnd) return true;
 
-  const load = useCallback(async () => {
-    try {
-      // Always apply penalties first so missed stats reflect immediately
-      try {
-        await api.post("/routines/apply-penalties", { timezone: tz });
-      } catch {}
-      const [lr, sr] = await Promise.all([
-        api.get(`/routines?timezone=${tz}`),
-        api.get(`/routines/summary?timezone=${tz}`),
-      ]);
-      setRoutines(lr.data.routines);
-      setSummary({ ...lr.data.summary, ...sr.data });
-      setWeeklyGrid(sr.data.weeklyGrid || []);
-    } catch {
-      toast.error("Failed to load habits.");
-    } finally {
-      setLoading(false);
-    }
-  }, [tz]);
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const [startHour, startMin] = timeStart.split(":").map(Number);
+  const [endHour, endMin] = timeEnd.split(":").map(Number);
+  const start = startHour * 60 + startMin;
+  const end = endHour * 60 + endMin;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-  // Refresh every 60s to catch newly passed windows
-  useEffect(() => {
-    const id = setInterval(load, 60000);
-    return () => clearInterval(id);
-  }, [load]);
+  return currentTime >= start && currentTime < end;
+};
 
-  const handleComplete = async (id: string) => {
-    try {
-      const { data } = await api.patch(`/routines/${id}/complete`, {
-        timezone: tz,
-      });
-      let msg = `+5 points!`;
-      if (data.dailyBonus) msg += ` +${data.dailyBonus} daily bonus! 🎉`;
-      if (data.weeklyBonus) msg += ` +${data.weeklyBonus} perfect week! 🏆`;
-      toast.success(msg);
-      load();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed.");
-    }
-  };
+// Helper: Get time window status
+const getTimeWindowStatus = (timeStart?: string, timeEnd?: string): string => {
+  if (!timeStart || !timeEnd) return "";
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Delete this habit?")) return;
-    try {
-      await api.delete(`/routines/${id}`);
-      toast.success("Deleted.");
-      load();
-    } catch {
-      toast.error("Failed to delete.");
-    }
-  };
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const [startHour, startMin] = timeStart.split(":").map(Number);
+  const [endHour, endMin] = timeEnd.split(":").map(Number);
+  const start = startHour * 60 + startMin;
+  const end = endHour * 60 + endMin;
 
-  const progress =
-    summary.total > 0
-      ? Math.round((summary.completed / summary.total) * 100)
-      : 0;
+  if (currentTime >= start && currentTime < end) {
+    const minutesLeft = end - currentTime;
+    const hours = Math.floor(minutesLeft / 60);
+    const mins = minutesLeft % 60;
+    return `Open (${hours}h ${mins}m left)`;
+  } else if (currentTime < start) {
+    const minutesUntil = start - currentTime;
+    const hours = Math.floor(minutesUntil / 60);
+    const mins = minutesUntil % 60;
+    return `Starts in ${hours}h ${mins}m`;
+  } else {
+    return "Closed";
+  }
+};
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-      </div>
-    );
+function HabitCard({
+  habit,
+  onEdit,
+  onDelete,
+  onUnlink,
+  onComplete,
+  onLinkGoal,
+}: {
+  habit: Habit;
+  onEdit: (h: Habit) => void;
+  onDelete: (id: string) => void;
+  onUnlink: (id: string) => void;
+  onComplete: (id: string) => void;
+  onLinkGoal: (h: Habit) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const today = new Date().toISOString().split("T")[0];
+  const todayTracking = habit.tracking?.find((t) => t.date === today);
+  const isCompletedToday = todayTracking?.status === "completed";
+  const isMissedToday = todayTracking?.status === "missed";
+  const withinTimeWindow = isWithinTimeWindow(habit.timeStart, habit.timeEnd);
+  const timeWindowStatus = getTimeWindowStatus(habit.timeStart, habit.timeEnd);
+
+  const sortedTracking = habit.tracking
+    ? [...habit.tracking].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      )
+    : [];
+
+  const completedCount =
+    habit.tracking?.filter((t) => t.status === "completed").length || 0;
+  const missedCount =
+    habit.tracking?.filter((t) => t.status === "missed").length || 0;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Daily Habits
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setEditRoutine(null);
-            setShowModal(true);
-          }}
-          disabled={summary.total >= 12}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
-        >
-          <FaPlus className="text-xs" /> Add Habit
-        </button>
-      </div>
-
-      {/* 4-stat dashboard */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
-          label="Current Points"
-          value={summary.currentPoints}
-          icon={<FaWallet />}
-          colorClass="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600"
-          sub="Your balance"
-        />
-        <StatCard
-          label="Total Gained"
-          value={`+${summary.totalGained}`}
-          icon={<FaArrowUp />}
-          colorClass="bg-green-100 dark:bg-green-900/40 text-green-600"
-          sub="All time earned"
-        />
-        <StatCard
-          label="Total Lost"
-          value={`-${summary.totalLost}`}
-          icon={<FaArrowDown />}
-          colorClass="bg-red-100 dark:bg-red-900/40 text-red-500"
-          sub="Penalties paid"
-        />
-        <StatCard
-          label="This Week"
-          value={summary.weeklyPoints}
-          icon={<FaFire />}
-          colorClass="bg-amber-100 dark:bg-amber-900/40 text-amber-600"
-          sub="Resets Monday"
-        />
-      </div>
-
-      {/* Progress bar */}
-      {summary.total > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">
-              Today's Progress
-            </span>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-green-600 font-semibold">
-                {summary.completed} done
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 hover:shadow-md transition-all">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
+              {habit.name}
+            </h3>
+            {habit.linkedGoal && (
+              <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <FaLink className="text-xs" />
+                Goal Linked
               </span>
-              {summary.missed > 0 && (
-                <span className="text-red-500 font-semibold">
-                  {summary.missed} missed
-                </span>
-              )}
-              <span className="font-bold text-indigo-600">{progress}%</span>
-            </div>
+            )}
           </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3">
-            <div
-              className="h-3 rounded-full transition-all duration-700"
-              style={{
-                width: `${progress}%`,
-                background: progress === 100 ? "#22c55e" : "#6366f1",
-              }}
-            />
-          </div>
-          {progress === 100 && (
-            <p className="text-xs text-green-600 mt-2 font-semibold text-center">
-              🎉 All done! +10 bonus earned!
-            </p>
-          )}
-          {summary.todayPoints !== 0 && (
-            <p
-              className={`text-xs mt-1.5 text-center font-medium ${summary.todayPoints >= 0 ? "text-indigo-500" : "text-red-500"}`}
-            >
-              Today: {summary.todayPoints >= 0 ? "+" : ""}
-              {summary.todayPoints} pts
-            </p>
-          )}
-        </div>
-      )}
 
-      {/* Weekly grid */}
-      {weeklyGrid.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-            This Week
-          </h3>
-          <div className="grid grid-cols-7 gap-1.5">
-            {weeklyGrid.map((day) => {
-              const isToday =
-                day.date === new Date().toLocaleDateString("en-CA");
-              const pct = day.total > 0 ? day.completed / day.total : 0;
-              return (
-                <div
-                  key={day.date}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <span
-                    className={`text-xs ${isToday ? "font-bold text-indigo-600" : "text-gray-400"}`}
-                  >
-                    {getDayLabel(day.date)}
-                  </span>
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all
-                    ${day.perfect ? "bg-green-500 text-white" : pct > 0 ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700" : isToday ? "bg-gray-100 dark:bg-gray-800 text-gray-500 ring-2 ring-indigo-400" : "bg-gray-100 dark:bg-gray-800 text-gray-400"}`}
-                  >
-                    {day.perfect
-                      ? "✓"
-                      : day.completed > 0
-                        ? day.completed
-                        : "·"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-gray-400 mt-2 text-center">
-            Perfect week = +25 bonus 🏆
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {habit.description}
           </p>
-        </div>
-      )}
 
-      {/* Habits */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Your Habits ({summary.total}/12)
-          </h2>
-          <span className="text-xs text-gray-400">Sorted by time</span>
-        </div>
-        {routines.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 p-12 text-center">
-            <div className="text-5xl mb-3">🌱</div>
-            <p className="text-gray-500 text-sm">No habits yet.</p>
-            <button
-              onClick={() => {
-                setEditRoutine(null);
-                setShowModal(true);
-              }}
-              className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm hover:bg-indigo-700 transition-colors"
-            >
-              + Add First Habit
-            </button>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full">
+              {habit.category}
+            </span>
+            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full">
+              {habit.frequency}
+            </span>
+            {habit.timeStart && habit.timeEnd && (
+              <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full flex items-center gap-1">
+                <FaClock className="text-xs" />
+                {habit.timeStart} - {habit.timeEnd}
+              </span>
+            )}
           </div>
-        ) : (
-          routines.map((r) => (
-            <HabitCard
-              key={r._id}
-              routine={r}
-              onComplete={handleComplete}
-              onEdit={(r) => {
-                setEditRoutine(r);
-                setShowModal(true);
-              }}
-              onDelete={handleDelete}
-            />
-          ))
-        )}
-      </div>
 
-      {/* Rules */}
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-2xl p-4 border border-indigo-100 dark:border-indigo-900/50">
-        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-          <FaTrophy className="text-amber-500" /> Points Rules
-        </h3>
-        <div className="space-y-2 text-xs">
-          {[
-            ["Complete a habit", "+5", "text-green-600"],
-            ["All habits done today", "+10 bonus", "text-green-600"],
-            ["Perfect week (all 7 days)", "+25 🏆", "text-amber-500"],
-            ["Missed habit (window closed)", "−3", "text-red-500"],
-            ["Habits added today", "No penalty", "text-blue-500"],
-          ].map(([label, pts, cls]) => (
-            <div key={label} className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">{label}</span>
-              <span className={`font-bold ${cls}`}>{pts}</span>
+          {habit.linkedGoal && habit.linkedGoalTitle && (
+            <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Linked to:</strong> {habit.linkedGoalTitle}
+              </p>
             </div>
-          ))}
+          )}
+
+          {/* Today's Status & Quick Stats */}
+          <div className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+            <div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-semibold">
+                Today's Status
+              </p>
+              {isMissedToday ? (
+                <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                  ❌ Missed
+                </p>
+              ) : isCompletedToday ? (
+                <p className="text-sm font-bold text-green-600 dark:text-green-400">
+                  ✅ Completed
+                </p>
+              ) : (
+                <p className="text-sm font-bold text-gray-600 dark:text-gray-400">
+                  ⏳ Pending
+                </p>
+              )}
+            </div>
+            <div className="flex-1 text-right">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Completed:{" "}
+                <span className="font-bold text-green-600">
+                  {completedCount}
+                </span>{" "}
+                | Missed:{" "}
+                <span className="font-bold text-red-600">{missedCount}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Time Window Status */}
+          {habit.timeStart && habit.timeEnd && (
+            <div
+              className={`mb-3 text-xs font-semibold px-3 py-1.5 rounded-lg ${
+                withinTimeWindow
+                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                  : timeWindowStatus === "Closed"
+                    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                    : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+              }`}
+            >
+              <FaClockIcon className="inline mr-1" /> {timeWindowStatus}
+            </div>
+          )}
+
+          {/* History Toggle */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200"
+          >
+            <FaHistory className="text-xs" />
+            {expanded ? (
+              <>
+                <FaChevronUp className="text-xs" /> Hide History
+              </>
+            ) : (
+              <>
+                <FaChevronDown className="text-xs" /> View Full History (
+                {sortedTracking.length} records)
+              </>
+            )}
+          </button>
+
+          {/* History Section */}
+          {expanded && (
+            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-3">
+                📋 All Tracking History
+              </h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {sortedTracking.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    No tracking history yet
+                  </p>
+                ) : (
+                  sortedTracking.map((record, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2 rounded-lg text-xs ${
+                        record.status === "completed"
+                          ? "bg-green-100 dark:bg-green-900/30"
+                          : record.status === "missed"
+                            ? "bg-red-100 dark:bg-red-900/30"
+                            : "bg-gray-200 dark:bg-gray-700"
+                      }`}
+                    >
+                      <span className="font-medium">
+                        {new Date(record.date).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          weekday: "short",
+                        })}
+                      </span>
+                      <span
+                        className={`font-bold px-2 py-0.5 rounded ${
+                          record.status === "completed"
+                            ? "bg-green-200 dark:bg-green-900 text-green-700 dark:text-green-300"
+                            : record.status === "missed"
+                              ? "bg-red-200 dark:bg-red-900 text-red-700 dark:text-red-300"
+                              : "bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {record.status === "completed"
+                          ? "✅ Completed"
+                          : record.status === "missed"
+                            ? "❌ Missed"
+                            : "⏳ Pending"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          {/* Mark Complete Button - Only during time window & not missed */}
+          {!isMissedToday && !isCompletedToday && withinTimeWindow && (
+            <button
+              onClick={() => onComplete(habit._id)}
+              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+              title="Mark today as complete"
+            >
+              <FaCheck className="text-sm" />
+            </button>
+          )}
+
+          {/* Link to Goal Button - Only if not already linked */}
+          {!habit.linkedGoal && (
+            <button
+              onClick={() => onLinkGoal(habit)}
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              title="Link this habit to a goal"
+            >
+              <FaLink className="text-sm" />
+            </button>
+          )}
+
+          {/* Unlink Button */}
+          {habit.linkedGoal && (
+            <button
+              onClick={() => onUnlink(habit._id)}
+              className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 p-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+              title="Unlink from goal"
+            >
+              <FaUnlink className="text-sm" />
+            </button>
+          )}
+
+          <button
+            onClick={() => onEdit(habit)}
+            className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+          >
+            <FaEdit className="text-sm" />
+          </button>
+
+          <button
+            onClick={() => onDelete(habit._id)}
+            className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          >
+            <FaTrash className="text-sm" />
+          </button>
         </div>
       </div>
-
-      {showModal && (
-        <RoutineModal
-          routine={editRoutine}
-          onClose={() => {
-            setShowModal(false);
-            setEditRoutine(null);
-          }}
-          onSave={load}
-          count={summary.total}
-        />
-      )}
     </div>
   );
 }
 
 export default function HabitsPage() {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [editHabit, setEditHabit] = useState<Habit | null>(null);
+  const [selectedHabitForLink, setSelectedHabitForLink] =
+    useState<Habit | null>(null);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/habits");
+      if (res.data.success) {
+        setHabits(res.data.data);
+      }
+    } catch (err) {
+      toast.error("Failed to load habits");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleDelete = async (habitId: string) => {
+    if (!window.confirm("Delete this habit?")) return;
+    try {
+      await api.delete(`/habits/${habitId}`);
+      toast.success("Habit deleted");
+      load();
+    } catch (err: any) {
+      toast.error("Failed to delete habit");
+    }
+  };
+
+  const handleUnlink = async (habitId: string) => {
+    try {
+      await api.patch(`/habits/${habitId}/unlink`);
+      toast.success("Habit unlinked from goal");
+      load();
+    } catch (err: any) {
+      toast.error("Failed to unlink habit");
+    }
+  };
+
+  const handleComplete = async (habitId: string) => {
+    try {
+      await api.patch(`/habits/${habitId}/complete`);
+      toast.success("✅ Habit marked complete for today!");
+      load();
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.message || "Failed to mark habit complete",
+      );
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  const totalHabits = habits.length;
+  const linkedHabits = habits.filter((h) => h.linkedGoal).length;
+  const dailyHabits = habits.filter((h) => !h.linkedGoal).length;
+
   return (
-    <DashboardLayout>
-      <HabitsContent />
-    </DashboardLayout>
+    <div className="max-w-6xl mx-auto space-y-6 pb-10">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Habits
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Build consistency with daily habits
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditHabit(null);
+            setShowModal(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <FaPlus className="text-xs" /> New Habit
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800">
+          <p className="text-xs text-blue-700 dark:text-blue-300 font-semibold">
+            Total Habits
+          </p>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+            {totalHabits}
+          </p>
+        </div>
+
+        <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-800">
+          <p className="text-xs text-purple-700 dark:text-purple-300 font-semibold">
+            Goal Linked
+          </p>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+            {linkedHabits}
+          </p>
+        </div>
+
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 border border-green-200 dark:border-green-800">
+          <p className="text-xs text-green-700 dark:text-green-300 font-semibold">
+            Day-to-Day
+          </p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+            {dailyHabits}
+          </p>
+        </div>
+      </div>
+
+      {/* Habits Section */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+          📋 Habits ({totalHabits})
+        </h2>
+
+        {totalHabits === 0 ? (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 p-8 text-center">
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              No habits yet. Create your first habit to get started! 🚀
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {habits.map((habit) => (
+              <HabitCard
+                key={habit._id}
+                habit={habit}
+                onEdit={(h) => {
+                  setEditHabit(h);
+                  setShowModal(true);
+                }}
+                onDelete={handleDelete}
+                onUnlink={handleUnlink}
+                onComplete={handleComplete}
+                onLinkGoal={(h) => {
+                  setSelectedHabitForLink(h);
+                  setShowLinkModal(true);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Info Box */}
+      <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/50">
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">
+          💡 About Habits
+        </h3>
+        <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+          <div>
+            ⏰ <strong>Time Windows:</strong> Complete habits only during their
+            scheduled time. Button only shows during active window
+          </div>
+          <div>
+            ❌ <strong>Missed Habits:</strong> If not completed during time
+            window, automatically marked as missed
+          </div>
+          <div>
+            🎯 <strong>Goal Linking:</strong> Use the link button to connect
+            habits to active goals anytime
+          </div>
+          <div>
+            📊 <strong>History:</strong> View all past tracking records expanded
+            in each habit card
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showModal && (
+        <HabitModal
+          habit={editHabit}
+          existingHabits={habits}
+          onClose={() => {
+            setShowModal(false);
+            setEditHabit(null);
+          }}
+          onSave={load}
+        />
+      )}
+
+      {showLinkModal && selectedHabitForLink && (
+        <LinkGoalModal
+          habit={selectedHabitForLink}
+          onClose={() => {
+            setShowLinkModal(false);
+            setSelectedHabitForLink(null);
+          }}
+          onSave={load}
+        />
+      )}
+    </div>
   );
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -515,417 +514,411 @@ export default function DevPlanPage() {
 
   if (loading)
     return (
-      <DashboardLayout>
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      </DashboardLayout>
+      <div className="flex justify-center py-24">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
     );
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex justify-between items-start flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">
-              My Development Plan
-            </h1>
-            <p className="text-foreground-muted mt-1">
-              Personalized plan built from your goals, skills & courses
-            </p>
-          </div>
+    <div className="space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="flex justify-between items-start flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">
+            My Development Plan
+          </h1>
+          <p className="text-foreground-muted mt-1">
+            Personalized plan built from your goals, skills & courses
+          </p>
+        </div>
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-50"
+        >
+          <FaSync className={refreshing ? "animate-spin" : ""} /> Refresh Plan
+        </button>
+      </div>
+
+      {/* Overall progress */}
+      <div className="card-elevated">
+        <div className="flex justify-between items-center mb-2">
+          <span className="font-semibold">Overall Progress</span>
+          <span className="text-sm text-foreground-muted">
+            {completed}/{total} completed
+          </span>
+        </div>
+        <div className="w-full bg-muted rounded-full h-3">
+          <div
+            className="bg-gradient-to-r from-primary to-success rounded-full h-3 transition-all duration-700"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-xs text-foreground-muted mt-2">
+          {pct}% of your plan done
+        </p>
+      </div>
+
+      {/* Quick navigation */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          {
+            label: "Update Goals",
+            icon: FaBullseye,
+            path: "/goals",
+            color: "bg-primary/10 text-primary hover:bg-primary/20",
+          },
+          {
+            label: "Track Skills",
+            icon: FaLightbulb,
+            path: "/skills",
+            color: "bg-secondary/10 text-secondary hover:bg-secondary/20",
+          },
+          {
+            label: "View Courses",
+            icon: FaBook,
+            path: "/learning",
+            color: "bg-success/10 text-success hover:bg-success/20",
+          },
+        ].map((btn, i) => (
           <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-50"
+            key={i}
+            onClick={() => navigate(btn.path)}
+            className={`${btn.color} rounded-xl p-3 text-center text-xs font-medium transition-all flex flex-col items-center gap-1.5`}
           >
-            <FaSync className={refreshing ? "animate-spin" : ""} /> Refresh Plan
+            <btn.icon className="text-lg" />
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── RECOMMENDATIONS ──────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold">📋 Recommendations</h2>
+          <button
+            onClick={() => {
+              setRecForm({ ...EMPTY_REC });
+              setShowAddRec(true);
+            }}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <FaPlus className="w-3 h-3" /> Add
           </button>
         </div>
 
-        {/* Overall progress */}
-        <div className="card-elevated">
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-semibold">Overall Progress</span>
-            <span className="text-sm text-foreground-muted">
-              {completed}/{total} completed
-            </span>
+        {groups.length === 0 && (
+          <div className="text-center py-10 text-foreground-muted">
+            <FaRocket className="text-4xl mx-auto mb-3 opacity-20" />
+            <p className="font-medium">No recommendations yet</p>
+            <p className="text-sm mt-1">
+              Add goals, skills, and courses — or click Refresh Plan
+            </p>
           </div>
-          <div className="w-full bg-muted rounded-full h-3">
-            <div
-              className="bg-gradient-to-r from-primary to-success rounded-full h-3 transition-all duration-700"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <p className="text-xs text-foreground-muted mt-2">
-            {pct}% of your plan done
-          </p>
-        </div>
+        )}
 
-        {/* Quick navigation */}
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            {
-              label: "Update Goals",
-              icon: FaBullseye,
-              path: "/goals",
-              color: "bg-primary/10 text-primary hover:bg-primary/20",
-            },
-            {
-              label: "Track Skills",
-              icon: FaLightbulb,
-              path: "/skills",
-              color: "bg-secondary/10 text-secondary hover:bg-secondary/20",
-            },
-            {
-              label: "View Courses",
-              icon: FaBook,
-              path: "/learning",
-              color: "bg-success/10 text-success hover:bg-success/20",
-            },
-          ].map((btn, i) => (
-            <button
-              key={i}
-              onClick={() => navigate(btn.path)}
-              className={`${btn.color} rounded-xl p-3 text-center text-xs font-medium transition-all flex flex-col items-center gap-1.5`}
-            >
-              <btn.icon className="text-lg" />
-              {btn.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── RECOMMENDATIONS ──────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">📋 Recommendations</h2>
-            <button
-              onClick={() => {
-                setRecForm({ ...EMPTY_REC });
-                setShowAddRec(true);
-              }}
-              className="btn-primary text-sm flex items-center gap-2"
-            >
-              <FaPlus className="w-3 h-3" /> Add
-            </button>
-          </div>
-
-          {groups.length === 0 && (
-            <div className="text-center py-10 text-foreground-muted">
-              <FaRocket className="text-4xl mx-auto mb-3 opacity-20" />
-              <p className="font-medium">No recommendations yet</p>
-              <p className="text-sm mt-1">
-                Add goals, skills, and courses — or click Refresh Plan
-              </p>
-            </div>
-          )}
-
-          {groups.map((group, gi) => (
-            <div key={gi} className="mb-6">
-              <h3 className="font-semibold text-sm text-foreground-muted uppercase tracking-wide mb-3">
-                {group.label}
-              </h3>
-              <div className="grid md:grid-cols-2 gap-3">
-                {group.recs.map((item) => {
-                  const Icon = iconMap[item.icon] || FaBook;
-                  return (
-                    <div
-                      key={item._id}
-                      className={`card-elevated border-l-4 ${group.cfg.color} ${item.completed ? "opacity-70" : ""} transition-all`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${item.completed ? "bg-success/20 text-success" : "bg-primary/10 text-primary"}`}
-                        >
-                          <Icon className="text-base" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <h3
-                                className={`font-semibold text-sm ${item.completed ? "line-through" : ""}`}
-                              >
-                                {item.title}
-                              </h3>
-                              <p className="text-xs text-foreground-muted mt-0.5">
-                                {item.type}
-                                {item.duration ? ` · ${item.duration}` : ""}
+        {groups.map((group, gi) => (
+          <div key={gi} className="mb-6">
+            <h3 className="font-semibold text-sm text-foreground-muted uppercase tracking-wide mb-3">
+              {group.label}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-3">
+              {group.recs.map((item) => {
+                const Icon = iconMap[item.icon] || FaBook;
+                return (
+                  <div
+                    key={item._id}
+                    className={`card-elevated border-l-4 ${group.cfg.color} ${item.completed ? "opacity-70" : ""} transition-all`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${item.completed ? "bg-success/20 text-success" : "bg-primary/10 text-primary"}`}
+                      >
+                        <Icon className="text-base" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              className={`font-semibold text-sm ${item.completed ? "line-through" : ""}`}
+                            >
+                              {item.title}
+                            </h3>
+                            <p className="text-xs text-foreground-muted mt-0.5">
+                              {item.type}
+                              {item.duration ? ` · ${item.duration}` : ""}
+                            </p>
+                            {item.reason && (
+                              <p className="text-xs text-foreground-muted mt-1 italic">
+                                💡 {item.reason}
                               </p>
-                              {item.reason && (
-                                <p className="text-xs text-foreground-muted mt-1 italic">
-                                  💡 {item.reason}
-                                </p>
-                              )}
-                              {item.courseTitle && (
-                                <p className="text-xs text-primary mt-1 flex items-center gap-1">
-                                  <FaLink className="w-2.5 h-2.5" />{" "}
-                                  {item.courseTitle}
-                                </p>
-                              )}
-                              {(item.startDate || item.endDate) && (
-                                <p className="text-xs text-foreground-muted mt-1 flex items-center gap-1">
-                                  <FaCalendar className="w-2.5 h-2.5" />
-                                  {fmtDate(item.startDate)} —{" "}
-                                  {fmtDate(item.endDate)}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex gap-1 shrink-0">
-                              <button
-                                onClick={() => openEditRec(item)}
-                                className="text-foreground-muted hover:text-primary p-1 hover:bg-primary/10 rounded-lg transition-all"
+                            )}
+                            {item.courseTitle && (
+                              <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                                <FaLink className="w-2.5 h-2.5" />{" "}
+                                {item.courseTitle}
+                              </p>
+                            )}
+                            {(item.startDate || item.endDate) && (
+                              <p className="text-xs text-foreground-muted mt-1 flex items-center gap-1">
+                                <FaCalendar className="w-2.5 h-2.5" />
+                                {fmtDate(item.startDate)} —{" "}
+                                {fmtDate(item.endDate)}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => openEditRec(item)}
+                              className="text-foreground-muted hover:text-primary p-1 hover:bg-primary/10 rounded-lg transition-all"
+                            >
+                              <FaEdit className="w-3.5 h-3.5" />
+                            </button>
+                            {item.completed ? (
+                              <span
+                                title="Completed — cannot delete"
+                                className="text-success p-1 cursor-not-allowed opacity-50"
                               >
-                                <FaEdit className="w-3.5 h-3.5" />
+                                <FaLock className="w-3 h-3" />
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => deleteRec(item)}
+                                className="text-foreground-muted hover:text-destructive p-1 hover:bg-destructive/10 rounded-lg transition-all"
+                              >
+                                <FaTrash className="w-3 h-3" />
                               </button>
-                              {item.completed ? (
-                                <span
-                                  title="Completed — cannot delete"
-                                  className="text-success p-1 cursor-not-allowed opacity-50"
-                                >
-                                  <FaLock className="w-3 h-3" />
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => deleteRec(item)}
-                                  className="text-foreground-muted hover:text-destructive p-1 hover:bg-destructive/10 rounded-lg transition-all"
-                                >
-                                  <FaTrash className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => toggleRec(item._id)}
-                        className={`mt-3 w-full py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${
-                          item.completed
-                            ? "bg-success/10 text-success"
-                            : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
-                        }`}
-                      >
-                        <FaCheck className="text-xs" />
-                        {item.completed ? "Completed ✓" : "Mark as Done"}
-                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── MILESTONES ────────────────────────────────────────────────────── */}
-        <div className="card-elevated">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">📅 Milestones / Roadmap</h2>
-            <button
-              onClick={() => {
-                setMsForm({ ...EMPTY_MS });
-                setShowAddMs(true);
-              }}
-              className="btn-primary text-sm flex items-center gap-2"
-            >
-              <FaPlus className="w-3 h-3" /> Add
-            </button>
-          </div>
-
-          {milestones.length === 0 ? (
-            <div className="text-center py-8 text-foreground-muted">
-              <p className="font-medium">No milestones yet</p>
-              <p className="text-sm mt-1">
-                Add milestones to track your journey
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {milestones.map((m, i) => (
-                <div key={m._id} className="flex gap-4">
-                  <div className="flex flex-col items-center">
                     <button
-                      onClick={() => toggleMs(m._id)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all shrink-0 ${
-                        m.done
-                          ? "bg-success text-white shadow-md"
-                          : "bg-muted text-foreground-muted hover:bg-primary/20"
+                      onClick={() => toggleRec(item._id)}
+                      className={`mt-3 w-full py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${
+                        item.completed
+                          ? "bg-success/10 text-success"
+                          : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
                       }`}
                     >
-                      {m.done ? <FaCheck /> : i + 1}
+                      <FaCheck className="text-xs" />
+                      {item.completed ? "Completed ✓" : "Mark as Done"}
                     </button>
-                    {i < milestones.length - 1 && (
-                      <div
-                        className={`w-0.5 flex-1 mt-2 ${m.done ? "bg-success" : "bg-border"}`}
-                      />
-                    )}
                   </div>
-                  <div className="pb-4 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4
-                          className={`font-semibold text-sm ${m.done ? "text-success" : ""}`}
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── MILESTONES ────────────────────────────────────────────────────── */}
+      <div className="card-elevated">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold">📅 Milestones / Roadmap</h2>
+          <button
+            onClick={() => {
+              setMsForm({ ...EMPTY_MS });
+              setShowAddMs(true);
+            }}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <FaPlus className="w-3 h-3" /> Add
+          </button>
+        </div>
+
+        {milestones.length === 0 ? (
+          <div className="text-center py-8 text-foreground-muted">
+            <p className="font-medium">No milestones yet</p>
+            <p className="text-sm mt-1">Add milestones to track your journey</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {milestones.map((m, i) => (
+              <div key={m._id} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => toggleMs(m._id)}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all shrink-0 ${
+                      m.done
+                        ? "bg-success text-white shadow-md"
+                        : "bg-muted text-foreground-muted hover:bg-primary/20"
+                    }`}
+                  >
+                    {m.done ? <FaCheck /> : i + 1}
+                  </button>
+                  {i < milestones.length - 1 && (
+                    <div
+                      className={`w-0.5 flex-1 mt-2 ${m.done ? "bg-success" : "bg-border"}`}
+                    />
+                  )}
+                </div>
+                <div className="pb-4 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4
+                        className={`font-semibold text-sm ${m.done ? "text-success" : ""}`}
+                      >
+                        {m.title}
+                      </h4>
+                      {m.desc && (
+                        <p className="text-sm text-foreground-muted mt-0.5">
+                          {m.desc}
+                        </p>
+                      )}
+                      {(m.startDate || m.endDate) && (
+                        <p className="text-xs text-foreground-muted mt-1 flex items-center gap-1">
+                          <FaCalendar className="w-2.5 h-2.5" />
+                          {fmtDate(m.startDate)} — {fmtDate(m.endDate)}
+                        </p>
+                      )}
+                      {m.done && (
+                        <p className="text-xs text-success mt-1 font-medium">
+                          ✅ Completed!
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => openEditMs(m)}
+                        className="text-foreground-muted hover:text-primary p-1 hover:bg-primary/10 rounded-lg transition-all"
+                      >
+                        <FaEdit className="w-3.5 h-3.5" />
+                      </button>
+                      {m.done ? (
+                        <span
+                          title="Completed — cannot delete"
+                          className="text-success p-1 cursor-not-allowed opacity-50"
                         >
-                          {m.title}
-                        </h4>
-                        {m.desc && (
-                          <p className="text-sm text-foreground-muted mt-0.5">
-                            {m.desc}
-                          </p>
-                        )}
-                        {(m.startDate || m.endDate) && (
-                          <p className="text-xs text-foreground-muted mt-1 flex items-center gap-1">
-                            <FaCalendar className="w-2.5 h-2.5" />
-                            {fmtDate(m.startDate)} — {fmtDate(m.endDate)}
-                          </p>
-                        )}
-                        {m.done && (
-                          <p className="text-xs text-success mt-1 font-medium">
-                            ✅ Completed!
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-1 shrink-0">
+                          <FaLock className="w-3 h-3" />
+                        </span>
+                      ) : (
                         <button
-                          onClick={() => openEditMs(m)}
-                          className="text-foreground-muted hover:text-primary p-1 hover:bg-primary/10 rounded-lg transition-all"
+                          onClick={() => deleteMs(m)}
+                          className="text-foreground-muted hover:text-destructive p-1 hover:bg-destructive/10 rounded-lg transition-all"
                         >
-                          <FaEdit className="w-3.5 h-3.5" />
+                          <FaTrash className="w-3 h-3" />
                         </button>
-                        {m.done ? (
-                          <span
-                            title="Completed — cannot delete"
-                            className="text-success p-1 cursor-not-allowed opacity-50"
-                          >
-                            <FaLock className="w-3 h-3" />
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => deleteMs(m)}
-                            className="text-foreground-muted hover:text-destructive p-1 hover:bg-destructive/10 rounded-lg transition-all"
-                          >
-                            <FaTrash className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-foreground-muted mt-3">
-            Click the circle number to mark a milestone done
-          </p>
-        </div>
-
-        {/* ── Add Rec Modal ─────────────────────────────────────────────────── */}
-        {showAddRec && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-6 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h2 className="font-bold text-lg flex items-center gap-2">
-                    <FaPlus className="text-primary" /> Add Recommendation
-                  </h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Fields marked <span className="text-destructive">*</span>{" "}
-                    are required
-                  </p>
-                </div>
-                <button onClick={() => setShowAddRec(false)}>
-                  <FaTimes />
-                </button>
               </div>
-              <RecFormFields f={recForm} setF={setRecForm} />
-              <button
-                onClick={addRec}
-                disabled={saving}
-                className="btn-primary w-full mt-4 disabled:opacity-50"
-              >
-                {saving ? "Adding..." : "Add Recommendation"}
-              </button>
-            </div>
+            ))}
           </div>
         )}
-
-        {/* ── Edit Rec Modal ────────────────────────────────────────────────── */}
-        {editRec && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-6 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg flex items-center gap-2">
-                  <FaEdit className="text-primary" /> Edit Recommendation
-                </h2>
-                <button onClick={() => setEditRec(null)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <RecFormFields f={recForm} setF={setRecForm} />
-              <button
-                onClick={saveEditRec}
-                disabled={saving}
-                className="btn-primary w-full mt-4 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Add Milestone Modal ───────────────────────────────────────────── */}
-        {showAddMs && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h2 className="font-bold text-lg flex items-center gap-2">
-                    <FaPlus className="text-primary" /> Add Milestone
-                  </h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Fields marked <span className="text-destructive">*</span>{" "}
-                    are required
-                  </p>
-                </div>
-                <button onClick={() => setShowAddMs(false)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <MsFormFields f={msForm} setF={setMsForm} />
-              <button
-                onClick={addMs}
-                disabled={saving}
-                className="btn-primary w-full mt-4 disabled:opacity-50"
-              >
-                {saving ? "Adding..." : "Add Milestone"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Edit Milestone Modal ──────────────────────────────────────────── */}
-        {editMs && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-bold text-lg flex items-center gap-2">
-                  <FaEdit className="text-primary" /> Edit Milestone
-                </h2>
-                <button onClick={() => setEditMs(null)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <MsFormFields f={msForm} setF={setMsForm} />
-              <button
-                onClick={saveEditMs}
-                disabled={saving}
-                className="btn-primary w-full mt-4 disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        )}
+        <p className="text-xs text-foreground-muted mt-3">
+          Click the circle number to mark a milestone done
+        </p>
       </div>
-    </DashboardLayout>
+
+      {/* ── Add Rec Modal ─────────────────────────────────────────────────── */}
+      {showAddRec && (
+        <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-6 overflow-y-auto">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  <FaPlus className="text-primary" /> Add Recommendation
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Fields marked <span className="text-destructive">*</span> are
+                  required
+                </p>
+              </div>
+              <button onClick={() => setShowAddRec(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            <RecFormFields f={recForm} setF={setRecForm} />
+            <button
+              onClick={addRec}
+              disabled={saving}
+              className="btn-primary w-full mt-4 disabled:opacity-50"
+            >
+              {saving ? "Adding..." : "Add Recommendation"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Rec Modal ────────────────────────────────────────────────── */}
+      {editRec && (
+        <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-6 overflow-y-auto">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <FaEdit className="text-primary" /> Edit Recommendation
+              </h2>
+              <button onClick={() => setEditRec(null)}>
+                <FaTimes />
+              </button>
+            </div>
+            <RecFormFields f={recForm} setF={setRecForm} />
+            <button
+              onClick={saveEditRec}
+              disabled={saving}
+              className="btn-primary w-full mt-4 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Milestone Modal ───────────────────────────────────────────── */}
+      {showAddMs && (
+        <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="font-bold text-lg flex items-center gap-2">
+                  <FaPlus className="text-primary" /> Add Milestone
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Fields marked <span className="text-destructive">*</span> are
+                  required
+                </p>
+              </div>
+              <button onClick={() => setShowAddMs(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            <MsFormFields f={msForm} setF={setMsForm} />
+            <button
+              onClick={addMs}
+              disabled={saving}
+              className="btn-primary w-full mt-4 disabled:opacity-50"
+            >
+              {saving ? "Adding..." : "Add Milestone"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Milestone Modal ──────────────────────────────────────────── */}
+      {editMs && (
+        <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <FaEdit className="text-primary" /> Edit Milestone
+              </h2>
+              <button onClick={() => setEditMs(null)}>
+                <FaTimes />
+              </button>
+            </div>
+            <MsFormFields f={msForm} setF={setMsForm} />
+            <button
+              onClick={saveEditMs}
+              disabled={saving}
+              className="btn-primary w-full mt-4 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

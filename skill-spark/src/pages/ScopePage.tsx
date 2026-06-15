@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -188,544 +187,537 @@ ${scop.myNextStep}`;
 
   if (loading)
     return (
-      <DashboardLayout>
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      </DashboardLayout>
+      <div className="flex justify-center py-24">
+        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      </div>
     );
 
   return (
-    <DashboardLayout>
-      <div className="space-y-5 max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <FaCompass className="text-indigo-600" /> SCOP
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              System Awareness Framework — Strengths, Constraints,
-              Opportunities, Patterns
-            </p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {showResult && !isEditing && (
-              <>
-                <button
-                  onClick={exportAsText}
-                  className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                >
-                  <FaDownload className="w-3.5 h-3.5" /> Export
-                </button>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-all"
-                >
-                  <FaEdit className="w-3.5 h-3.5" /> Edit
-                </button>
-              </>
-            )}
-          </div>
+    <div className="space-y-5 max-w-5xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <FaCompass className="text-indigo-600" /> SCOP
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            System Awareness Framework — Strengths, Constraints, Opportunities,
+            Patterns
+          </p>
         </div>
-
-        {/* Tab Navigation */}
-        {showResult && !isEditing && (
-          <div className="flex gap-2 flex-wrap border-b border-gray-100 pb-0">
-            {[
-              { id: "result", label: "📋 Your Plan", icon: "📋" },
-              { id: "questions", label: "❓ Reflect", icon: "❓" },
-              { id: "history", label: "📅 History", icon: "📅" },
-            ].map((tab) => (
+        <div className="flex gap-2 flex-wrap">
+          {showResult && !isEditing && (
+            <>
               <button
-                key={tab.id}
-                onClick={() => {
-                  setView(tab.id as any);
-                  if (tab.id === "history") loadHistory();
-                  if (tab.id === "questions") loadFollowUpQuestions();
-                }}
-                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-                  view === tab.id
-                    ? "border-indigo-600 text-indigo-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
+                onClick={exportAsText}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-all"
               >
-                {tab.label}
+                <FaDownload className="w-3.5 h-3.5" /> Export
               </button>
-            ))}
-          </div>
-        )}
-
-        {/* FORM / EDIT MODE */}
-        {(isEditing || view === "form") && (
-          <div className="space-y-4">
-            {/* SCOP Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Strengths */}
-              <div className="bg-white border-l-4 border-green-500 rounded-2xl border border-gray-100 shadow-sm p-5">
-                <label className="text-xs font-bold text-green-600 uppercase tracking-wide flex items-center gap-2 mb-3">
-                  💪 Strengths
-                </label>
-                <textarea
-                  value={scop.strengths}
-                  onChange={(e) =>
-                    setScop((p) => ({ ...p, strengths: e.target.value }))
-                  }
-                  placeholder="What are you good at? What comes naturally to you?"
-                  rows={4}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-200"
-                />
-              </div>
-
-              {/* Constraints */}
-              <div className="bg-white border-l-4 border-red-500 rounded-2xl border border-gray-100 shadow-sm p-5">
-                <label className="text-xs font-bold text-red-600 uppercase tracking-wide flex items-center gap-2 mb-3">
-                  🚧 Constraints
-                </label>
-                <textarea
-                  value={scop.constraints}
-                  onChange={(e) =>
-                    setScop((p) => ({ ...p, constraints: e.target.value }))
-                  }
-                  placeholder="What limits you? What challenges do you face?"
-                  rows={4}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
-                />
-              </div>
-
-              {/* Opportunities */}
-              <div className="bg-white border-l-4 border-amber-500 rounded-2xl border border-gray-100 shadow-sm p-5">
-                <label className="text-xs font-bold text-amber-600 uppercase tracking-wide flex items-center gap-2 mb-3">
-                  🌟 Opportunities
-                </label>
-                <textarea
-                  value={scop.opportunities}
-                  onChange={(e) =>
-                    setScop((p) => ({ ...p, opportunities: e.target.value }))
-                  }
-                  placeholder="What possibilities exist? What can you leverage?"
-                  rows={4}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200"
-                />
-              </div>
-
-              {/* Patterns */}
-              <div className="bg-white border-l-4 border-indigo-500 rounded-2xl border border-gray-100 shadow-sm p-5">
-                <label className="text-xs font-bold text-indigo-600 uppercase tracking-wide flex items-center gap-2 mb-3">
-                  🔄 Patterns
-                </label>
-                <textarea
-                  value={scop.patterns}
-                  onChange={(e) =>
-                    setScop((p) => ({ ...p, patterns: e.target.value }))
-                  }
-                  placeholder="What patterns repeat? What cycles do you notice?"
-                  rows={4}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
-              </div>
-            </div>
-
-            {/* From Awareness to Action */}
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border border-purple-100 shadow-sm p-6">
-              <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
-                <FaArrowRight className="text-purple-600" /> From Awareness to
-                Action
-              </h2>
-              <div className="space-y-4">
-                {/* Key Insight */}
-                <div>
-                  <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
-                    💡 Key Insight — What did you realize?
-                  </label>
-                  <textarea
-                    value={scop.keyInsight}
-                    onChange={(e) =>
-                      setScop((p) => ({ ...p, keyInsight: e.target.value }))
-                    }
-                    placeholder="The most important thing you realized about yourself..."
-                    rows={2}
-                    className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-
-                {/* My Focus */}
-                <div>
-                  <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
-                    🎯 My Focus — What will you focus on?
-                  </label>
-                  <input
-                    type="text"
-                    value={scop.myFocus}
-                    onChange={(e) =>
-                      setScop((p) => ({ ...p, myFocus: e.target.value }))
-                    }
-                    placeholder="One clear focus area for the next 7 days..."
-                    className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-
-                {/* My Next Step */}
-                <div>
-                  <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
-                    ⚡ My Next Step — What's the first action?
-                  </label>
-                  <input
-                    type="text"
-                    value={scop.myNextStep}
-                    onChange={(e) =>
-                      setScop((p) => ({ ...p, myNextStep: e.target.value }))
-                    }
-                    placeholder="One concrete action you'll take today or tomorrow..."
-                    className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              {scop._id && (
-                <button
-                  onClick={() => {
-                    setIsEditing(false);
-                    setView("result");
-                  }}
-                  className="flex-1 border border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
-              )}
               <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-all"
               >
-                <FaCheck className="w-3.5 h-3.5" />
-                {saving ? "Saving..." : "Save SCOP & Generate Plan"}
+                <FaEdit className="w-3.5 h-3.5" /> Edit
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
+      </div>
 
-        {/* RESULT VIEW */}
-        {view === "result" && showResult && !isEditing && (
-          <div className="space-y-5">
-            {/* Your Action Plan Card */}
-            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border-2 border-indigo-200 shadow-sm p-6 md:p-8">
-              <div className="flex items-start gap-3 mb-5">
-                <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center shrink-0">
-                  <FaCheckCircle className="text-white w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Your Action Plan
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Based on your SCOP analysis, here's your path forward
-                  </p>
-                </div>
-              </div>
-
-              {/* Key Insight Highlight */}
-              {scop.keyInsight && (
-                <div className="bg-white rounded-xl p-5 mb-5 border-l-4 border-purple-600">
-                  <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-2 flex items-center gap-2">
-                    <FaLightbulb className="w-3.5 h-3.5" /> Your Key Insight
-                  </p>
-                  <p className="text-lg text-gray-900 font-semibold italic">
-                    "{scop.keyInsight}"
-                  </p>
-                </div>
-              )}
-
-              {/* Focus & Next Step */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                {scop.myFocus && (
-                  <div className="bg-white rounded-xl p-4 border-l-4 border-amber-500">
-                    <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-2">
-                      🎯 Your Focus (Next 7 Days)
-                    </p>
-                    <p className="text-base text-gray-800 font-medium">
-                      {scop.myFocus}
-                    </p>
-                  </div>
-                )}
-                {scop.myNextStep && (
-                  <div className="bg-white rounded-xl p-4 border-l-4 border-green-500">
-                    <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-2 flex items-center gap-2">
-                      ⚡ First Action (Today/Tomorrow)
-                    </p>
-                    <p className="text-base text-gray-800 font-medium">
-                      {scop.myNextStep}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* SCOP Details */}
-              {scop.strengths && (
-                <div className="bg-white rounded-xl p-4 border-l-4 border-green-500 mb-4">
-                  <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-2">
-                    💪 Strengths to Leverage
-                  </p>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {scop.strengths}
-                  </p>
-                </div>
-              )}
-              {scop.constraints && (
-                <div className="bg-white rounded-xl p-4 border-l-4 border-red-500 mb-4">
-                  <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-2">
-                    🚧 Constraints to Navigate
-                  </p>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {scop.constraints}
-                  </p>
-                </div>
-              )}
-              {scop.opportunities && (
-                <div className="bg-white rounded-xl p-4 border-l-4 border-amber-500 mb-4">
-                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">
-                    🌟 Opportunities to Pursue
-                  </p>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {scop.opportunities}
-                  </p>
-                </div>
-              )}
-              {scop.patterns && (
-                <div className="bg-white rounded-xl p-4 border-l-4 border-indigo-500">
-                  <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide mb-2">
-                    🔄 Patterns to Break
-                  </p>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {scop.patterns}
-                  </p>
-                </div>
-              )}
-
-              {/* Next Steps */}
-              <div className="mt-6 pt-6 border-t border-indigo-200">
-                <p className="text-sm font-semibold text-gray-800 mb-3">
-                  What happens next?
-                </p>
-                <div className="flex flex-col gap-2 text-sm text-gray-700">
-                  <div className="flex items-start gap-3">
-                    <span className="text-base">1️⃣</span>
-                    <span>
-                      <strong>Today:</strong> Start your first action (
-                      {scop.myNextStep || "your next step"})
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-base">2️⃣</span>
-                    <span>
-                      <strong>This week:</strong> Focus on{" "}
-                      {scop.myFocus || "your focus area"}
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-base">3️⃣</span>
-                    <span>
-                      <strong>Track progress:</strong> Check in daily on Habits
-                      and Execution
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-base">4️⃣</span>
-                    <span>
-                      <strong>Reflect:</strong> Use Guidance when you need
-                      clarity
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
-                  Status
-                </p>
-                <p className="text-2xl font-bold text-green-600">✓ Complete</p>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
-                  Last Updated
-                </p>
-                <p className="text-sm font-bold text-gray-800">
-                  {scop.lastUpdated
-                    ? new Date(scop.lastUpdated).toLocaleDateString()
-                    : "Today"}
-                </p>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
-                  Focus Area
-                </p>
-                <p className="text-sm font-bold text-gray-800 line-clamp-2">
-                  {scop.myFocus || "Not set"}
-                </p>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
-                  Next Action
-                </p>
-                <p className="text-sm font-bold text-gray-800 line-clamp-2">
-                  {scop.myNextStep || "Not set"}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* REFLECTION QUESTIONS TAB */}
-        {view === "questions" && (
-          <div className="space-y-4">
-            {loadingQuestions ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : followUpQuestions ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600 mb-4">
-                  Use these reflection questions to deepen your understanding
-                  and strengthen your action plan.
-                </p>
-
-                {Object.entries(followUpQuestions).map(
-                  ([section, questions]) => (
-                    <div
-                      key={section}
-                      className="bg-white rounded-2xl border border-gray-100 p-5"
-                    >
-                      <h3 className="font-bold text-gray-900 mb-3 capitalize text-lg flex items-center gap-2">
-                        <FaQuestionCircle className="text-indigo-600 w-5 h-5" />{" "}
-                        Deepen your {section}
-                      </h3>
-                      <div className="space-y-2">
-                        {(questions as string[]).map((q, i) => (
-                          <div
-                            key={i}
-                            className="flex gap-3 p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
-                          >
-                            <span className="text-indigo-600 font-bold shrink-0">
-                              Q{i + 1}:
-                            </span>
-                            <p className="text-sm text-gray-700">{q}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ),
-                )}
-
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <p className="text-sm text-blue-800">
-                    💡 <strong>Tip:</strong> Spend 5-10 minutes journaling on
-                    each question. Your answers will reveal deeper insights and
-                    sharpen your focus.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
-                <FaQuestionCircle className="text-4xl text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No questions yet</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Complete your SCOP to generate reflection questions
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* HISTORY TAB */}
-        {view === "history" && (
-          <div className="space-y-4">
-            {loadingHistory ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : history.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-xl">
-                <FaHistory className="text-4xl text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No history yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600 mb-4">
-                  Your past SCOP submissions. Watch how your awareness evolves
-                  over time.
-                </p>
-                {history.map((h, i) => (
-                  <div
-                    key={h._id || i}
-                    className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {new Date(
-                            h.lastUpdated || h.createdAt,
-                          ).toLocaleDateString("en-IN", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(
-                            h.lastUpdated || h.createdAt,
-                          ).toLocaleTimeString()}
-                        </p>
-                      </div>
-                      <span className="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">
-                        Completed
-                      </span>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      {h.keyInsight && (
-                        <p>
-                          <strong>Insight:</strong> "{h.keyInsight}"
-                        </p>
-                      )}
-                      {h.myFocus && (
-                        <p>
-                          <strong>Focus:</strong> {h.myFocus}
-                        </p>
-                      )}
-                      {h.myNextStep && (
-                        <p>
-                          <strong>Next Step:</strong> {h.myNextStep}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Danger Zone */}
-        {showResult && !isEditing && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-8">
-            <p className="text-sm font-semibold text-red-800 mb-3">
-              ⚠️ Danger Zone
-            </p>
+      {/* Tab Navigation */}
+      {showResult && !isEditing && (
+        <div className="flex gap-2 flex-wrap border-b border-gray-100 pb-0">
+          {[
+            { id: "result", label: "📋 Your Plan", icon: "📋" },
+            { id: "questions", label: "❓ Reflect", icon: "❓" },
+            { id: "history", label: "📅 History", icon: "📅" },
+          ].map((tab) => (
             <button
-              onClick={handleDeleteScop}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium"
+              key={tab.id}
+              onClick={() => {
+                setView(tab.id as any);
+                if (tab.id === "history") loadHistory();
+                if (tab.id === "questions") loadFollowUpQuestions();
+              }}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+                view === tab.id
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
             >
-              <FaTrash className="w-3.5 h-3.5" /> Reset SCOP
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* FORM / EDIT MODE */}
+      {(isEditing || view === "form") && (
+        <div className="space-y-4">
+          {/* SCOP Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Strengths */}
+            <div className="bg-white border-l-4 border-green-500 rounded-2xl border border-gray-100 shadow-sm p-5">
+              <label className="text-xs font-bold text-green-600 uppercase tracking-wide flex items-center gap-2 mb-3">
+                💪 Strengths
+              </label>
+              <textarea
+                value={scop.strengths}
+                onChange={(e) =>
+                  setScop((p) => ({ ...p, strengths: e.target.value }))
+                }
+                placeholder="What are you good at? What comes naturally to you?"
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-200"
+              />
+            </div>
+
+            {/* Constraints */}
+            <div className="bg-white border-l-4 border-red-500 rounded-2xl border border-gray-100 shadow-sm p-5">
+              <label className="text-xs font-bold text-red-600 uppercase tracking-wide flex items-center gap-2 mb-3">
+                🚧 Constraints
+              </label>
+              <textarea
+                value={scop.constraints}
+                onChange={(e) =>
+                  setScop((p) => ({ ...p, constraints: e.target.value }))
+                }
+                placeholder="What limits you? What challenges do you face?"
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-200"
+              />
+            </div>
+
+            {/* Opportunities */}
+            <div className="bg-white border-l-4 border-amber-500 rounded-2xl border border-gray-100 shadow-sm p-5">
+              <label className="text-xs font-bold text-amber-600 uppercase tracking-wide flex items-center gap-2 mb-3">
+                🌟 Opportunities
+              </label>
+              <textarea
+                value={scop.opportunities}
+                onChange={(e) =>
+                  setScop((p) => ({ ...p, opportunities: e.target.value }))
+                }
+                placeholder="What possibilities exist? What can you leverage?"
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-200"
+              />
+            </div>
+
+            {/* Patterns */}
+            <div className="bg-white border-l-4 border-indigo-500 rounded-2xl border border-gray-100 shadow-sm p-5">
+              <label className="text-xs font-bold text-indigo-600 uppercase tracking-wide flex items-center gap-2 mb-3">
+                🔄 Patterns
+              </label>
+              <textarea
+                value={scop.patterns}
+                onChange={(e) =>
+                  setScop((p) => ({ ...p, patterns: e.target.value }))
+                }
+                placeholder="What patterns repeat? What cycles do you notice?"
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              />
+            </div>
+          </div>
+
+          {/* From Awareness to Action */}
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border border-purple-100 shadow-sm p-6">
+            <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
+              <FaArrowRight className="text-purple-600" /> From Awareness to
+              Action
+            </h2>
+            <div className="space-y-4">
+              {/* Key Insight */}
+              <div>
+                <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
+                  💡 Key Insight — What did you realize?
+                </label>
+                <textarea
+                  value={scop.keyInsight}
+                  onChange={(e) =>
+                    setScop((p) => ({ ...p, keyInsight: e.target.value }))
+                  }
+                  placeholder="The most important thing you realized about yourself..."
+                  rows={2}
+                  className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-200"
+                />
+              </div>
+
+              {/* My Focus */}
+              <div>
+                <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
+                  🎯 My Focus — What will you focus on?
+                </label>
+                <input
+                  type="text"
+                  value={scop.myFocus}
+                  onChange={(e) =>
+                    setScop((p) => ({ ...p, myFocus: e.target.value }))
+                  }
+                  placeholder="One clear focus area for the next 7 days..."
+                  className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                />
+              </div>
+
+              {/* My Next Step */}
+              <div>
+                <label className="text-xs font-bold text-purple-600 uppercase tracking-wide block mb-2">
+                  ⚡ My Next Step — What's the first action?
+                </label>
+                <input
+                  type="text"
+                  value={scop.myNextStep}
+                  onChange={(e) =>
+                    setScop((p) => ({ ...p, myNextStep: e.target.value }))
+                  }
+                  placeholder="One concrete action you'll take today or tomorrow..."
+                  className="w-full border border-purple-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3">
+            {scop._id && (
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setView("result");
+                }}
+                className="flex-1 border border-gray-200 text-gray-600 px-4 py-3 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              <FaCheck className="w-3.5 h-3.5" />
+              {saving ? "Saving..." : "Save SCOP & Generate Plan"}
             </button>
           </div>
-        )}
-      </div>
-    </DashboardLayout>
+        </div>
+      )}
+
+      {/* RESULT VIEW */}
+      {view === "result" && showResult && !isEditing && (
+        <div className="space-y-5">
+          {/* Your Action Plan Card */}
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border-2 border-indigo-200 shadow-sm p-6 md:p-8">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center shrink-0">
+                <FaCheckCircle className="text-white w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Your Action Plan
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Based on your SCOP analysis, here's your path forward
+                </p>
+              </div>
+            </div>
+
+            {/* Key Insight Highlight */}
+            {scop.keyInsight && (
+              <div className="bg-white rounded-xl p-5 mb-5 border-l-4 border-purple-600">
+                <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <FaLightbulb className="w-3.5 h-3.5" /> Your Key Insight
+                </p>
+                <p className="text-lg text-gray-900 font-semibold italic">
+                  "{scop.keyInsight}"
+                </p>
+              </div>
+            )}
+
+            {/* Focus & Next Step */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              {scop.myFocus && (
+                <div className="bg-white rounded-xl p-4 border-l-4 border-amber-500">
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    🎯 Your Focus (Next 7 Days)
+                  </p>
+                  <p className="text-base text-gray-800 font-medium">
+                    {scop.myFocus}
+                  </p>
+                </div>
+              )}
+              {scop.myNextStep && (
+                <div className="bg-white rounded-xl p-4 border-l-4 border-green-500">
+                  <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    ⚡ First Action (Today/Tomorrow)
+                  </p>
+                  <p className="text-base text-gray-800 font-medium">
+                    {scop.myNextStep}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* SCOP Details */}
+            {scop.strengths && (
+              <div className="bg-white rounded-xl p-4 border-l-4 border-green-500 mb-4">
+                <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-2">
+                  💪 Strengths to Leverage
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {scop.strengths}
+                </p>
+              </div>
+            )}
+            {scop.constraints && (
+              <div className="bg-white rounded-xl p-4 border-l-4 border-red-500 mb-4">
+                <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-2">
+                  🚧 Constraints to Navigate
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {scop.constraints}
+                </p>
+              </div>
+            )}
+            {scop.opportunities && (
+              <div className="bg-white rounded-xl p-4 border-l-4 border-amber-500 mb-4">
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-2">
+                  🌟 Opportunities to Pursue
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {scop.opportunities}
+                </p>
+              </div>
+            )}
+            {scop.patterns && (
+              <div className="bg-white rounded-xl p-4 border-l-4 border-indigo-500">
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide mb-2">
+                  🔄 Patterns to Break
+                </p>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {scop.patterns}
+                </p>
+              </div>
+            )}
+
+            {/* Next Steps */}
+            <div className="mt-6 pt-6 border-t border-indigo-200">
+              <p className="text-sm font-semibold text-gray-800 mb-3">
+                What happens next?
+              </p>
+              <div className="flex flex-col gap-2 text-sm text-gray-700">
+                <div className="flex items-start gap-3">
+                  <span className="text-base">1️⃣</span>
+                  <span>
+                    <strong>Today:</strong> Start your first action (
+                    {scop.myNextStep || "your next step"})
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-base">2️⃣</span>
+                  <span>
+                    <strong>This week:</strong> Focus on{" "}
+                    {scop.myFocus || "your focus area"}
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-base">3️⃣</span>
+                  <span>
+                    <strong>Track progress:</strong> Check in daily on Habits
+                    and Execution
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="text-base">4️⃣</span>
+                  <span>
+                    <strong>Reflect:</strong> Use Guidance when you need clarity
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
+                Status
+              </p>
+              <p className="text-2xl font-bold text-green-600">✓ Complete</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
+                Last Updated
+              </p>
+              <p className="text-sm font-bold text-gray-800">
+                {scop.lastUpdated
+                  ? new Date(scop.lastUpdated).toLocaleDateString()
+                  : "Today"}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
+                Focus Area
+              </p>
+              <p className="text-sm font-bold text-gray-800 line-clamp-2">
+                {scop.myFocus || "Not set"}
+              </p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
+                Next Action
+              </p>
+              <p className="text-sm font-bold text-gray-800 line-clamp-2">
+                {scop.myNextStep || "Not set"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REFLECTION QUESTIONS TAB */}
+      {view === "questions" && (
+        <div className="space-y-4">
+          {loadingQuestions ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : followUpQuestions ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Use these reflection questions to deepen your understanding and
+                strengthen your action plan.
+              </p>
+
+              {Object.entries(followUpQuestions).map(([section, questions]) => (
+                <div
+                  key={section}
+                  className="bg-white rounded-2xl border border-gray-100 p-5"
+                >
+                  <h3 className="font-bold text-gray-900 mb-3 capitalize text-lg flex items-center gap-2">
+                    <FaQuestionCircle className="text-indigo-600 w-5 h-5" />{" "}
+                    Deepen your {section}
+                  </h3>
+                  <div className="space-y-2">
+                    {(questions as string[]).map((q, i) => (
+                      <div
+                        key={i}
+                        className="flex gap-3 p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
+                      >
+                        <span className="text-indigo-600 font-bold shrink-0">
+                          Q{i + 1}:
+                        </span>
+                        <p className="text-sm text-gray-700">{q}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Tip:</strong> Spend 5-10 minutes journaling on each
+                  question. Your answers will reveal deeper insights and sharpen
+                  your focus.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <FaQuestionCircle className="text-4xl text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No questions yet</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Complete your SCOP to generate reflection questions
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* HISTORY TAB */}
+      {view === "history" && (
+        <div className="space-y-4">
+          {loadingHistory ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <FaHistory className="text-4xl text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No history yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 mb-4">
+                Your past SCOP submissions. Watch how your awareness evolves
+                over time.
+              </p>
+              {history.map((h, i) => (
+                <div
+                  key={h._id || i}
+                  className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {new Date(
+                          h.lastUpdated || h.createdAt,
+                        ).toLocaleDateString("en-IN", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(
+                          h.lastUpdated || h.createdAt,
+                        ).toLocaleTimeString()}
+                      </p>
+                    </div>
+                    <span className="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">
+                      Completed
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {h.keyInsight && (
+                      <p>
+                        <strong>Insight:</strong> "{h.keyInsight}"
+                      </p>
+                    )}
+                    {h.myFocus && (
+                      <p>
+                        <strong>Focus:</strong> {h.myFocus}
+                      </p>
+                    )}
+                    {h.myNextStep && (
+                      <p>
+                        <strong>Next Step:</strong> {h.myNextStep}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Danger Zone */}
+      {showResult && !isEditing && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-8">
+          <p className="text-sm font-semibold text-red-800 mb-3">
+            ⚠️ Danger Zone
+          </p>
+          <button
+            onClick={handleDeleteScop}
+            className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium"
+          >
+            <FaTrash className="w-3.5 h-3.5" /> Reset SCOP
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

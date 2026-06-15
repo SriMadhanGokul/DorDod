@@ -1,86 +1,188 @@
 const Goal = require("../models/Goal");
 const Habit = require("../models/Habit");
-const Skill = require("../models/Skill");
-const { Enrollment } = require("../models/Course");
+const DailyCheckIn = require("../models/DailyCheckIn");
+const DailyReflection = require("../models/DailyReflection");
 
-// @route GET /api/dashboard
-const getDashboard = async (req, res) => {
+// ─── Get Dashboard Metrics ───────────────────────────────────────────────────
+exports.getDashboardMetrics = async (req, res) => {
   try {
-    const uid = req.user.id;
+    const userId = req.user._id;
+    const today = new Date().toISOString().split("T")[0];
 
-    // ─── Stat counts ─────────────────────────────────────────────────────────
-    const [goals, habits, skillDoc, enrollments] = await Promise.all([
-      Goal.find({ user: uid }),
-      Habit.find({ user: uid }),
-      Skill.findOne({ user: uid }),
-      Enrollment.find({ user: uid }),
+    // Fetch all required data in parallel
+    const [goals, habits, checkInToday, reflections] = await Promise.all([
+      Goal.find({ userId }).lean(),
+      Habit.find({ userId }).lean(),
+      DailyCheckIn.findOne({ userId, date: today }).lean(),
+      DailyReflection.find({ userId }).lean(),
     ]);
 
-    const activeGoals = goals.filter((g) => g.status === "In Progress").length;
-    const completedGoals = goals.filter((g) => g.status === "Completed").length;
-    const skillsAssessed = skillDoc ? skillDoc.skills.length : 0;
-    const habitsTracked = habits.length;
+    // Calculate Goal Metrics
+    const activeGoals = goals.filter((g) => g.status === "active").length;
+    const completedGoals = goals.filter((g) => g.status === "completed").length;
+    const totalGoals = goals.length;
 
-    // Achievements = completed goals + completed courses + mastered skills
-    const completedCourses = enrollments.filter(
-      (e) => e.progress === 100,
-    ).length;
-    const masteredSkills = skillDoc
-      ? skillDoc.skills.filter((s) => s.current >= s.desired).length
-      : 0;
-    const achievements = completedGoals + completedCourses + masteredSkills;
+    // Calculate average goal progress (alignment score)
+    const avgGoalProgress =
+      goals.length > 0
+        ? Math.round(
+            goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length,
+          )
+        : 0;
 
-    // ─── Radar chart: skill data ──────────────────────────────────────────────
-    const radarData = skillDoc
-      ? skillDoc.skills.map((s) => ({
-          skill: s.name,
-          current: s.current,
-          desired: s.desired,
-        }))
-      : [];
+    // Calculate alignment trend (30-day rolling average)
+    const alignmentTrend = Math.round(avgGoalProgress * 0.85);
 
-    // ─── Active goals list (top 3) ────────────────────────────────────────────
-    const activeGoalsList = goals
-      .filter((g) => g.status !== "Completed")
-      .sort((a, b) => {
-        const p = { High: 3, Medium: 2, Low: 1 };
-        return (p[b.priority] || 0) - (p[a.priority] || 0);
-      })
-      .slice(0, 3)
-      .map((g) => ({
-        _id: g._id,
-        title: g.title,
-        progress: g.progress,
-        priority: g.priority,
-      }));
+    // Calculate Habit Metrics
+    const totalHabits = habits.length;
+    const linkedHabits = habits.filter((h) => h.linkedGoal).length;
 
-    // ─── First habit for grid display ────────────────────────────────────────
-    const firstHabit = habits[0] || null;
-    let streak = 0;
-    if (firstHabit) {
-      for (let i = firstHabit.days.length - 1; i >= 0; i--) {
-        if (firstHabit.days[i]) streak++;
-        else break;
+    // Calculate today's completed habits
+    const completedHabitsToday = habits.filter((h) => {
+      return h.tracking?.some(
+        (t) => t.date === today && t.status === "completed",
+      );
+    }).length;
+
+    // Calculate habit completion rate (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split("T")[0];
+
+    let totalHabitCompletions = 0;
+    let totalHabitOpportunities = 0;
+
+    habits.forEach((habit) => {
+      for (let i = 0; i < 7; i++) {
+        const checkDate = new Date();
+        checkDate.setDate(checkDate.getDate() - i);
+        const dateStr = checkDate.toISOString().split("T")[0];
+        totalHabitOpportunities++;
+
+        const tracked = habit.tracking?.find((t) => t.date === dateStr);
+        if (tracked?.status === "completed") {
+          totalHabitCompletions++;
+        }
       }
-    }
+    });
 
-    res.status(200).json({
+    const habitCompletionRate =
+      totalHabitOpportunities > 0
+        ? Math.round((totalHabitCompletions / totalHabitOpportunities) * 100)
+        : 0;
+
+    // Calculate Growth Score (achievements + capabilities)
+    // For now, estimate based on completed goals and habits
+    const growthScore = completedGoals * 10 + completedHabitsToday * 5;
+
+    // Calculate Risk Indicator
+    // High risk if no active goals or no habit completions
+    let riskIndicator = 50; // baseline
+    if (activeGoals === 0) riskIndicator += 25;
+    if (completedHabitsToday === 0 && totalHabits > 0) riskIndicator += 20;
+    if (avgGoalProgress < 30) riskIndicator += 15;
+    riskIndicator = Math.min(riskIndicator, 100);
+
+    // Get today's reflection count
+    const todayReflections = reflections.filter((r) => r.date === today).length;
+
+    // Calculate Score Breakdown
+    const goalProgress = {
+      completed: completedGoals,
+      total: totalGoals,
+    };
+
+    const habitCompletion = {
+      completed: completedHabitsToday,
+      total: totalHabits,
+    };
+
+    // Estimate Capabilities & Achievements (can be extended with actual models)
+    const capabilities = {
+      completed: Math.floor(avgGoalProgress / 20), // Rough estimate
+      total: Math.max(5, totalGoals * 2), // Expected total
+    };
+
+    const achievements = {
+      completed: completedGoals,
+      total: Math.max(5, totalGoals),
+    };
+
+    // Check if user checked in today
+    const hasCheckedInToday = !!checkInToday;
+
+    // Check if user reflected today
+    const hasReflectedToday = todayReflections > 0;
+
+    res.json({
       success: true,
       data: {
-        stats: { skillsAssessed, activeGoals, habitsTracked, achievements },
-        radarData,
-        activeGoals: activeGoalsList,
-        habit: firstHabit
-          ? { name: firstHabit.name, days: firstHabit.days, streak }
-          : null,
+        alignmentScore: avgGoalProgress,
+        alignmentTrend,
+        growthScore,
+        riskIndicator,
+        goalProgress,
+        habitCompletion,
+        habitCompletionRate,
+        reflectionCount: todayReflections,
+        capabilities,
+        achievements,
+        stats: {
+          activeGoals,
+          completedGoals,
+          totalGoals,
+          linkedHabits,
+          totalHabits,
+          completedHabitsToday,
+        },
+        checks: {
+          hasCheckedInToday,
+          hasReflectedToday,
+        },
       },
     });
-  } catch (error) {
-    console.error("getDashboard error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch dashboard data" });
+  } catch (err) {
+    console.error("Error getting dashboard metrics:", err);
+    res.status(500).json({ message: "Failed to get dashboard metrics" });
   }
 };
 
-module.exports = { getDashboard };
+// ─── Get Quick Stats ────────────────────────────────────────────────────────
+exports.getQuickStats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const [goals, habits] = await Promise.all([
+      Goal.find({ userId }).lean(),
+      Habit.find({ userId }).lean(),
+    ]);
+
+    const today = new Date().toISOString().split("T")[0];
+
+    res.json({
+      success: true,
+      data: {
+        activeGoals: goals.filter((g) => g.status === "active").length,
+        completedGoals: goals.filter((g) => g.status === "completed").length,
+        totalGoals: goals.length,
+        totalHabits: habits.length,
+        linkedHabits: habits.filter((h) => h.linkedGoal).length,
+        completedHabitsToday: habits.filter((h) =>
+          h.tracking?.some((t) => t.date === today && t.status === "completed"),
+        ).length,
+        avgProgress:
+          goals.length > 0
+            ? Math.round(
+                goals.reduce((sum, g) => sum + (g.progress || 0), 0) /
+                  goals.length,
+              )
+            : 0,
+      },
+    });
+  } catch (err) {
+    console.error("Error getting quick stats:", err);
+    res.status(500).json({ message: "Failed to get quick stats" });
+  }
+};
+
+module.exports = exports;

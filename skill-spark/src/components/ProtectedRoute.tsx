@@ -6,26 +6,25 @@ export default function ProtectedRoute({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, loading } = useAuth();
 
-  // ✅ Always wait for session check before making any redirect decision
+  // ✅ FIX: While loading, show nothing (not a redirect)
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-foreground-muted animate-pulse">
-            Loading your session...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // ✅ Only redirect to login if truly not authenticated (after loading completes)
-  if (!isAuthenticated) {
+  // ✅ After loading: if no user, redirect to login
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // ✅ User is authenticated, render children
   return <>{children}</>;
 }

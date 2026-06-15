@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -161,312 +160,309 @@ export default function AchievementsPage() {
   const totalXP = done.length * 30;
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
-              Achievements <FaTrophy className="text-yellow-500" />
-            </h1>
-            <p className="text-foreground-muted mt-1">
-              Every win — big or small — deserves to be remembered
-            </p>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
+            Achievements <FaTrophy className="text-yellow-500" />
+          </h1>
+          <p className="text-foreground-muted mt-1">
+            Every win — big or small — deserves to be remembered
+          </p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <FaPlus /> Add Achievement
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card-elevated text-center">
+          <p className="text-3xl font-black text-yellow-500">{done.length}</p>
+          <p className="text-xs text-foreground-muted mt-1">🏆 Completed</p>
+        </div>
+        <div className="card-elevated text-center">
+          <p className="text-3xl font-black text-primary">{inProg.length}</p>
+          <p className="text-xs text-foreground-muted mt-1">⚡ In Progress</p>
+        </div>
+        <div className="card-elevated text-center">
+          <p className="text-3xl font-black text-secondary">{totalXP}</p>
+          <p className="text-xs text-foreground-muted mt-1">✨ XP Earned</p>
+        </div>
+      </div>
+
+      {done.length > 0 && (
+        <div className="card-elevated bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200 dark:from-yellow-950/20 dark:to-orange-950/20">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🌟</span>
+            <div>
+              <p className="font-semibold text-yellow-700 dark:text-yellow-400">
+                {done.length === 1
+                  ? "You earned your first achievement!"
+                  : `${done.length} achievements — you're building a legacy!`}
+              </p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-0.5">
+                {pick(ENCOURAGEMENT)}
+              </p>
+            </div>
           </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        {[
+          { key: "all", label: "All" },
+          { key: "done", label: "🏆 Completed" },
+          { key: "progress", label: "⚡ In Progress" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === f.key ? "bg-primary text-primary-foreground" : "bg-muted text-foreground-muted hover:bg-accent"}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && (
+        <div className="flex justify-center py-12">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {!loading && shown.length === 0 && (
+        <div className="text-center py-16 text-foreground-muted">
+          <FaTrophy className="text-5xl mx-auto mb-3 opacity-20" />
+          <p className="text-lg font-medium">No achievements yet</p>
+          <p className="text-sm mt-1">
+            Complete goals and activities to earn your first achievement!
+          </p>
           <button
             onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary mt-4 mx-auto flex items-center gap-2"
           >
             <FaPlus /> Add Achievement
           </button>
         </div>
+      )}
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="card-elevated text-center">
-            <p className="text-3xl font-black text-yellow-500">{done.length}</p>
-            <p className="text-xs text-foreground-muted mt-1">🏆 Completed</p>
-          </div>
-          <div className="card-elevated text-center">
-            <p className="text-3xl font-black text-primary">{inProg.length}</p>
-            <p className="text-xs text-foreground-muted mt-1">⚡ In Progress</p>
-          </div>
-          <div className="card-elevated text-center">
-            <p className="text-3xl font-black text-secondary">{totalXP}</p>
-            <p className="text-xs text-foreground-muted mt-1">✨ XP Earned</p>
-          </div>
-        </div>
-
-        {done.length > 0 && (
-          <div className="card-elevated bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200 dark:from-yellow-950/20 dark:to-orange-950/20">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🌟</span>
-              <div>
-                <p className="font-semibold text-yellow-700 dark:text-yellow-400">
-                  {done.length === 1
-                    ? "You earned your first achievement!"
-                    : `${done.length} achievements — you're building a legacy!`}
-                </p>
-                <p className="text-sm text-yellow-600 dark:text-yellow-500 mt-0.5">
-                  {pick(ENCOURAGEMENT)}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          {[
-            { key: "all", label: "All" },
-            { key: "done", label: "🏆 Completed" },
-            { key: "progress", label: "⚡ In Progress" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === f.key ? "bg-primary text-primary-foreground" : "bg-muted text-foreground-muted hover:bg-accent"}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {loading && (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-
-        {!loading && shown.length === 0 && (
-          <div className="text-center py-16 text-foreground-muted">
-            <FaTrophy className="text-5xl mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">No achievements yet</p>
-            <p className="text-sm mt-1">
-              Complete goals and activities to earn your first achievement!
-            </p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="btn-primary mt-4 mx-auto flex items-center gap-2"
-            >
-              <FaPlus /> Add Achievement
-            </button>
-          </div>
-        )}
-
-        {!loading && shown.length > 0 && (
-          <div className="grid md:grid-cols-2 gap-4">
-            {shown.map((a) => {
-              const cfg = TYPE_CONFIG[a.type] || TYPE_CONFIG.default;
-              const isDone = a.progress === 100;
-              return (
-                <div
-                  key={a._id}
-                  className={`relative rounded-2xl border p-5 transition-all hover:shadow-md ${cfg.bg}`}
-                >
-                  {/* Lock icon for completed */}
-                  {isDone && (
-                    <div className="absolute top-3 right-3 flex items-center gap-1">
-                      <span
-                        title="Completed — cannot be deleted"
-                        className="text-success opacity-60"
-                      >
-                        <FaLock className="w-3 h-3" />
-                      </span>
-                      <div className="w-7 h-7 bg-success rounded-full flex items-center justify-center">
-                        <FaCheck className="text-white w-3 h-3" />
-                      </div>
-                    </div>
-                  )}
-                  {!isDone && (
-                    <button
-                      onClick={() => del(a)}
-                      className="absolute top-3 right-3 text-foreground-muted hover:text-destructive p-1"
+      {!loading && shown.length > 0 && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {shown.map((a) => {
+            const cfg = TYPE_CONFIG[a.type] || TYPE_CONFIG.default;
+            const isDone = a.progress === 100;
+            return (
+              <div
+                key={a._id}
+                className={`relative rounded-2xl border p-5 transition-all hover:shadow-md ${cfg.bg}`}
+              >
+                {/* Lock icon for completed */}
+                {isDone && (
+                  <div className="absolute top-3 right-3 flex items-center gap-1">
+                    <span
+                      title="Completed — cannot be deleted"
+                      className="text-success opacity-60"
                     >
-                      <FaTimes className="w-3 h-3" />
-                    </button>
-                  )}
-
-                  <div className="flex items-start gap-3 mb-3 pr-10">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isDone ? "bg-yellow-400" : "bg-white/60"}`}
-                    >
-                      <cfg.icon
-                        className={`text-xl ${isDone ? "text-yellow-900" : cfg.color}`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold">{a.title}</h3>
-                      {a.description && (
-                        <p className="text-sm text-foreground-muted mt-0.5 line-clamp-2">
-                          {a.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium bg-white/60 ${cfg.color}`}
-                        >
-                          {cfg.label}
-                        </span>
-                        {a.autoGenerated && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-foreground-muted">
-                            Auto ✨
-                          </span>
-                        )}
-                        {a.linkedGoal && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-foreground-muted">
-                            🎯 {a.linkedGoal.title}
-                          </span>
-                        )}
-                      </div>
+                      <FaLock className="w-3 h-3" />
+                    </span>
+                    <div className="w-7 h-7 bg-success rounded-full flex items-center justify-center">
+                      <FaCheck className="text-white w-3 h-3" />
                     </div>
                   </div>
+                )}
+                {!isDone && (
+                  <button
+                    onClick={() => del(a)}
+                    className="absolute top-3 right-3 text-foreground-muted hover:text-destructive p-1"
+                  >
+                    <FaTimes className="w-3 h-3" />
+                  </button>
+                )}
 
-                  {a.progress < 100 && (
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-foreground-muted">Progress</span>
-                        <span className="font-medium">{a.progress}%</span>
-                      </div>
-                      <div className="w-full bg-white/60 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${cfg.color.replace("text-", "bg-")}`}
-                          style={{ width: `${a.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notes field */}
-                  {a.notes && (
-                    <div className="mb-3 p-2 bg-white/40 rounded-lg">
-                      <p className="text-xs text-foreground-muted italic">
-                        📝 {a.notes}
-                      </p>
-                    </div>
-                  )}
-
-                  <p className={`text-xs italic mt-2 ${cfg.color}`}>
-                    {pick(ENCOURAGEMENT)}
-                  </p>
-                  <p className="text-xs text-foreground-muted mt-2">
-                    {isDone ? "✅ Completed" : "⚡ In Progress"} ·{" "}
-                    {a.date
-                      ? new Date(a.date).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : ""}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Create Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
-            <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <FaTrophy className="text-yellow-500" /> New Achievement
-                  </h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Fields marked <span className="text-destructive">*</span>{" "}
-                    are required
-                  </p>
-                </div>
-                <button onClick={() => setShowModal(false)}>
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium text-foreground-muted">
-                    Title <span className="text-destructive">*</span>
-                  </label>
-                  <input
-                    placeholder="What did you achieve?"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, title: e.target.value }))
-                    }
-                    className="input-field mt-1"
-                    autoFocus
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-foreground-muted">
-                    Description
-                  </label>
-                  <textarea
-                    placeholder="Describe it..."
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, description: e.target.value }))
-                    }
-                    className="input-field min-h-[60px] mt-1"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-foreground-muted">
-                      Type <span className="text-destructive">*</span>
-                    </label>
-                    <select
-                      value={form.type}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, type: e.target.value }))
-                      }
-                      className="input-field mt-1"
-                    >
-                      <option value="Performance">🏆 Performance</option>
-                      <option value="Learning">📚 Learning</option>
-                      <option value="Consistency">🔥 Consistency</option>
-                      <option value="Leadership">👑 Leadership</option>
-                      <option value="Personal">💛 Personal</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-foreground-muted">
-                      Achievement Date{" "}
-                      <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={form.date}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, date: e.target.value }))
-                      }
-                      className="input-field mt-1"
+                <div className="flex items-start gap-3 mb-3 pr-10">
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isDone ? "bg-yellow-400" : "bg-white/60"}`}
+                  >
+                    <cfg.icon
+                      className={`text-xl ${isDone ? "text-yellow-900" : cfg.color}`}
                     />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold">{a.title}</h3>
+                    {a.description && (
+                      <p className="text-sm text-foreground-muted mt-0.5 line-clamp-2">
+                        {a.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium bg-white/60 ${cfg.color}`}
+                      >
+                        {cfg.label}
+                      </span>
+                      {a.autoGenerated && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-foreground-muted">
+                          Auto ✨
+                        </span>
+                      )}
+                      {a.linkedGoal && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/60 text-foreground-muted">
+                          🎯 {a.linkedGoal.title}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {a.progress < 100 && (
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-foreground-muted">Progress</span>
+                      <span className="font-medium">{a.progress}%</span>
+                    </div>
+                    <div className="w-full bg-white/60 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${cfg.color.replace("text-", "bg-")}`}
+                        style={{ width: `${a.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes field */}
+                {a.notes && (
+                  <div className="mb-3 p-2 bg-white/40 rounded-lg">
+                    <p className="text-xs text-foreground-muted italic">
+                      📝 {a.notes}
+                    </p>
+                  </div>
+                )}
+
+                <p className={`text-xs italic mt-2 ${cfg.color}`}>
+                  {pick(ENCOURAGEMENT)}
+                </p>
+                <p className="text-xs text-foreground-muted mt-2">
+                  {isDone ? "✅ Completed" : "⚡ In Progress"} ·{" "}
+                  {a.date
+                    ? new Date(a.date).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : ""}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-foreground/50 flex items-start justify-center z-50 p-4 pt-8 overflow-y-auto">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-md my-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <FaTrophy className="text-yellow-500" /> New Achievement
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Fields marked <span className="text-destructive">*</span> are
+                  required
+                </p>
+              </div>
+              <button onClick={() => setShowModal(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-foreground-muted">
+                  Title <span className="text-destructive">*</span>
+                </label>
+                <input
+                  placeholder="What did you achieve?"
+                  value={form.title}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, title: e.target.value }))
+                  }
+                  className="input-field mt-1"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground-muted">
+                  Description
+                </label>
+                <textarea
+                  placeholder="Describe it..."
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, description: e.target.value }))
+                  }
+                  className="input-field min-h-[60px] mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-foreground-muted">
+                    Type <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={form.type}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, type: e.target.value }))
+                    }
+                    className="input-field mt-1"
+                  >
+                    <option value="Performance">🏆 Performance</option>
+                    <option value="Learning">📚 Learning</option>
+                    <option value="Consistency">🔥 Consistency</option>
+                    <option value="Leadership">👑 Leadership</option>
+                    <option value="Personal">💛 Personal</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-foreground-muted">
-                    Notes <span className="opacity-50">(optional)</span>
+                    Achievement Date <span className="text-destructive">*</span>
                   </label>
-                  <textarea
-                    placeholder="Any additional notes, reflections, or context..."
-                    value={form.notes}
+                  <input
+                    type="date"
+                    value={form.date}
                     onChange={(e) =>
-                      setForm((p) => ({ ...p, notes: e.target.value }))
+                      setForm((p) => ({ ...p, date: e.target.value }))
                     }
-                    className="input-field min-h-[60px] mt-1"
+                    className="input-field mt-1"
                   />
                 </div>
-                <button
-                  onClick={create}
-                  disabled={saving || !form.title.trim()}
-                  className="btn-primary w-full disabled:opacity-50 py-3"
-                >
-                  {saving ? "Adding..." : "🏆 Add Achievement"}
-                </button>
               </div>
+              <div>
+                <label className="text-xs font-medium text-foreground-muted">
+                  Notes <span className="opacity-50">(optional)</span>
+                </label>
+                <textarea
+                  placeholder="Any additional notes, reflections, or context..."
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, notes: e.target.value }))
+                  }
+                  className="input-field min-h-[60px] mt-1"
+                />
+              </div>
+              <button
+                onClick={create}
+                disabled={saving || !form.title.trim()}
+                className="btn-primary w-full disabled:opacity-50 py-3"
+              >
+                {saving ? "Adding..." : "🏆 Add Achievement"}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-    </DashboardLayout>
+        </div>
+      )}
+    </div>
   );
 }

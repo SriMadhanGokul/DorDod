@@ -1,1030 +1,821 @@
-import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  FaChartLine,
+  FaTrophy,
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaFire,
+  FaPen,
+  FaClipboardList,
+  FaCheck,
+  FaTimes,
+  FaRedo,
+} from "react-icons/fa";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
-import {
-  FaCheck,
-  FaFire,
-  FaTag,
-  FaShareAlt,
-  FaPlus,
-  FaTimes,
-  FaLock,
-} from "react-icons/fa";
-import { GrowthScoreSection } from "./GrowthScorePage";
 
-const QUOTES = [
-  "We don't become what we want. We become what we REPEAT.",
-  "Awareness first, then action.",
-  "Small daily actions done consistently create change.",
-  "What gets measured gets repeated.",
-  "Consistency over intensity.",
-];
-const getDailyQuote = () =>
-  QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
-
-const STATES = [
-  {
-    value: "Calm",
-    label: "Calm",
-    bg: "bg-green-100  text-green-700  border-green-300",
-    active: "bg-green-500  text-white border-green-500",
-  },
-  {
-    value: "Focused",
-    label: "Focused",
-    bg: "bg-blue-100   text-blue-700   border-blue-300",
-    active: "bg-blue-600   text-white border-blue-600",
-  },
-  {
-    value: "Stressed",
-    label: "Stressed",
-    bg: "bg-red-100    text-red-700    border-red-300",
-    active: "bg-red-500    text-white border-red-500",
-  },
-  {
-    value: "Distracted",
-    label: "Distracted",
-    bg: "bg-yellow-100 text-yellow-700 border-yellow-300",
-    active: "bg-yellow-500 text-white border-yellow-500",
-  },
-  {
-    value: "Energized",
-    label: "Energized",
-    bg: "bg-purple-100 text-purple-700 border-purple-300",
-    active: "bg-purple-500 text-white border-purple-500",
-  },
-];
-
-const SLOT_CONFIG = {
-  Morning: {
-    emoji: "🌅",
-    label: "Morning",
-    time: "Before 12 PM",
-    color: "text-amber-600",
-    bg: "bg-amber-50 border-amber-200",
-  },
-  Midday: {
-    emoji: "☀️",
-    label: "Midday",
-    time: "12 PM – 5 PM",
-    color: "text-orange-600",
-    bg: "bg-orange-50 border-orange-200",
-  },
-  Evening: {
-    emoji: "🌙",
-    label: "Evening",
-    time: "After 5 PM",
-    color: "text-indigo-600",
-    bg: "bg-indigo-50 border-indigo-200",
-  },
-};
-
-const REALIZATION_TAGS = [
-  "Avoidance",
-  "Clarity",
-  "Fear",
-  "Progress",
-  "Insight",
-  "Breakthrough",
-  "Pattern",
-  "Gratitude",
-];
-
-function AlignmentRing({ score, label }: { score: number; label: string }) {
-  const size = 130;
-  const r = 50;
-  const circ = 2 * Math.PI * r;
-  const off = circ - (Math.min(score, 100) / 100) * circ;
-  const color = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke="#e5e7eb"
-            strokeWidth={12}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={12}
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={off}
-            style={{ transition: "stroke-dashoffset 1s ease" }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-3xl font-black" style={{ color }}>
-            {score}
-          </p>
-          <p className="text-xs text-gray-400">/100</p>
-        </div>
-      </div>
-      <span
-        className={`mt-2 text-xs font-bold px-3 py-1 rounded-full ${score >= 70 ? "bg-green-100 text-green-700" : score >= 40 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"}`}
-      >
-        {label}
-      </span>
-    </div>
-  );
+interface DashboardMetrics {
+  alignmentScore: number;
+  alignmentTrend: number;
+  growthScore: number;
+  riskIndicator: number;
+  goalProgress: { completed: number; total: number };
+  habitCompletion: { completed: number; total: number };
+  habitCompletionRate: number;
+  reflectionCount: number;
+  capabilities: { completed: number; total: number };
+  achievements: { completed: number; total: number };
+  stats: {
+    activeGoals: number;
+    completedGoals: number;
+    totalGoals: number;
+    linkedHabits: number;
+    totalHabits: number;
+    completedHabitsToday: number;
+  };
+  checks: {
+    hasCheckedInToday: boolean;
+    hasReflectedToday: boolean;
+  };
 }
 
-function ScoreBar({
-  label,
-  score,
-  max,
-  color,
-  icon,
-  detail,
-}: {
-  label: string;
-  score: number;
-  max: number;
-  color: string;
-  icon: string;
-  detail: string;
-}) {
-  const isNeg = score < 0;
-  const pct = Math.round((Math.abs(score) / max) * 100);
-  return (
-    <div
-      className={`rounded-xl p-3 border ${isNeg ? "bg-red-50 border-red-100" : "border-gray-100"}`}
-      style={{ background: isNeg ? undefined : `${color}08` }}
-    >
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-          {icon} {label}
-        </span>
-        <span
-          className="text-sm font-black"
-          style={{ color: isNeg ? "#ef4444" : color }}
-        >
-          {isNeg ? score : score}/{isNeg ? -max : max}
-        </span>
-      </div>
-      <div className="w-full bg-gray-100 rounded-full h-2">
-        <div
-          className="h-2 rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: isNeg ? "#ef4444" : color }}
-        />
-      </div>
-      <p className="text-xs text-gray-400 mt-1">{detail}</p>
-    </div>
-  );
+interface DailyCheckIn {
+  _id?: string;
+  date: string;
+  mood: string;
+  energy: number;
+  focus: number;
+  completed: boolean;
+}
+
+interface DailyReflection {
+  _id?: string;
+  date: string;
+  title: string;
+  content: string;
+  completed: boolean;
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-  const quote = getDailyQuote();
-  const realRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [slots, setSlots] = useState<
-    { slot: string; state: string; note: string; time: string }[]
-  >([]);
-  const [usedSlots, setUsedSlots] = useState<string[]>([]);
-  const [currentSlot, setCurrentSlot] = useState<string>("Morning");
-  const [canCheckIn, setCanCheckIn] = useState(true);
-  const [selectedState, setSelectedState] = useState("");
-  const [noteText, setNoteText] = useState("");
-  const [showCheckInForm, setShowCheckInForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [alignScore, setAlignScore] = useState(0);
-  const [alignLabel, setAlignLabel] = useState("Misaligned");
-  const [awareness, setAwareness] = useState(0);
-  const [execution, setExecution] = useState(0);
-  const [penalty, setPenalty] = useState(0);
-  const [breakdown, setBreakdown] = useState<any>(null);
-
-  const [weeklyLoops, setWeeklyLoops] = useState<any[]>([]);
-  const [awarenessStreak, setStreak] = useState(0);
-  const [realization, setRealization] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [realizationSaved, setRealSaved] = useState(false);
-  const [savingReal, setSavingReal] = useState(false);
-  const [insight, setInsight] = useState<string | null>(null);
-  const [suggestedAction, setSuggested] = useState<{ text: string } | null>(
-    null,
-  );
-  const [, setLoopType] = useState("None");
-  const [todayActivity, setTodayActivity] = useState<any>(null);
-  const [guidanceDone, setGuidanceDone] = useState(false);
+  const navigate = useNavigate();
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showPostGuidance, setShowPG] = useState(false);
-  const [guidanceForm, setGuidanceForm] = useState({
-    goalUpdate: "",
-    behaviorSuggestion: "",
-    insight: "",
+  const [dailyCheckIn, setDailyCheckIn] = useState<DailyCheckIn | null>(null);
+  const [dailyReflection, setDailyReflection] =
+    useState<DailyReflection | null>(null);
+
+  // Check-in form states
+  const [showCheckInForm, setShowCheckInForm] = useState(false);
+  const [checkInForm, setCheckInForm] = useState({
+    mood: "neutral",
+    energy: 5,
+    focus: 5,
   });
 
+  // Reflection form states
+  const [showReflectionForm, setShowReflectionForm] = useState(false);
+  const [reflectionForm, setReflectionForm] = useState({
+    title: "",
+    content: "",
+  });
+  const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
+  const [submittingReflection, setSubmittingReflection] = useState(false);
+
   useEffect(() => {
-    if (!localStorage.getItem("onboarded")) {
-      window.location.href = "/onboarding";
-      return;
-    }
-    load();
+    loadDashboardData();
+    const interval = setInterval(loadDashboardData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  const load = async () => {
+  const loadDashboardData = async () => {
     try {
-      const [dashRes, slotRes, goalRes] = await Promise.all([
-        api.get("/checkin/dashboard"),
-        api.get("/checkin/slot-status"),
-        api.get("/goals"),
+      const [metricsRes, checkInRes, reflectionRes] = await Promise.all([
+        api
+          .get("/dashboard/metrics")
+          .catch(() => ({ data: { success: false } })),
+        api
+          .get("/daily-check-in/today")
+          .catch(() => ({ data: { success: false } })),
+        api
+          .get("/daily-reflection/today")
+          .catch(() => ({ data: { success: false } })),
       ]);
-      const d = dashRes.data.data;
-      setStreak(d.awarenessStreak || 0);
-      setWeeklyLoops(d.weeklyLoops || []);
-      if (d.alignmentScore) {
-        setAlignScore(d.alignmentScore.score || 0);
-        setAlignLabel(d.alignmentScore.label?.label || "Misaligned");
-        setAwareness(d.alignmentScore.awareness || 0);
-        setExecution(d.alignmentScore.execution || 0);
-        setPenalty(d.alignmentScore.penalty || 0);
-        setBreakdown(d.alignmentScore.detail || null);
+
+      if (metricsRes.data.success) {
+        setMetrics(metricsRes.data.data);
       }
-      if (d.todayCheckIn) {
-        const ci = d.todayCheckIn;
-        setSlots(ci.slots || []);
-        setRealization(ci.realization || "");
-        setSelectedTags(ci.realizationTags || []);
-        setGuidanceDone(ci.guidanceSessionDone || false);
-        if (ci.realization) setRealSaved(true);
-        if (ci.loopType && ci.loopType !== "None") setLoopType(ci.loopType);
+      if (checkInRes.data.success) {
+        setDailyCheckIn(checkInRes.data.data);
       }
-      const s = slotRes.data.data;
-      setUsedSlots(s.usedSlots || []);
-      setCurrentSlot(s.currentSlot || "Morning");
-      setCanCheckIn(s.canCheckIn);
-      const activeGoals = (goalRes.data.data || []).filter(
-        (g: any) => g.status === "In Progress",
-      );
-      if (activeGoals.length > 0) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const firstGoal = activeGoals[0];
-        const todayDay = firstGoal.dayActivities?.find(
-          (d: any) => d.dueDate?.slice(0, 10) === todayStr,
-        );
-        if (todayDay) setTodayActivity({ goal: firstGoal, day: todayDay });
+      if (reflectionRes.data.success) {
+        setDailyReflection(reflectionRes.data.data);
       }
-    } catch {
-      toast.error("Failed to load dashboard");
+    } catch (err: any) {
+      console.error("Dashboard error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCheckIn = async () => {
-    if (!selectedState) return toast.error("Select your current state first");
-    setSaving(true);
+  const submitCheckIn = async () => {
+    setSubmittingCheckIn(true);
     try {
-      const res = await api.post("/checkin", {
-        dailyState: selectedState,
-        note: noteText,
-        avoidingText: noteText,
+      const res = await api.post("/daily-check-in", {
+        mood: checkInForm.mood,
+        energy: checkInForm.energy,
+        focus: checkInForm.focus,
       });
-      const d = res.data.data;
-      setSlots((prev) => [
-        ...prev,
-        {
-          slot: d.currentSlot || currentSlot,
-          state: selectedState,
-          note: noteText,
-          time: new Date().toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
-      setUsedSlots((prev) => [...prev, d.currentSlot || currentSlot]);
-      if (d.alignmentBreakdown) {
-        setAlignScore(d.alignmentBreakdown.score || 0);
-        setAlignLabel(d.alignmentLabel?.label || "Misaligned");
-        setAwareness(d.alignmentBreakdown.awareness || 0);
-        setExecution(d.alignmentBreakdown.execution || 0);
-        setPenalty(d.alignmentBreakdown.penalty || 0);
-        setBreakdown(d.alignmentBreakdown.detail || null);
+      if (res.data.success) {
+        setDailyCheckIn(res.data.data);
+        setShowCheckInForm(false);
+        toast.success("Check-in saved! 📊");
       }
-      if (d.insight) setInsight(d.insight);
-      if (d.suggestedAction) setSuggested(d.suggestedAction);
-      if (d.checkIn?.loopType) setLoopType(d.checkIn.loopType);
-      const slotRes = await api.get("/checkin/slot-status");
-      const s = slotRes.data.data;
-      setUsedSlots(s.usedSlots || []);
-      setCurrentSlot(s.currentSlot || "Morning");
-      setCanCheckIn(s.canCheckIn);
-      setSelectedState("");
-      setNoteText("");
-      setShowCheckInForm(false);
-      const dashRes = await api.get("/checkin/dashboard");
-      setStreak(dashRes.data.data.awarenessStreak || 0);
-      setWeeklyLoops(dashRes.data.data.weeklyLoops || []);
-      toast.success(`✅ ${d.currentSlot || currentSlot} check-in saved!`);
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed to save check-in");
+    } catch (err: any) {
+      toast.error("Failed to save check-in");
     } finally {
-      setSaving(false);
+      setSubmittingCheckIn(false);
     }
   };
 
-  const handleRealizationChange = (val: string) => {
-    setRealization(val);
-    setRealSaved(false);
-    if (realRef.current) clearTimeout(realRef.current);
-    if (val.trim().length > 5 && slots.length > 0) {
-      realRef.current = setTimeout(
-        () => doSaveRealization(val, selectedTags),
-        2000,
-      );
+  const submitReflection = async () => {
+    if (!reflectionForm.title.trim() || !reflectionForm.content.trim()) {
+      toast.error("Please fill in all fields");
+      return;
     }
-  };
 
-  const doSaveRealization = async (text: string, tags: string[]) => {
-    if (!text.trim() || slots.length === 0) return;
-    setSavingReal(true);
+    setSubmittingReflection(true);
     try {
-      const res = await api.patch("/checkin/realization", {
-        realization: text,
-        realizationTags: tags,
+      const res = await api.post("/daily-reflection", {
+        title: reflectionForm.title,
+        content: reflectionForm.content,
       });
-      setRealSaved(true);
-      if (res.data.newScore) {
-        setAlignScore(res.data.newScore.score);
-        setAlignLabel(res.data.newScore.label?.label || "");
-        setAwareness(res.data.newScore.awareness);
-        setExecution(res.data.newScore.execution);
-        setPenalty(res.data.newScore.penalty);
+      if (res.data.success) {
+        setDailyReflection(res.data.data);
+        setShowReflectionForm(false);
+        setReflectionForm({ title: "", content: "" });
+        toast.success("Reflection saved! 📝");
       }
-    } catch {
+    } catch (err: any) {
+      toast.error("Failed to save reflection");
     } finally {
-      setSavingReal(false);
+      setSubmittingReflection(false);
     }
   };
 
-  const handleCompleteActivity = async () => {
-    if (!todayActivity) return;
-    try {
-      await api.patch(
-        `/goals/${todayActivity.goal._id}/day/${todayActivity.day.dayNumber}/complete`,
-      );
-      setTodayActivity((p: any) =>
-        p ? { ...p, day: { ...p.day, status: "Completed" } } : p,
-      );
-      const dashRes = await api.get("/checkin/dashboard");
-      const scoreData = dashRes.data.data.alignmentScore;
-      if (scoreData) {
-        setAlignScore(scoreData.score || 0);
-        setExecution(scoreData.execution || 0);
-        setPenalty(scoreData.penalty || 0);
-        setBreakdown(scoreData.detail || null);
-      }
-      toast.success("✅ Activity completed! Score updated.");
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || "Failed");
-    }
+  const getRiskLevel = (risk: number) => {
+    if (risk >= 70)
+      return { text: "High Risk ⚠️", color: "text-red-600", bg: "bg-red-50" };
+    if (risk >= 40)
+      return {
+        text: "Medium Risk",
+        color: "text-yellow-600",
+        bg: "bg-yellow-50",
+      };
+    return { text: "Low Risk ✅", color: "text-green-600", bg: "bg-green-50" };
   };
 
-  const toggleTag = (tag: string) => {
-    const newTags = selectedTags.includes(tag)
-      ? selectedTags.filter((t) => t !== tag)
-      : [...selectedTags, tag];
-    setSelectedTags(newTags);
-    if (realization.trim().length > 5) doSaveRealization(realization, newTags);
+  const getAlignmentStatus = (score: number) => {
+    if (score >= 80)
+      return { text: "Aligned", color: "text-green-600", bg: "bg-green-50" };
+    if (score >= 60)
+      return { text: "Progressing", color: "text-blue-600", bg: "bg-blue-50" };
+    if (score >= 40)
+      return {
+        text: "Developing",
+        color: "text-yellow-600",
+        bg: "bg-yellow-50",
+      };
+    return { text: "Unaligned", color: "text-red-600", bg: "bg-red-50" };
   };
 
-  const handleShare = () => {
-    const text = `"${realization || insight}" — Alignment: ${alignScore}/100 #DoRDoD`;
-    if (navigator.share) navigator.share({ text }).catch(() => {});
-    else {
-      navigator.clipboard.writeText(text);
-      toast.success("Copied!");
-    }
+  const getMoodEmoji = (mood: string) => {
+    const moodMap: Record<string, string> = {
+      great: "😄",
+      good: "🙂",
+      neutral: "😐",
+      bad: "😟",
+      terrible: "😞",
+    };
+    return moodMap[mood] || "😐";
   };
 
-  const allSlotsUsed = usedSlots.length >= 3;
-  const hasDoneAnyCheckIn = slots.length > 0;
-
-  if (loading)
+  if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+          <p className="text-gray-600 text-sm">Loading dashboard...</p>
         </div>
-      </DashboardLayout>
+      </div>
     );
+  }
+
+  const alignmentStatus = getAlignmentStatus(metrics?.alignmentScore || 0);
+  const riskLevel = getRiskLevel(metrics?.riskIndicator || 0);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-5 animate-fade-in max-w-6xl mx-auto">
-        {/* ── PAGE TITLE ─────────────────────────────────────────────────── */}
-        
+    <div className="space-y-6 pb-10">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Who Am I Becoming?
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Track your daily alignment and long-term growth
+          </p>
+        </div>
+        <button
+          onClick={loadDashboardData}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          <FaRedo className="text-sm" />
+          Refresh
+        </button>
+      </div>
 
-        {/* Greeting */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              Good{" "}
-              {new Date().getHours() < 12
-                ? "Morning"
-                : new Date().getHours() < 17
-                  ? "Afternoon"
-                  : "Evening"}
-              , {(user as any)?.name?.split(" ")[0]} 👋
+      {/* Daily Check-In & Reflection */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Daily Check-In */}
+        <div
+          className={`rounded-2xl border p-6 ${
+            dailyCheckIn?.completed
+              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+              : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <FaClipboardList
+              className={
+                dailyCheckIn?.completed ? "text-green-600" : "text-blue-600"
+              }
+            />
+            <h2 className="font-bold text-gray-900 dark:text-white">
+              Daily Check-In
             </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Here's your alignment overview
-            </p>
           </div>
-          {awarenessStreak > 0 && (
-            <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-full">
-              <FaFire className="text-orange-500 w-3.5 h-3.5" />
-              <span className="text-sm font-bold text-orange-600">
-                {awarenessStreak}d streak
-              </span>
-            </div>
-          )}
-        </div>
 
-        {/* ── ALIGNMENT SCORE ─────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-bold text-gray-900 text-lg">
-                Alignment Score
-              </h2>
-              <p className="text-xs text-gray-400">
-                Based on what you repeat daily
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <AlignmentRing score={alignScore} label={alignLabel} />
-            <div className="flex-1 space-y-2.5 w-full">
-              <ScoreBar
-                label="Awareness"
-                score={awareness}
-                max={30}
-                color="#3b82f6"
-                icon="🧠"
-                detail={
-                  breakdown?.checkInDone
-                    ? `✓ Check-in done${breakdown?.reflectionDone ? " · ✓ Reflection added" : " · Add reflection for +10"}`
-                    : "Check in to earn +20"
-                }
-              />
-              <ScoreBar
-                label="Execution"
-                score={execution}
-                max={70}
-                color="#22c55e"
-                icon="⚡"
-                detail={`${breakdown?.completed || 0} of ${breakdown?.totalActivities || 21} activities completed on time`}
-              />
-              <ScoreBar
-                label="Penalty"
-                score={Math.abs(penalty)}
-                max={30}
-                color="#ef4444"
-                icon="⚠️"
-                detail={
-                  penalty < 0
-                    ? `${penalty} applied — ${!breakdown?.reflectionDone ? "No reflection (-10)" : ""}${breakdown?.missedToday ? " Missed today (-5)" : ""}`
-                    : "No penalties today 🎉"
-                }
-              />
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-2 flex-wrap text-xs text-gray-500">
-            <span className="font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">
-              Awareness {awareness}/30
-            </span>
-            <span>+</span>
-            <span className="font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-              Execution {execution}/70
-            </span>
-            <span>−</span>
-            <span className="font-bold text-red-500 bg-red-50 px-2 py-1 rounded-lg">
-              Penalty {Math.abs(penalty)}/30
-            </span>
-            <span>=</span>
-            <span className="font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-lg">
-              {alignScore}/100
-            </span>
-          </div>
-        </div>
-
-        {/* ── DAILY CHECK-IN — 3 SLOTS ─────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-bold text-gray-900">Daily Check-In</h2>
-              <p className="text-xs text-gray-400">
-                Up to 3 times per day — Morning, Midday, Evening
-              </p>
-            </div>
-            <span
-              className={`text-xs font-bold px-3 py-1.5 rounded-full ${allSlotsUsed ? "bg-green-100 text-green-700" : "bg-indigo-100 text-indigo-700"}`}
+          {!dailyCheckIn?.completed && !showCheckInForm ? (
+            <button
+              onClick={() => setShowCheckInForm(true)}
+              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
             >
-              {slots.length}/3 done
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {(["Morning", "Midday", "Evening"] as const).map((slotName) => {
-              const cfg = SLOT_CONFIG[slotName];
-              const doneSlot = slots.find((s) => s.slot === slotName);
-              const isUsed = usedSlots.includes(slotName);
-              const isCurrent = currentSlot === slotName && !isUsed;
-              return (
-                <div
-                  key={slotName}
-                  className={`rounded-xl p-3 border-2 text-center transition-all ${isUsed ? "bg-green-50 border-green-300" : isCurrent ? `${cfg.bg} border-current` : "bg-gray-50 border-gray-100 opacity-60"}`}
+              Start Check-In
+            </button>
+          ) : showCheckInForm ? (
+            <div className="space-y-4">
+              {/* Mood */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  How's your mood today? {getMoodEmoji(checkInForm.mood)}
+                </label>
+                <select
+                  value={checkInForm.mood}
+                  onChange={(e) =>
+                    setCheckInForm({ ...checkInForm, mood: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <p className="text-xl mb-1">{cfg.emoji}</p>
-                  <p
-                    className={`text-xs font-bold ${isUsed ? "text-green-700" : cfg.color}`}
-                  >
-                    {cfg.label}
-                  </p>
-                  <p className="text-xs text-gray-400">{cfg.time}</p>
-                  {isUsed && doneSlot ? (
-                    <div className="mt-2">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-1">
-                        <FaCheck className="text-white w-2.5 h-2.5" />
-                      </div>
-                      <p className="text-xs font-semibold text-green-700">
-                        {doneSlot.state}
-                      </p>
-                      {doneSlot.time && (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {doneSlot.time}
-                        </p>
-                      )}
-                    </div>
-                  ) : isCurrent ? (
-                    <div className="mt-2">
-                      <div className="w-5 h-5 border-2 border-current rounded-full mx-auto flex items-center justify-center">
-                        <FaPlus className="w-2 h-2" />
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Available</p>
-                    </div>
-                  ) : isUsed ? null : (
-                    <div className="mt-2">
-                      <FaLock className="w-4 h-4 text-gray-300 mx-auto" />
-                      <p className="text-xs text-gray-300 mt-1">Not yet</p>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {slots.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-xl">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Today's Check-ins
-              </p>
-              <div className="space-y-1.5">
-                {slots.map((s, i) => {
-                  const cfg = SLOT_CONFIG[s.slot as keyof typeof SLOT_CONFIG];
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <span>{cfg?.emoji}</span>
-                      <span className="font-medium text-gray-700">
-                        {s.slot}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${["Calm", "Focused", "Energized"].includes(s.state) ? "bg-green-100 text-green-700" : ["Stressed", "Distracted"].includes(s.state) ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}
-                      >
-                        {s.state}
-                      </span>
-                      {s.time && (
-                        <span className="text-xs text-gray-400">{s.time}</span>
-                      )}
-                      {s.note && (
-                        <span className="text-xs text-gray-400 italic truncate">
-                          — "{s.note}"
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                  <option value="great">Great 😄</option>
+                  <option value="good">Good 🙂</option>
+                  <option value="neutral">Neutral 😐</option>
+                  <option value="bad">Bad 😟</option>
+                  <option value="terrible">Terrible 😞</option>
+                </select>
               </div>
-            </div>
-          )}
 
-          {!allSlotsUsed && canCheckIn && (
-            <>
-              {!showCheckInForm ? (
+              {/* Energy */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Energy Level
+                  </label>
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {checkInForm.energy}/10
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={checkInForm.energy}
+                  onChange={(e) =>
+                    setCheckInForm({
+                      ...checkInForm,
+                      energy: parseInt(e.target.value),
+                    })
+                  }
+                  className="w-full h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              {/* Focus */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Focus Level
+                  </label>
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {checkInForm.focus}/10
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={checkInForm.focus}
+                  onChange={(e) =>
+                    setCheckInForm({
+                      ...checkInForm,
+                      focus: parseInt(e.target.value),
+                    })
+                  }
+                  className="w-full h-2 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-2 pt-2">
                 <button
-                  onClick={() => setShowCheckInForm(true)}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                  onClick={submitCheckIn}
+                  disabled={submittingCheckIn}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
                 >
-                  <FaPlus className="w-3 h-3" /> Check in for {currentSlot}
-                  <span className="text-xs opacity-80">
-                    (
-                    {SLOT_CONFIG[currentSlot as keyof typeof SLOT_CONFIG]?.time}
-                    )
-                  </span>
+                  {submittingCheckIn ? "Saving..." : "Save Check-In"}
                 </button>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-700">
-                      {
-                        SLOT_CONFIG[currentSlot as keyof typeof SLOT_CONFIG]
-                          ?.emoji
-                      }{" "}
-                      {currentSlot} — How are you feeling?
-                    </p>
-                    <button
-                      onClick={() => {
-                        setShowCheckInForm(false);
-                        setSelectedState("");
-                        setNoteText("");
-                      }}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <FaTimes className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {STATES.map((s) => (
-                      <button
-                        key={s.value}
-                        onClick={() => setSelectedState(s.value)}
-                        className={`px-4 py-2 rounded-full border-2 font-medium text-sm transition-all hover:scale-105 ${selectedState === s.value ? s.active : s.bg}`}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                  {selectedState && (
-                    <input
-                      placeholder="Add a note (optional)"
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                    />
-                  )}
-                  <button
-                    onClick={handleCheckIn}
-                    disabled={saving || !selectedState}
-                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
-                  >
-                    {saving ? "Saving..." : "Save Check-in"}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {allSlotsUsed && (
-            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shrink-0">
-                <FaCheck className="text-white w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-green-800">
-                  All 3 check-ins completed today! 🎉
-                </p>
-                <p className="text-xs text-green-600">
-                  Come back tomorrow for your next check-in.
-                </p>
+                <button
+                  onClick={() => setShowCheckInForm(false)}
+                  className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-colors text-sm"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-          )}
-
-          {!allSlotsUsed && !canCheckIn && (
-            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-              <FaLock className="text-amber-500 w-4 h-4 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-amber-800">
-                  {usedSlots.includes("Morning") &&
-                  !usedSlots.includes("Midday")
-                    ? "Midday check-in opens at 12 PM"
-                    : usedSlots.includes("Midday") &&
-                        !usedSlots.includes("Evening")
-                      ? "Evening check-in opens at 5 PM"
-                      : "No check-in slot available right now"}
-                </p>
-                <p className="text-xs text-amber-600">
-                  Missed slots cannot be filled later.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── TODAY'S ACTIONS ──────────────────────────────────────────────── */}
-        {hasDoneAnyCheckIn && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="font-bold text-gray-900 mb-4">Today's Actions</h2>
-            <div className="space-y-2">
-              <div
-                className={`flex items-center justify-between p-3 rounded-xl ${hasDoneAnyCheckIn ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${hasDoneAnyCheckIn ? "bg-green-500" : "bg-gray-200"}`}
-                  >
-                    {hasDoneAnyCheckIn ? (
-                      <FaCheck className="text-white w-3.5 h-3.5" />
-                    ) : (
-                      <span>📋</span>
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-gray-800">
-                    Daily Check-In ({slots.length}/3 slots)
-                  </span>
-                </div>
-                <span className="text-xs text-green-600 font-semibold">
-                  {slots.length} done
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Mood
+                </span>
+                <span className="text-2xl">
+                  {getMoodEmoji(dailyCheckIn?.mood || "neutral")}
                 </span>
               </div>
-              <div
-                className={`flex items-center justify-between p-3 rounded-xl ${realizationSaved ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
-              >
-                <div className="flex items-center gap-3">
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Energy
+                  </span>
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {dailyCheckIn?.energy}/10
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${realizationSaved ? "bg-green-500" : "bg-gray-200"}`}
-                  >
-                    {realizationSaved ? (
-                      <FaCheck className="text-white w-3.5 h-3.5" />
-                    ) : (
-                      <span>📝</span>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-medium ${realizationSaved ? "line-through text-gray-400" : "text-gray-800"}`}
-                  >
-                    Daily Reflection
+                    className="h-full bg-blue-600"
+                    style={{
+                      width: `${((dailyCheckIn?.energy || 0) / 10) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Focus
+                  </span>
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                    {dailyCheckIn?.focus}/10
                   </span>
                 </div>
-                {!realizationSaved ? (
-                  <button
-                    onClick={() =>
-                      document.getElementById("reflection-box")?.focus()
-                    }
-                    className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg"
-                  >
-                    Write reflection
-                  </button>
-                ) : (
-                  <span className="text-xs text-green-600 font-semibold">
-                    ✓ Completed
-                  </span>
-                )}
-              </div>
-              {todayActivity && (
-                <div
-                  className={`flex items-center justify-between p-3 rounded-xl ${todayActivity.day.status === "Completed" ? "bg-green-50 border border-green-100" : "bg-gray-50"}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${todayActivity.day.status === "Completed" ? "bg-green-500" : "bg-gray-200"}`}
-                    >
-                      {todayActivity.day.status === "Completed" ? (
-                        <FaCheck className="text-white w-3.5 h-3.5" />
-                      ) : (
-                        <span>⚡</span>
-                      )}
-                    </div>
-                    <div>
-                      <span
-                        className={`text-sm font-medium ${todayActivity.day.status === "Completed" ? "line-through text-gray-400" : "text-gray-800"}`}
-                      >
-                        {todayActivity.day.title}
-                      </span>
-                      <p className="text-xs text-gray-400">
-                        {todayActivity.goal.title} — Day{" "}
-                        {todayActivity.day.dayNumber}/21
-                      </p>
-                    </div>
-                  </div>
-                  {todayActivity.day.status === "Completed" ? (
-                    <span className="text-xs text-green-600 font-semibold">
-                      ✓ Done
-                    </span>
-                  ) : (
-                    <button
-                      onClick={handleCompleteActivity}
-                      className="text-xs font-semibold text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg transition-all"
-                    >
-                      ✓ Mark Done
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            <p className="text-sm text-center text-gray-400 italic mt-4">
-              {alignScore >= 70
-                ? "🌟 You're aligned! Keep going!"
-                : alignScore >= 40
-                  ? "👍 You're improving. Keep it up!"
-                  : "💪 Every action counts. Start with one step."}
-            </p>
-          </div>
-        )}
-
-        {/* ── INSIGHT ─────────────────────────────────────────────────────── */}
-        {hasDoneAnyCheckIn && insight && (
-          <div className="bg-white rounded-2xl border-l-4 border-indigo-400 shadow-sm p-5">
-            <p className="text-xs font-bold text-indigo-400 uppercase tracking-wide mb-2">
-              💡 Today's Insight
-            </p>
-            <p className="text-sm text-gray-700 leading-relaxed">{insight}</p>
-            {suggestedAction && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <p className="text-xs text-blue-600 font-semibold mb-0.5">
-                  ⚡ Suggested Action
-                </p>
-                <p className="text-sm text-blue-800">{suggestedAction.text}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── REFLECTION ──────────────────────────────────────────────────── */}
-        {hasDoneAnyCheckIn && (
-          <div
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"
-            style={{ background: "linear-gradient(135deg,#faf5ff,#f0fdf4)" }}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-gray-900">📝 Daily Reflection</h2>
-              <div className="text-xs text-gray-400">
-                {savingReal ? (
-                  "Saving..."
-                ) : realizationSaved ? (
-                  <span className="text-green-600">✓ Saved to Insights</span>
-                ) : (
-                  "Auto-saves as you type"
-                )}
-              </div>
-            </div>
-            {!realizationSaved && !breakdown?.reflectionDone && (
-              <div className="flex items-center gap-2 mb-3 p-2.5 bg-amber-50 border border-amber-100 rounded-xl">
-                <span>⚠️</span>
-                <p className="text-xs text-amber-700">
-                  No reflection added yet. Adding one removes the −10 penalty
-                  and adds +10 awareness.
-                </p>
-              </div>
-            )}
-            <textarea
-              id="reflection-box"
-              placeholder="Write your realization... (auto-saves)"
-              value={realization}
-              onChange={(e) => handleRealizationChange(e.target.value)}
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 bg-white/80"
-            />
-            {realization.trim().length > 5 && (
-              <div className="mt-3">
-                <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                  <FaTag className="w-3 h-3" /> Tag:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {REALIZATION_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => toggleTag(tag)}
-                      className={`text-xs px-3 py-1 rounded-full border transition-all ${selectedTags.includes(tag) ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-gray-200 text-gray-500 hover:border-indigo-300"}`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600"
+                    style={{
+                      width: `${((dailyCheckIn?.focus || 0) / 10) * 100}%`,
+                    }}
+                  />
                 </div>
               </div>
-            )}
-            {realization.trim() && (
-              <div className="flex justify-between items-center mt-3">
-                <button
-                  onClick={() => setShowPG((p) => !p)}
-                  className="text-xs text-indigo-500 hover:underline"
-                >
-                  📝 Had a Guidance session? →
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg"
-                >
-                  <FaShareAlt className="w-3 h-3" /> Share
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── POST-GUIDANCE ─────────────────────────────────────────────── */}
-        {showPostGuidance && !guidanceDone && hasDoneAnyCheckIn && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h3 className="font-bold mb-3 text-gray-900">
-              After Guidance — Update Your System
-            </h3>
-            <div className="space-y-3">
-              <input
-                placeholder="🎯 Intent update"
-                value={guidanceForm.goalUpdate}
-                onChange={(e) =>
-                  setGuidanceForm((p) => ({ ...p, goalUpdate: e.target.value }))
-                }
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-              />
-              <input
-                placeholder="🔥 Behavior to try"
-                value={guidanceForm.behaviorSuggestion}
-                onChange={(e) =>
-                  setGuidanceForm((p) => ({
-                    ...p,
-                    behaviorSuggestion: e.target.value,
-                  }))
-                }
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-              />
-              <textarea
-                placeholder="💡 Key insight"
-                value={guidanceForm.insight}
-                onChange={(e) =>
-                  setGuidanceForm((p) => ({ ...p, insight: e.target.value }))
-                }
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm min-h-[60px] resize-none focus:outline-none"
-              />
               <button
-                onClick={async () => {
-                  try {
-                    await api.post("/checkin/guidance-update", guidanceForm);
-                    setGuidanceDone(true);
-                    setShowPG(false);
-                    toast.success("✅ System updated!");
-                  } catch {
-                    toast.error("Failed");
-                  }
-                }}
-                className="w-full bg-indigo-600 text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700"
+                onClick={() => setShowCheckInForm(true)}
+                className="w-full py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg font-semibold transition-colors text-sm"
               >
-                ✅ Record Update
+                Edit Check-In
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* ── WEEKLY PATTERNS ──────────────────────────────────────────────── */}
-        {weeklyLoops.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="font-bold text-gray-900 mb-3">
-              This Week's Patterns
+        {/* Daily Reflection */}
+        <div
+          className={`rounded-2xl border p-6 ${
+            dailyReflection?.completed
+              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+              : "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <FaPen
+              className={
+                dailyReflection?.completed
+                  ? "text-green-600"
+                  : "text-purple-600"
+              }
+            />
+            <h2 className="font-bold text-gray-900 dark:text-white">
+              Daily Reflection
             </h2>
-            <div className="space-y-2">
-              {weeklyLoops.map((loop, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center justify-between p-3 rounded-xl border ${loop.severity === "High" ? "bg-red-50 border-red-100" : loop.severity === "Medium" ? "bg-amber-50 border-amber-100" : "bg-yellow-50 border-yellow-100"}`}
-                >
-                  <p
-                    className={`text-sm font-medium ${loop.severity === "High" ? "text-red-700" : loop.severity === "Medium" ? "text-amber-700" : "text-yellow-700"}`}
-                  >
-                    {loop.pattern}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${loop.severity === "High" ? "bg-red-100 text-red-600" : loop.severity === "Medium" ? "bg-amber-100 text-amber-600" : "bg-yellow-100 text-yellow-600"}`}
-                    >
-                      {loop.severity}
-                    </span>
-                    <span className="text-xs font-bold text-gray-600">
-                      {loop.count}×
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
 
-        {/* ── QUOTE ───────────────────────────────────────────────────────── */}
-        <div className="bg-indigo-600 rounded-2xl p-6 text-center">
-          <p className="text-white font-semibold text-base leading-relaxed">
-            "{quote}"
+          {!dailyReflection?.completed && !showReflectionForm ? (
+            <button
+              onClick={() => setShowReflectionForm(true)}
+              className="w-full py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Write Reflection
+            </button>
+          ) : showReflectionForm ? (
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Reflection title..."
+                value={reflectionForm.title}
+                onChange={(e) =>
+                  setReflectionForm({
+                    ...reflectionForm,
+                    title: e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <textarea
+                placeholder="What did you learn today? What went well? What could improve?..."
+                value={reflectionForm.content}
+                onChange={(e) =>
+                  setReflectionForm({
+                    ...reflectionForm,
+                    content: e.target.value,
+                  })
+                }
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={submitReflection}
+                  disabled={submittingReflection}
+                  className="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
+                >
+                  {submittingReflection ? "Saving..." : "Save Reflection"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReflectionForm(false);
+                    setReflectionForm({ title: "", content: "" });
+                  }}
+                  className="flex-1 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                  {dailyReflection?.title}
+                </h4>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-3">
+                  {dailyReflection?.content}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowReflectionForm(true)}
+                className="w-full py-2 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg font-semibold transition-colors text-sm"
+              >
+                Edit Reflection
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Alignment Score */}
+        <div
+          className={`rounded-2xl p-4 border ${alignmentStatus.bg} border-opacity-40`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Alignment Score
+            </p>
+            <span className="text-lg">🎯</span>
+          </div>
+          <p className={`text-3xl font-black ${alignmentStatus.color}`}>
+            {metrics?.alignmentScore || 0}
+          </p>
+          <p className={`text-xs mt-2 ${alignmentStatus.color}`}>
+            {alignmentStatus.text}
           </p>
         </div>
 
-        {/* ── GROWTH SCORE SECTION (merged in below overview) ──────────────── */}
-        <div className="pt-2 border-t border-gray-100">
-          <GrowthScoreSection />
+        {/* Alignment Trend */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Alignment Trend
+            </p>
+            <FaChartLine className="text-blue-600" />
+          </div>
+          <p className="text-3xl font-black text-blue-600 dark:text-blue-400">
+            {metrics?.alignmentTrend || 0}
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            30-day avg
+          </p>
+        </div>
+
+        {/* Growth Score */}
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl p-4 border border-yellow-200 dark:border-yellow-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Growth Score
+            </p>
+            <FaTrophy className="text-yellow-600" />
+          </div>
+          <p className="text-3xl font-black text-yellow-600 dark:text-yellow-400">
+            {metrics?.growthScore || 0}
+          </p>
+          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+            Cumulative
+          </p>
+        </div>
+
+        {/* Risk Indicator */}
+        <div
+          className={`rounded-2xl p-4 border ${riskLevel.bg} border-opacity-40`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+              Risk Level
+            </p>
+            <FaExclamationTriangle className={riskLevel.color} />
+          </div>
+          <p className={`text-3xl font-black ${riskLevel.color}`}>
+            {metrics?.riskIndicator || 0}
+          </p>
+          <p className={`text-xs mt-2 ${riskLevel.color}`}>{riskLevel.text}</p>
         </div>
       </div>
-    </DashboardLayout>
+
+      {/* Score Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Left: Score Breakdown */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800">
+          <h3 className="font-bold text-gray-900 dark:text-white mb-4">
+            📊 Score Breakdown
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Goal Progress
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {metrics?.goalProgress.completed}/
+                  {metrics?.goalProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      metrics?.goalProgress.total
+                        ? (metrics.goalProgress.completed /
+                            metrics.goalProgress.total) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Habit Completion
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {metrics?.habitCompletion.completed}/
+                  {metrics?.habitCompletion.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      metrics?.habitCompletion.total
+                        ? (metrics.habitCompletion.completed /
+                            metrics.habitCompletion.total) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Habit Rate (7-day)
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {metrics?.habitCompletionRate || 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${metrics?.habitCompletionRate || 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Growth Breakdown */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800">
+          <h3 className="font-bold text-gray-900 dark:text-white mb-4">
+            🏆 Growth Breakdown
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Capabilities
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {metrics?.capabilities.completed}/
+                  {metrics?.capabilities.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      metrics?.capabilities.total
+                        ? (metrics.capabilities.completed /
+                            metrics.capabilities.total) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Achievements
+                </span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {metrics?.achievements.completed}/
+                  {metrics?.achievements.total}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-pink-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      metrics?.achievements.total
+                        ? (metrics.achievements.completed /
+                            metrics.achievements.total) *
+                          100
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>💡 Tip:</strong> Complete more goals and habits to boost
+                your growth score!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Goals Card */}
+        <button
+          onClick={() => navigate("/goals")}
+          className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all text-left hover:scale-105"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
+              Goals
+            </span>
+            <span className="text-lg">🎯</span>
+          </div>
+          <p className="text-2xl font-black text-blue-600 dark:text-blue-400">
+            {metrics?.stats.activeGoals || 0}
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            active • {metrics?.stats.completedGoals || 0} completed
+          </p>
+        </button>
+
+        {/* Habits Card */}
+        <button
+          onClick={() => navigate("/habits")}
+          className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 border border-green-200 dark:border-green-800 hover:shadow-lg transition-all text-left hover:scale-105"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-green-700 dark:text-green-300">
+              Habits
+            </span>
+            <FaFire className="text-green-600 text-lg" />
+          </div>
+          <p className="text-2xl font-black text-green-600 dark:text-green-400">
+            {metrics?.stats.completedHabitsToday || 0}
+          </p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+            today • {metrics?.stats.linkedHabits || 0} linked
+          </p>
+        </button>
+
+        {/* Execution Card */}
+        <button
+          onClick={() => navigate("/execution")}
+          className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-200 dark:border-amber-800 hover:shadow-lg transition-all text-left hover:scale-105"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
+              Execution
+            </span>
+            <span className="text-lg">🔥</span>
+          </div>
+          <p className="text-2xl font-black text-amber-600 dark:text-amber-400">
+            {metrics?.stats.activeGoals || 0}
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+            in progress
+          </p>
+        </button>
+
+        {/* Analytics Card */}
+        <button
+          onClick={() => navigate("/analytics")}
+          className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all text-left hover:scale-105"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+              Analytics
+            </span>
+            <FaChartLine className="text-purple-600 text-lg" />
+          </div>
+          <p className="text-2xl font-black text-purple-600 dark:text-purple-400">
+            →
+          </p>
+          <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+            view insights
+          </p>
+        </button>
+      </div>
+
+      {/* Info Box */}
+      <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-2xl p-6 border border-blue-100 dark:border-blue-900/50">
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">
+          📈 Dashboard Metrics Explained
+        </h3>
+        <div className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
+          <div>
+            <strong>Alignment Score:</strong> Your overall goal progress (0-100)
+          </div>
+          <div>
+            <strong>Growth Score:</strong> Cumulative growth from completed
+            goals and habits
+          </div>
+          <div>
+            <strong>Risk Indicator:</strong> Flags if goals are inactive or
+            habits incomplete
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -13,13 +13,19 @@ const sendTokenResponse = (user, statusCode, res, message) => {
   });
   const cookieOptions = {
     httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge:   7 * 24 * 60 * 60 * 1000,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   };
-  res.status(statusCode).cookie('token', token, cookieOptions).json({
-    success: true, message, user: sanitizeUser(user),
-  });
+  res
+    .status(statusCode)
+    .cookie("token", token, cookieOptions)
+    .json({
+      success: true,
+      message,
+      token, // ← ADD THIS LINE!
+      user: sanitizeUser(user),
+    });
 };
 
 // ─── STEP 1: Send OTP ─────────────────────────────────────────────────────────

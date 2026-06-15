@@ -35,28 +35,76 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  // ✅ Starts true — we are checking session cookie on mount
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user has a valid cookie session
-    api
-      .get("/auth/me")
-      .then((r) => setUser(r.data.user))
-      .catch(() => setUser(null)) // no session = null, not an error
-      .finally(() => setLoading(false));
+    // ✅ FIX: Check localStorage first, then verify with backend
+    const initAuth = async () => {
+      try {
+        // Step 1: Check localStorage for existing session
+        const token = localStorage.getItem("authToken");
+        const userStr = localStorage.getItem("user");
+
+        // If no token, user is not logged in
+        if (!token) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // Step 2: Try to validate token with backend
+        try {
+          const res = await api.get("/auth/me");
+          setUser(res.data.user);
+        } catch (err: any) {
+          // Token is invalid or expired, clear it
+          console.log("Token validation failed, clearing auth");
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("user");
+          setUser(null);
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post("/auth/login", { email, password });
-    setUser(res.data.user);
-    toast.success(res.data.message || "Welcome back!");
+    try {
+      const res = await api.post("/auth/login", { email, password });
+
+      // Save token and user to localStorage
+      if (res.data.token) {
+        localStorage.setItem("authToken", res.data.token);
+      }
+      if (res.data.user) {
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+        setUser(res.data.user);
+      }
+
+      toast.success(res.data.message || "Welcome back!");
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Login failed";
+      toast.error(message);
+      throw err;
+    }
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await api.post("/auth/logout");
-    } catch {}
+    } catch (err) {
+      console.log("Logout error (expected):", err);
+    }
+
+    // Clear all auth data
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("user");
     setUser(null);
     toast.success("Logged out!");
   }, []);

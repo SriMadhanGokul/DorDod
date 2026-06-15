@@ -1,0 +1,23 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Don't rewrite if it's a real file
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+  
+  # Don't rewrite if it's a real directory
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  
+  # Don't rewrite common static file extensions
+  RewriteCond %{REQUEST_URI} !\.(?:css|gif|ico|jpg|jpeg|js|map|png|svg|webp|woff|woff2)$ [NC]
+  RewriteRule ^ - [L]
+  
+  # Don't rewrite /api calls (if you have backend on same domain)
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^ - [L]
+  
+  # Rewrite everything else to index.html for SPA routing
+  RewriteRule ^ /index.html [L]
+</IfModule>
