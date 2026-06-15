@@ -93,22 +93,22 @@ export default function DashboardPage() {
       const [metricsRes, checkInRes, reflectionRes] = await Promise.all([
         api
           .get("/dashboard/metrics")
-          .catch(() => ({ data: { success: false } })),
+          .catch(() => ({ data: { success: false, data: null } })),
         api
           .get("/daily-check-in/today")
-          .catch(() => ({ data: { success: false } })),
+          .catch(() => ({ data: { success: false, data: null } })),
         api
           .get("/daily-reflection/today")
-          .catch(() => ({ data: { success: false } })),
+          .catch(() => ({ data: { success: false, data: null } })),
       ]);
 
-      if (metricsRes.data.success) {
+      if (metricsRes?.data?.data) {
         setMetrics(metricsRes.data.data);
       }
-      if (checkInRes.data.success) {
+      if (checkInRes?.data?.data) {
         setDailyCheckIn(checkInRes.data.data);
       }
-      if (reflectionRes.data.success) {
+      if (reflectionRes?.data?.data) {
         setDailyReflection(reflectionRes.data.data);
       }
     } catch (err: any) {
@@ -121,18 +121,23 @@ export default function DashboardPage() {
   const submitCheckIn = async () => {
     setSubmittingCheckIn(true);
     try {
-      const res = await api.post("/daily-check-in", {
+      const today = new Date().toISOString().split("T")[0];
+      const payload = {
+        date: today,
         mood: checkInForm.mood,
         energy: checkInForm.energy,
         focus: checkInForm.focus,
-      });
-      if (res.data.success) {
+      };
+      console.log("Submitting check-in:", payload);
+      const res = await api.post("/daily-check-in", payload);
+      if (res.data.success || res.data.data) {
         setDailyCheckIn(res.data.data);
         setShowCheckInForm(false);
         toast.success("Check-in saved! 📊");
       }
     } catch (err: any) {
-      toast.error("Failed to save check-in");
+      console.error("Check-in error:", err);
+      toast.error(err.response?.data?.message || "Failed to save check-in");
     } finally {
       setSubmittingCheckIn(false);
     }
@@ -146,18 +151,24 @@ export default function DashboardPage() {
 
     setSubmittingReflection(true);
     try {
-      const res = await api.post("/daily-reflection", {
+      const today = new Date().toISOString().split("T")[0];
+      const payload = {
+        date: today,
         title: reflectionForm.title,
         content: reflectionForm.content,
-      });
-      if (res.data.success) {
+      };
+      console.log("Submitting reflection:", payload);
+      const res = await api.post("/daily-reflection", payload);
+      console.log("Reflection response:", res.data);
+      if (res.data.success || res.data.data) {
         setDailyReflection(res.data.data);
         setShowReflectionForm(false);
         setReflectionForm({ title: "", content: "" });
         toast.success("Reflection saved! 📝");
       }
     } catch (err: any) {
-      toast.error("Failed to save reflection");
+      console.error("Reflection error details:", err.response?.data);
+      toast.error(err.response?.data?.message || "Failed to save reflection");
     } finally {
       setSubmittingReflection(false);
     }
@@ -205,7 +216,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
-          <p className="text-gray-600 text-sm">Loading dashboard...</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            Loading dashboard...
+          </p>
         </div>
       </div>
     );
@@ -585,8 +598,8 @@ export default function DashboardPage() {
                   Goal Progress
                 </span>
                 <span className="font-bold text-gray-900 dark:text-white">
-                  {metrics?.goalProgress.completed}/
-                  {metrics?.goalProgress.total}
+                  {metrics?.goalProgress.completed || 0}/
+                  {metrics?.goalProgress.total || 0}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -611,8 +624,8 @@ export default function DashboardPage() {
                   Habit Completion
                 </span>
                 <span className="font-bold text-gray-900 dark:text-white">
-                  {metrics?.habitCompletion.completed}/
-                  {metrics?.habitCompletion.total}
+                  {metrics?.habitCompletion.completed || 0}/
+                  {metrics?.habitCompletion.total || 0}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -662,8 +675,8 @@ export default function DashboardPage() {
                   Capabilities
                 </span>
                 <span className="font-bold text-gray-900 dark:text-white">
-                  {metrics?.capabilities.completed}/
-                  {metrics?.capabilities.total}
+                  {metrics?.capabilities.completed || 0}/
+                  {metrics?.capabilities.total || 0}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -688,8 +701,8 @@ export default function DashboardPage() {
                   Achievements
                 </span>
                 <span className="font-bold text-gray-900 dark:text-white">
-                  {metrics?.achievements.completed}/
-                  {metrics?.achievements.total}
+                  {metrics?.achievements.completed || 0}/
+                  {metrics?.achievements.total || 0}
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
