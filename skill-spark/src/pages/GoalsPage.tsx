@@ -454,17 +454,6 @@ function GoalCard({
             </button>
           )}
 
-          {/* VIEW DETAILS BUTTON (Only for Active Goals) */}
-          {isActive && (
-            <button
-              onClick={() => navigate(`/execution/${goal._id}`)}
-              className="px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-              title="View & track this goal"
-            >
-              📊 View
-            </button>
-          )}
-
           {/* PAUSE BUTTON */}
           {isActive && (
             <button
@@ -816,8 +805,8 @@ export default function GoalsPage() {
             it (max 3 active)
           </div>
           <div>
-            2️⃣ <strong>Click View:</strong> Go to the goal's execution page to
-            track daily progress
+            2️⃣ <strong>Click on Goal Title:</strong> Go to the goal's execution
+            page to track daily progress
           </div>
           <div>
             3️⃣ <strong>Mark Days:</strong> Click days to mark them complete

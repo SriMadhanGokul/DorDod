@@ -17,9 +17,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 13% 18%;
 
-    --primary: 232 65% 30%;
+    /* ✅ PRIMARY COLOR - Now matches Tailwind config */
+    --primary: 262 80% 50%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 232 65% 95%;
+    --primary-light: 262 80% 97%;
 
     --secondary: 43 95% 56%;
     --secondary-foreground: 220 13% 18%;
@@ -27,8 +28,8 @@
     --muted: 220 14% 96%;
     --muted-foreground: 220 9% 46%;
 
-    --accent: 232 65% 95%;
-    --accent-foreground: 232 65% 30%;
+    --accent: 262 80% 95%;
+    --accent-foreground: 262 80% 30%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -38,21 +39,21 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 232 65% 30%;
+    --ring: 262 80% 50%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 232 65% 30%;
+    --sidebar-background: 262 80% 50%;
     --sidebar-foreground: 232 30% 90%;
     --sidebar-primary: 43 95% 56%;
     --sidebar-primary-foreground: 220 13% 18%;
-    --sidebar-accent: 232 50% 38%;
+    --sidebar-accent: 262 80% 58%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 232 50% 38%;
+    --sidebar-border: 262 80% 58%;
     --sidebar-ring: 43 95% 56%;
-    --sidebar-muted: 232 40% 45%;
+    --sidebar-muted: 262 40% 45%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(232 65% 30%), hsl(232 50% 45%));
+    --gradient-hero: linear-gradient(135deg, hsl(262 80% 50%), hsl(262 80% 60%));
     --gradient-gold: linear-gradient(135deg, hsl(43 95% 56%), hsl(35 95% 50%));
     --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -71,9 +72,10 @@
     --popover: 222 47% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 232 65% 55%;
+    /* ✅ PRIMARY COLOR - Dark mode version */
+    --primary: 262 80% 55%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 232 40% 18%;
+    --primary-light: 262 40% 18%;
 
     --secondary: 43 95% 56%;
     --secondary-foreground: 220 13% 18%;
@@ -81,8 +83,8 @@
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 232 40% 18%;
-    --accent-foreground: 232 65% 75%;
+    --accent: 262 40% 18%;
+    --accent-foreground: 262 80% 75%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
@@ -92,7 +94,7 @@
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 232 65% 55%;
+    --ring: 262 80% 55%;
 
     --sidebar-background: 222 47% 8%;
     --sidebar-foreground: 210 40% 90%;
@@ -121,16 +123,26 @@
 }
 
 @layer components {
+  /* ✅ PRIMARY BUTTON */
   .btn-primary {
     @apply bg-primary text-primary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md;
   }
 
+  /* ✅ SECONDARY BUTTON - Using CSS variables */
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition-all duration-200;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    @apply hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition-all duration-200;
   }
 
+  /* ✅ OUTLINE BUTTON */
   .btn-outline {
     @apply border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground px-6 py-3 rounded-lg font-semibold transition-all duration-200;
+  }
+
+  /* ✅ OUTLINE SECONDARY BUTTON */
+  .btn-outline-secondary {
+    @apply border border-border text-foreground hover:bg-muted px-6 py-3 rounded-lg font-semibold transition-all duration-200;
   }
 
   .card-elevated {
@@ -158,11 +170,61 @@
   }
 
   .habit-day-complete {
-    @apply bg-success text-success-foreground border-success;
+    background-color: hsl(var(--success));
+    color: hsl(var(--success-foreground));
+    @apply border-success;
   }
 
   .habit-day-incomplete {
     @apply bg-muted hover:bg-accent;
+  }
+
+  /* ✅ Premium card component */
+  .card {
+    @apply bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-all duration-normal;
+  }
+
+  /* ✅ Badge component */
+  .badge {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-primary {
+    background-color: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+  }
+
+  .badge-success {
+    background-color: hsl(var(--success) / 0.1);
+    color: hsl(var(--success));
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+
+  .badge-error {
+    background-color: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+  }
+
+  /* ✅ Progress bar */
+  .progress {
+    @apply w-full h-2 bg-muted rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    background-color: hsl(var(--primary));
+    @apply h-full rounded-full transition-all duration-300;
+  }
+
+  /* ✅ Text utilities */
+  .text-muted {
+    @apply text-foreground-muted;
+  }
+
+  .text-primary {
+    color: hsl(var(--primary));
   }
 }
 
@@ -175,5 +237,54 @@
   .text-gradient-gold {
     @apply bg-clip-text text-transparent;
     background-image: var(--gradient-gold);
+  }
+
+  /* ✅ NEW: Utilities for spacing */
+  .gap-xs {
+    @apply gap-1;
+  }
+
+  .gap-sm {
+    @apply gap-2;
+  }
+
+  .gap-md {
+    @apply gap-3;
+  }
+
+  .gap-lg {
+    @apply gap-4;
+  }
+
+  .gap-xl {
+    @apply gap-6;
+  }
+
+  .gap-2xl {
+    @apply gap-8;
+  }
+
+  .p-xs {
+    @apply p-1;
+  }
+
+  .p-sm {
+    @apply p-2;
+  }
+
+  .p-md {
+    @apply p-3;
+  }
+
+  .p-lg {
+    @apply p-4;
+  }
+
+  .p-xl {
+    @apply p-6;
+  }
+
+  .p-2xl {
+    @apply p-8;
   }
 }
