@@ -9,9 +9,9 @@ import {
   FaArrowRight,
   FaCheckCircle,
   FaHistory,
-  FaQuestionCircle,
   FaDownload,
   FaTrash,
+  FaPlus,
 } from "react-icons/fa";
 
 interface ScopData {
@@ -25,6 +25,19 @@ interface ScopData {
   myNextStep: string;
   lastUpdated?: string;
   createdAt?: string;
+  title?: string;
+}
+
+interface HistoryEntry {
+  date: string;
+  strengths: string;
+  constraints: string;
+  opportunities: string;
+  patterns: string;
+  keyInsight: string;
+  myFocus: string;
+  myNextStep: string;
+  reason: "reset" | "update";
 }
 
 const EMPTY_SCOP: ScopData = {
@@ -43,25 +56,29 @@ export default function ScopePage() {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showResult, setShowResult] = useState(false);
-  const [view, setView] = useState<"form" | "result" | "history" | "questions">(
-    "form",
-  );
-  const [history, setHistory] = useState<ScopData[]>([]);
+  const [view, setView] = useState<"form" | "result" | "history">("form");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [followUpQuestions, setFollowUpQuestions] = useState<any>(null);
-  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [creatingNew, setCreatingNew] = useState(false);
 
   useEffect(() => {
     load();
   }, []);
 
+  // ✅ Load both SCOP and history on mount
   const load = async () => {
     try {
+      // Load SCOP
       const res = await api.get("/scop");
       if (res.data.data) {
         setScop(res.data.data);
-        setShowResult(true);
-        setView("result");
+        // Show result view only if SCOP has content
+        if (res.data.data.strengths && res.data.data.constraints) {
+          setShowResult(true);
+          setView("result");
+        } else {
+          setView("form");
+        }
       } else {
         setView("form");
       }
@@ -69,44 +86,25 @@ export default function ScopePage() {
       console.error("Failed to load SCOP", err);
       setView("form");
     } finally {
+      // Always load history, regardless of SCOP result
+      await loadHistory();
       setLoading(false);
     }
   };
 
+  // ✅ Load history - works even if no SCOP exists
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
       const res = await api.get("/scop/history");
-      setHistory(res.data.data || []);
+      const historyData = res.data.data || [];
+      setHistory(historyData);
+      console.log("✅ History loaded:", historyData.length, "entries");
     } catch (err) {
-      toast.error("Failed to load history");
+      console.error("Failed to load history", err);
+      setHistory([]);
     } finally {
       setLoadingHistory(false);
-    }
-  };
-
-  const loadFollowUpQuestions = async () => {
-    if (
-      !scop.strengths ||
-      !scop.constraints ||
-      !scop.opportunities ||
-      !scop.patterns
-    ) {
-      return toast.error("Complete SCOP first to get reflection questions");
-    }
-    setLoadingQuestions(true);
-    try {
-      const res = await api.post("/scop/follow-up", {
-        strengths: scop.strengths,
-        constraints: scop.constraints,
-        opportunities: scop.opportunities,
-        patterns: scop.patterns,
-      });
-      setFollowUpQuestions(res.data.data);
-    } catch (err) {
-      toast.error("Failed to generate questions");
-    } finally {
-      setLoadingQuestions(false);
     }
   };
 
@@ -134,16 +132,40 @@ export default function ScopePage() {
     }
   };
 
-  const handleDeleteScop = async () => {
-    if (!confirm("Reset your SCOP? This will clear all data.")) return;
+  const handleResetScop = async () => {
+    if (
+      !confirm(
+        "Reset your SCOP? This will save your current work to History and clear the form.",
+      )
+    )
+      return;
     try {
       await api.delete("/scop");
       setScop(EMPTY_SCOP);
       setView("form");
       setShowResult(false);
-      toast.success("SCOP reset");
+      // ✅ Reload history after reset
+      await loadHistory();
+      toast.success("✅ SCOP reset and saved to History!");
     } catch (err) {
       toast.error("Failed to reset");
+    }
+  };
+
+  const handleCreateNewScop = async () => {
+    setCreatingNew(true);
+    try {
+      const res = await api.post("/scop/create");
+      setScop(res.data.data);
+      setView("form");
+      setShowResult(false);
+      // ✅ Reload history after creating new
+      await loadHistory();
+      toast.success("✅ New SCOP created! Previous one archived.");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to create new SCOP");
+    } finally {
+      setCreatingNew(false);
     }
   };
 
@@ -220,41 +242,82 @@ ${scop.myNextStep}`;
               >
                 <FaEdit className="w-3.5 h-3.5" /> Edit
               </button>
+              <button
+                onClick={handleCreateNewScop}
+                disabled={creatingNew}
+                className="flex items-center gap-2 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-all disabled:opacity-60"
+              >
+                <FaPlus className="w-3.5 h-3.5" />{" "}
+                {creatingNew ? "Creating..." : "New"}
+              </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      {showResult && !isEditing && (
+      {/* ✅ TAB NAVIGATION - Always show if not editing (whether has result or history) */}
+      {!isEditing && (
         <div className="flex gap-2 flex-wrap border-b border-gray-100 pb-0">
-          {[
-            { id: "result", label: "📋 Your Plan", icon: "📋" },
-            { id: "questions", label: "❓ Reflect", icon: "❓" },
-            { id: "history", label: "📅 History", icon: "📅" },
-          ].map((tab) => (
+          {/* Your Plan Tab - Show if SCOP has content */}
+          {showResult && (
             <button
-              key={tab.id}
-              onClick={() => {
-                setView(tab.id as any);
-                if (tab.id === "history") loadHistory();
-                if (tab.id === "questions") loadFollowUpQuestions();
-              }}
+              onClick={() => setView("result")}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-                view === tab.id
+                view === "result"
                   ? "border-indigo-600 text-indigo-600"
                   : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
-              {tab.label}
+              📋 Your Plan
             </button>
-          ))}
+          )}
+
+          {/* History Tab - Always show if history exists */}
+          {history.length > 0 && (
+            <button
+              onClick={() => {
+                setView("history");
+              }}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+                view === "history"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              📅 History {history.length > 0 && `(${history.length})`}
+            </button>
+          )}
+
+          {/* Form Tab - Show when editing or no content yet */}
+          {(!showResult || isEditing) && (
+            <button
+              onClick={() => setView("form")}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
+                view === "form"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              ✏️ {showResult ? "Edit SCOP" : "Create SCOP"}
+            </button>
+          )}
         </div>
       )}
 
       {/* FORM / EDIT MODE */}
       {(isEditing || view === "form") && (
         <div className="space-y-4">
+          {/* Info Box - Show if history exists and not editing */}
+          {history.length > 0 && !isEditing && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                📅 <strong>View History:</strong> You have {history.length}{" "}
+                saved SCOP {history.length === 1 ? "entry" : "entries"}. Click
+                the <strong>History tab</strong> above to review your past work.
+              </p>
+            </div>
+          )}
+
           {/* SCOP Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Strengths */}
@@ -551,8 +614,8 @@ ${scop.myNextStep}`;
                 Last Updated
               </p>
               <p className="text-sm font-bold text-gray-800">
-                {scop.lastUpdated
-                  ? new Date(scop.lastUpdated).toLocaleDateString()
+                {scop.createdAt
+                  ? new Date(scop.createdAt).toLocaleDateString()
                   : "Today"}
               </p>
             </div>
@@ -566,76 +629,17 @@ ${scop.myNextStep}`;
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
               <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
-                Next Action
+                Total History
               </p>
-              <p className="text-sm font-bold text-gray-800 line-clamp-2">
-                {scop.myNextStep || "Not set"}
+              <p className="text-2xl font-bold text-indigo-600">
+                {history.length}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* REFLECTION QUESTIONS TAB */}
-      {view === "questions" && (
-        <div className="space-y-4">
-          {loadingQuestions ? (
-            <div className="flex justify-center py-12">
-              <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : followUpQuestions ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 mb-4">
-                Use these reflection questions to deepen your understanding and
-                strengthen your action plan.
-              </p>
-
-              {Object.entries(followUpQuestions).map(([section, questions]) => (
-                <div
-                  key={section}
-                  className="bg-white rounded-2xl border border-gray-100 p-5"
-                >
-                  <h3 className="font-bold text-gray-900 mb-3 capitalize text-lg flex items-center gap-2">
-                    <FaQuestionCircle className="text-indigo-600 w-5 h-5" />{" "}
-                    Deepen your {section}
-                  </h3>
-                  <div className="space-y-2">
-                    {(questions as string[]).map((q, i) => (
-                      <div
-                        key={i}
-                        className="flex gap-3 p-3 bg-gray-50 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer"
-                      >
-                        <span className="text-indigo-600 font-bold shrink-0">
-                          Q{i + 1}:
-                        </span>
-                        <p className="text-sm text-gray-700">{q}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <p className="text-sm text-blue-800">
-                  💡 <strong>Tip:</strong> Spend 5-10 minutes journaling on each
-                  question. Your answers will reveal deeper insights and sharpen
-                  your focus.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-50 rounded-xl">
-              <FaQuestionCircle className="text-4xl text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No questions yet</p>
-              <p className="text-sm text-gray-400 mt-2">
-                Complete your SCOP to generate reflection questions
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* HISTORY TAB */}
+      {/* ✅ HISTORY TAB - Accessible even before first submission */}
       {view === "history" && (
         <div className="space-y-4">
           {loadingHistory ? (
@@ -645,25 +649,35 @@ ${scop.myNextStep}`;
           ) : history.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-xl">
               <FaHistory className="text-4xl text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No history yet</p>
+              <p className="text-gray-500 font-semibold">No history yet</p>
+              <p className="text-sm text-gray-400 mt-2">
+                When you save, update, or reset your SCOP, changes will be saved
+                here.
+              </p>
+              <button
+                onClick={() => setView("form")}
+                className="mt-4 text-indigo-600 hover:text-indigo-700 font-semibold text-sm"
+              >
+                Create your first SCOP →
+              </button>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-gray-600 mb-4">
-                Your past SCOP submissions. Watch how your awareness evolves
-                over time.
-              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  📝 <strong>{history.length} entries</strong> — Review your
+                  journey. Watch how your awareness evolves over time.
+                </p>
+              </div>
               {history.map((h, i) => (
                 <div
-                  key={h._id || i}
+                  key={i}
                   className="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {new Date(
-                          h.lastUpdated || h.createdAt,
-                        ).toLocaleDateString("en-IN", {
+                        {new Date(h.date).toLocaleDateString("en-IN", {
                           weekday: "short",
                           month: "short",
                           day: "numeric",
@@ -671,30 +685,61 @@ ${scop.myNextStep}`;
                         })}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {new Date(
-                          h.lastUpdated || h.createdAt,
-                        ).toLocaleTimeString()}
+                        {new Date(h.date).toLocaleTimeString()}
                       </p>
                     </div>
-                    <span className="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-medium">
-                      Completed
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full font-medium ${
+                        h.reason === "reset"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-blue-100 text-blue-600"
+                      }`}
+                    >
+                      {h.reason === "reset" ? "🔄 Reset" : "✏️ Updated"}
                     </span>
                   </div>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-sm border-t border-gray-100 pt-3">
+                    {h.strengths && (
+                      <div>
+                        <strong className="text-green-700">Strengths:</strong>
+                        <p className="text-gray-600 text-xs mt-0.5">
+                          {h.strengths}
+                        </p>
+                      </div>
+                    )}
+                    {h.constraints && (
+                      <div>
+                        <strong className="text-red-700">Constraints:</strong>
+                        <p className="text-gray-600 text-xs mt-0.5">
+                          {h.constraints}
+                        </p>
+                      </div>
+                    )}
                     {h.keyInsight && (
-                      <p>
-                        <strong>Insight:</strong> "{h.keyInsight}"
-                      </p>
+                      <div>
+                        <strong className="text-purple-700">💡 Insight:</strong>
+                        <p className="text-gray-600 text-xs mt-0.5">
+                          "{h.keyInsight}"
+                        </p>
+                      </div>
                     )}
                     {h.myFocus && (
-                      <p>
-                        <strong>Focus:</strong> {h.myFocus}
-                      </p>
+                      <div>
+                        <strong className="text-amber-700">🎯 Focus:</strong>
+                        <p className="text-gray-600 text-xs mt-0.5">
+                          {h.myFocus}
+                        </p>
+                      </div>
                     )}
                     {h.myNextStep && (
-                      <p>
-                        <strong>Next Step:</strong> {h.myNextStep}
-                      </p>
+                      <div>
+                        <strong className="text-green-700">
+                          ⚡ Next Step:
+                        </strong>
+                        <p className="text-gray-600 text-xs mt-0.5">
+                          {h.myNextStep}
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -711,11 +756,14 @@ ${scop.myNextStep}`;
             ⚠️ Danger Zone
           </p>
           <button
-            onClick={handleDeleteScop}
+            onClick={handleResetScop}
             className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium"
           >
-            <FaTrash className="w-3.5 h-3.5" /> Reset SCOP
+            <FaTrash className="w-3.5 h-3.5" /> Reset Current SCOP
           </button>
+          <p className="text-xs text-red-600 mt-2">
+            Your current work will be saved to History before clearing.
+          </p>
         </div>
       )}
     </div>

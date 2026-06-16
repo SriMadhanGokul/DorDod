@@ -45,8 +45,8 @@ const GoalSchema = new mongoose.Schema(
     },
     duration: {
       type: Number,
-      min: [21, "Duration must be at least 21 days"],
-      max: [50, "Duration cannot exceed 50 days"],
+      min: [1, "Duration must be at least 1 day"],
+      max: [365, "Duration cannot exceed 365 days"],
       required: [true, "Please specify a duration"],
       default: 21,
     },
@@ -60,13 +60,13 @@ const GoalSchema = new mongoose.Schema(
       },
     ],
 
-    // ✅ NEW: Track completion status for each day
+    // ✅ Track completion status for each day
     dayCompletion: {
       type: Map,
       of: new mongoose.Schema(
         {
           dayNumber: Number,
-          completedAt: Date, // null = not completed, Date = when completed
+          completedAt: Date,
           status: {
             type: String,
             enum: ["pending", "completed", "missed"],

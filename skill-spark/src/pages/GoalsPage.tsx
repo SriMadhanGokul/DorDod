@@ -64,8 +64,8 @@ function GoalModal({
       newErrors.description = "Description is required";
     if (!form.category) newErrors.category = "Category is required";
     if (!form.priority) newErrors.priority = "Priority is required";
-    if (!form.duration || form.duration < 21 || form.duration > 50) {
-      newErrors.duration = "Duration must be between 21 and 50 days";
+    if (!form.duration || form.duration < 1 || form.duration > 365) {
+      newErrors.duration = "Duration must be between 1 and 365 days";
     }
 
     setErrors(newErrors);
@@ -93,14 +93,6 @@ function GoalModal({
     }
   };
 
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + (form.duration || 21));
-  const formattedTargetDate = targetDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto">
@@ -119,10 +111,10 @@ function GoalModal({
         <div className="p-5 space-y-4">
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/30 dark:to-cyan-900/30 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
             <p className="text-sm text-blue-900 dark:text-blue-200">
-              💡 <strong>Did you know?</strong> Research shows that practicing a
-              behavior consistently for 21+ days helps form lasting habits. This
-              goal will guide you through a structured journey to build
-              something meaningful!
+              💡 <strong>Did you know?</strong> The duration you set becomes
+              your target! Activate the goal to start tracking your progress. A
+              longer duration builds lasting habits. A shorter one creates quick
+              wins.
             </p>
           </div>
 
@@ -233,8 +225,8 @@ function GoalModal({
             <div className="flex items-center gap-3">
               <input
                 type="range"
-                min="21"
-                max="50"
+                min="1"
+                max="365"
                 value={form.duration}
                 onChange={(e) =>
                   setForm({ ...form, duration: parseInt(e.target.value) })
@@ -242,17 +234,18 @@ function GoalModal({
                 className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-600"
               />
               <span className="min-w-fit text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg">
-                {form.duration} days
+                {form.duration} day{form.duration !== 1 ? "s" : ""}
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
-              📅 Target date: <strong>{formattedTargetDate}</strong>
-            </p>
             {errors.duration && (
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                 {errors.duration}
               </p>
             )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
+              Choose a duration that challenges you. Short durations (1-30 days)
+              = quick wins 🚀. Long durations (31-365 days) = deep mastery 🎓
+            </p>
           </div>
 
           <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
@@ -381,14 +374,15 @@ function GoalCard({
             {goal.duration && (
               <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
                 <FaClock className="text-xs" />
-                {goal.duration} days
+                {goal.duration} day{goal.duration !== 1 ? "s" : ""}
               </span>
             )}
 
             {goal.linkedHabits && goal.linkedHabits.length > 0 && (
               <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
                 <FaLink className="text-xs" />
-                {goal.linkedHabits.length} habits
+                {goal.linkedHabits.length} habit
+                {goal.linkedHabits.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
@@ -569,7 +563,9 @@ export default function GoalsPage() {
 
     try {
       await api.patch(`/goals/${goalId}/activate`);
-      toast.success("Goal activated! 🚀 Click View to start tracking!");
+      toast.success(
+        "Goal activated! 🚀 Click on goal title to start tracking!",
+      );
       load();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to activate goal");
@@ -801,8 +797,8 @@ export default function GoalsPage() {
         </h3>
         <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
           <div>
-            1️⃣ <strong>Create & Activate:</strong> Set up your goal and activate
-            it (max 3 active)
+            1️⃣ <strong>Create & Activate:</strong> Set up your goal with
+            duration 1-365 days and activate it (max 3 active)
           </div>
           <div>
             2️⃣ <strong>Click on Goal Title:</strong> Go to the goal's execution
