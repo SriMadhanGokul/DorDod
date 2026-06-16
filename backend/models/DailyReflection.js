@@ -8,27 +8,46 @@ const DailyReflectionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // ✅ FIXED: Changed from Date to String (YYYY-MM-DD format)
     date: {
-      type: Date,
+      type: String,
       required: true,
       default: () => new Date().toISOString().split("T")[0],
       index: true,
     },
     title: {
       type: String,
-      required: [true, "Please provide a reflection title"],
+      required: [true, "Reflection title required"],
       trim: true,
-      maxlength: 200,
     },
     content: {
       type: String,
-      required: [true, "Please write your reflection"],
+      required: [true, "Reflection content required"],
       trim: true,
     },
-    tags: [
+    mood: {
+      type: String,
+      enum: ["excellent", "good", "neutral", "difficult", "challenging"],
+      default: "neutral",
+    },
+    keyTakeaway: {
+      type: String,
+      trim: true,
+    },
+    actionItems: [
       {
-        type: String,
-        trim: true,
+        item: {
+          type: String,
+          required: true,
+        },
+        dueDate: {
+          type: String, // YYYY-MM-DD format
+        },
+        priority: {
+          type: String,
+          enum: ["low", "medium", "high"],
+          default: "medium",
+        },
       },
     ],
     completed: {
@@ -39,7 +58,7 @@ const DailyReflectionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Ensure one reflection per user per day
+// ✅ Ensure one reflection per user per day (now works with String dates)
 DailyReflectionSchema.index({ userId: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model("DailyReflection", DailyReflectionSchema);

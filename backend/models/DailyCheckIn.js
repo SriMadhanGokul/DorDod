@@ -8,8 +8,9 @@ const DailyCheckInSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // ✅ FIXED: Changed from Date to String (YYYY-MM-DD format)
     date: {
-      type: Date,
+      type: String,
       required: true,
       default: () => new Date().toISOString().split("T")[0],
       index: true,
@@ -61,7 +62,7 @@ const DailyCheckInSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Ensure one check-in per user per day
+// ✅ Ensure one check-in per user per day (now works with String dates)
 DailyCheckInSchema.index({ userId: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model("DailyCheckIn", DailyCheckInSchema);

@@ -16,6 +16,9 @@ import {
   FaClock as FaClockIcon,
 } from "react-icons/fa";
 
+// ✅ IMPORT DASHBOARD REFRESH TRIGGER
+import { triggerDashboardRefresh } from "@/pages/DashboardPage";
+
 interface Habit {
   _id: string;
   title: string;
@@ -455,7 +458,6 @@ function LinkGoalModal({
   );
 }
 
-// Helper: Check if within time window
 const isWithinTimeWindow = (timeStart?: string, timeEnd?: string): boolean => {
   if (!timeStart || !timeEnd) return true;
 
@@ -469,7 +471,6 @@ const isWithinTimeWindow = (timeStart?: string, timeEnd?: string): boolean => {
   return currentTime >= start && currentTime < end;
 };
 
-// Helper: Get time window status
 const getTimeWindowStatus = (timeStart?: string, timeEnd?: string): string => {
   if (!timeStart || !timeEnd) return "";
 
@@ -537,10 +538,14 @@ function HabitCard({
             <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
               {habit.title}
             </h3>
-            {habit.linkedGoal && (
+            {habit.linkedGoal ? (
               <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
                 <FaLink className="text-xs" />
                 Goal Linked
+              </span>
+            ) : (
+              <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
+                Standalone
               </span>
             )}
           </div>
@@ -567,7 +572,22 @@ function HabitCard({
           {habit.linkedGoal && habit.linkedGoalTitle && (
             <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                <strong>Linked to:</strong> {habit.linkedGoalTitle}
+                <strong>📌 Linked to Goal:</strong> {habit.linkedGoalTitle}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                ✅ This habit contributes to your alignment score
+              </p>
+            </div>
+          )}
+
+          {!habit.linkedGoal && (
+            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                <strong>📌 Standalone Habit:</strong> Tracked independently, not
+                connected to a goal
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                💡 Link to a goal anytime to boost your alignment score
               </p>
             </div>
           )}
@@ -806,6 +826,10 @@ export default function HabitsPage() {
     try {
       await api.patch(`/habits/${habitId}/complete`);
       toast.success("✅ Habit marked complete for today!");
+
+      // ✅ TRIGGER INSTANT DASHBOARD REFRESH
+      triggerDashboardRefresh();
+
       load();
     } catch (err: any) {
       toast.error(
@@ -822,9 +846,10 @@ export default function HabitsPage() {
     );
   }
 
+  // ✅ SEPARATE LINKED vs STANDALONE HABITS
+  const linkedHabits = habits.filter((h) => h.linkedGoal);
+  const standaloneHabits = habits.filter((h) => !h.linkedGoal);
   const totalHabits = habits.length;
-  const linkedHabits = habits.filter((h) => h.linkedGoal).length;
-  const dailyHabits = habits.filter((h) => !h.linkedGoal).length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-10">
@@ -862,38 +887,46 @@ export default function HabitsPage() {
 
         <div className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-800">
           <p className="text-xs text-purple-700 dark:text-purple-300 font-semibold">
-            Goal Linked
+            🎯 Goal-Linked
           </p>
           <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
-            {linkedHabits}
+            {linkedHabits.length}
+          </p>
+          <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+            Boost alignment score
           </p>
         </div>
 
         <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 border border-green-200 dark:border-green-800">
           <p className="text-xs text-green-700 dark:text-green-300 font-semibold">
-            Day-to-Day
+            🏃 Standalone
           </p>
           <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-            {dailyHabits}
+            {standaloneHabits.length}
+          </p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+            Day-to-day tracking
           </p>
         </div>
       </div>
 
-      {/* Habits Section */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-          📋 Habits ({totalHabits})
-        </h2>
-
-        {totalHabits === 0 ? (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 p-8 text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              No habits yet. Create your first habit to get started! 🚀
+      {/* GOAL-LINKED HABITS SECTION */}
+      {linkedHabits.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            🎯 Goal-Linked Habits ({linkedHabits.length})
+          </h2>
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800 mb-3">
+            <p className="text-xs text-purple-700 dark:text-purple-300">
+              <strong>
+                ✨ These habits contribute to your alignment score
+              </strong>{" "}
+              and help you achieve your goals. Complete these to boost your
+              daily alignment!
             </p>
           </div>
-        ) : (
           <div className="space-y-2">
-            {habits.map((habit) => (
+            {linkedHabits.map((habit) => (
               <HabitCard
                 key={habit._id}
                 habit={habit}
@@ -911,30 +944,79 @@ export default function HabitsPage() {
               />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* STANDALONE HABITS SECTION */}
+      {standaloneHabits.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            🏃 Standalone Habits ({standaloneHabits.length})
+          </h2>
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-800 mb-3">
+            <p className="text-xs text-green-700 dark:text-green-300">
+              <strong>📌 Tracked independently</strong> and not connected to any
+              goal. Perfect for habits you want to maintain separately!
+            </p>
+          </div>
+          <div className="space-y-2">
+            {standaloneHabits.map((habit) => (
+              <HabitCard
+                key={habit._id}
+                habit={habit}
+                onEdit={(h) => {
+                  setEditHabit(h);
+                  setShowModal(true);
+                }}
+                onDelete={handleDelete}
+                onUnlink={handleUnlink}
+                onComplete={handleComplete}
+                onLinkGoal={(h) => {
+                  setSelectedHabitForLink(h);
+                  setShowLinkModal(true);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* EMPTY STATE */}
+      {totalHabits === 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            No habits yet. Create your first habit to get started! 🚀
+          </p>
+        </div>
+      )}
 
       {/* Info Box */}
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-2xl p-4 border border-blue-100 dark:border-blue-900/50">
         <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">
-          💡 About Habits
+          💡 How Habits Work
         </h3>
-        <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+        <div className="text-xs text-gray-700 dark:text-gray-300 space-y-2">
           <div>
-            ⏰ <strong>Time Windows:</strong> Complete habits only during their
-            scheduled time. Button shows green during time window, gray outside
+            <strong>🎯 Goal-Linked Habits:</strong> Link habits to active goals
+            to track progress and boost your alignment score. These show on your
+            dashboard!
           </div>
           <div>
-            ❌ <strong>Missed Habits:</strong> If not completed during time
-            window, automatically marked as missed
+            <strong>🏃 Standalone Habits:</strong> Track habits independently.
+            Perfect for personal wellness routines that aren't tied to specific
+            goals.
           </div>
           <div>
-            🎯 <strong>Goal Linking:</strong> Use the link button to connect
-            habits to active goals anytime
+            <strong>⏰ Time Windows:</strong> Complete habits only during their
+            scheduled time. Button shows green during time window.
           </div>
           <div>
-            📊 <strong>History:</strong> View all past tracking records expanded
-            in each habit card
+            <strong>📊 Tracking:</strong> View full history by expanding any
+            habit card. See completed, missed, and pending records.
+          </div>
+          <div>
+            <strong>⚡ Real-Time Sync:</strong> Dashboard updates instantly when
+            you complete habits!
           </div>
         </div>
       </div>

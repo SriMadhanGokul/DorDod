@@ -58,6 +58,13 @@ interface DailyReflection {
   completed: boolean;
 }
 
+// ✅ EVENT EMITTER FOR REAL-TIME DASHBOARD REFRESH
+const DashboardRefreshEvent = new EventTarget();
+
+export const triggerDashboardRefresh = () => {
+  DashboardRefreshEvent.dispatchEvent(new Event("refresh"));
+};
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -80,15 +87,31 @@ export default function DashboardPage() {
   });
   const [submittingCheckIn, setSubmittingCheckIn] = useState(false);
   const [submittingReflection, setSubmittingReflection] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 30000);
-    return () => clearInterval(interval);
+
+    // ✅ 10-second auto-refresh (faster than before)
+    const interval = setInterval(loadDashboardData, 10000);
+
+    // ✅ LISTEN FOR HABIT COMPLETION EVENTS
+    const handleRefresh = () => {
+      console.log("📊 Dashboard: Habit completion detected, refreshing...");
+      loadDashboardData();
+    };
+
+    DashboardRefreshEvent.addEventListener("refresh", handleRefresh);
+
+    return () => {
+      clearInterval(interval);
+      DashboardRefreshEvent.removeEventListener("refresh", handleRefresh);
+    };
   }, []);
 
   const loadDashboardData = async () => {
     try {
+      setIsRefreshing(true);
       const [metricsRes, checkInRes, reflectionRes] = await Promise.all([
         api
           .get("/dashboard/metrics")
@@ -114,6 +137,7 @@ export default function DashboardPage() {
       console.error("Dashboard error:", err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -215,11 +239,24 @@ export default function DashboardPage() {
         </div>
         <button
           onClick={loadDashboardData}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          disabled={isRefreshing}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+            isRefreshing
+              ? "bg-blue-600 text-white opacity-60 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
         >
-          <FaRedo className="text-sm" />
-          Refresh
+          <FaRedo className={`text-sm ${isRefreshing ? "animate-spin" : ""}`} />
+          {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
+      </div>
+
+      {/* ✅ AUTO-REFRESH INFO */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+        <p className="text-xs text-blue-700 dark:text-blue-300">
+          <strong>🔄 Auto-refreshing every 10 seconds</strong> — Metrics update
+          automatically when you complete habits!
+        </p>
       </div>
 
       {/* Daily Check-In & Reflection */}
@@ -549,7 +586,7 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Habit Completion
+                  Habit Completion (Linked Only)
                 </span>
                 <span className="font-bold text-gray-900 dark:text-white">
                   {metrics?.habitCompletion.completed || 0}/
@@ -570,6 +607,9 @@ export default function DashboardPage() {
                   }}
                 />
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                ✅ Only goal-linked habits count toward alignment
+              </p>
             </div>
 
             <div>
@@ -742,7 +782,7 @@ export default function DashboardPage() {
         <div className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
           <div>
             <strong>Alignment Score:</strong> Daily execution quality combining
-            goals, habits, and check-in
+            goals, habits, and check-in (only goal-linked habits count)
           </div>
           <div>
             <strong>Alignment Trend:</strong> Your 30-day consistency pattern

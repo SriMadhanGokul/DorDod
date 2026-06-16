@@ -60,10 +60,16 @@ exports.getDashboardMetrics = async (req, res) => {
       console.log(`   ⚠️  No habits found`);
     }
 
+    // ✅ SEPARATE LINKED vs STANDALONE HABITS
     const linkedHabits = allHabits.filter((h) => h.linkedGoal);
+    const standaloneHabits = allHabits.filter((h) => !h.linkedGoal);
 
-    // Get completed habits today using tracking
-    const completedHabitsToday = allHabits.filter((h) => {
+    console.log(`   Total Habits: ${allHabits.length}`);
+    console.log(`   Linked Habits: ${linkedHabits.length}`);
+    console.log(`   Standalone Habits: ${standaloneHabits.length}`);
+
+    // ✅ ONLY COUNT GOAL-LINKED HABITS FOR ALIGNMENT SCORING
+    const completedLinkedHabitsToday = linkedHabits.filter((h) => {
       if (!h.tracking || h.tracking.length === 0) return false;
       const todayTracking = h.tracking.find((t) => {
         const trackDate = new Date(t.date).toISOString().split("T")[0];
@@ -72,9 +78,7 @@ exports.getDashboardMetrics = async (req, res) => {
       return !!todayTracking;
     });
 
-    console.log(`   Total Habits: ${allHabits.length}`);
-    console.log(`   Completed Today: ${completedHabitsToday.length}`);
-    console.log(`   Linked Habits: ${linkedHabits.length}`);
+    console.log(`   Completed Linked Habits Today: ${completedLinkedHabitsToday.length}`);
 
     // ============ DAILY CHECK-IN & REFLECTION ============
     const checkInToday = await DailyCheckIn.findOne({
@@ -105,20 +109,20 @@ exports.getDashboardMetrics = async (req, res) => {
       console.log(`   Goal Points: 0/70 (no active goals)`);
     }
 
-    // Habit completion (20%)
+    // ✅ HABIT COMPLETION (20%) - ONLY GOAL-LINKED HABITS
     const habitCompletion = {
-      completed: completedHabitsToday.length,
-      total: linkedHabits.length > 0 ? linkedHabits.length : allHabits.length,
+      completed: completedLinkedHabitsToday.length,
+      total: linkedHabits.length,
     };
 
     if (habitCompletion.total > 0) {
       const habitPts = (habitCompletion.completed / habitCompletion.total) * 20;
       alignmentScore += habitPts;
       console.log(
-        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total})`,
+        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total} linked habits)`,
       );
     } else {
-      console.log(`   Habit Points: 0/20 (no habits)`);
+      console.log(`   Habit Points: 0/20 (no linked habits)`);
     }
 
     // Check-in (10%)
@@ -133,12 +137,13 @@ exports.getDashboardMetrics = async (req, res) => {
     console.log(`   ✅ ALIGNMENT SCORE: ${alignmentScore}`);
 
     // ============ CALCULATE GROWTH SCORE ============
-    const completedHabits = allHabits.filter(
+    // ✅ ONLY COUNT GOAL-LINKED HABITS
+    const completedLinkedHabits = linkedHabits.filter(
       (h) => h.status === "Completed",
     ).length;
     const capabilities = {
-      completed: completedHabits,
-      total: allHabits.length,
+      completed: completedLinkedHabits,
+      total: linkedHabits.length,
     };
     const achievements = {
       completed: completedGoals.length,
@@ -154,7 +159,8 @@ exports.getDashboardMetrics = async (req, res) => {
     // ============ CALCULATE RISK INDICATOR ============
     let riskScore = 0;
     if (!checkInToday) riskScore += 5;
-    if (completedHabitsToday.length === 0 && linkedHabits.length > 0)
+    // ✅ Only penalize if there are linked habits and none completed
+    if (completedLinkedHabitsToday.length === 0 && linkedHabits.length > 0)
       riskScore += 5;
 
     const missedGoalsCount = activeGoals.filter((g) => {
@@ -168,6 +174,7 @@ exports.getDashboardMetrics = async (req, res) => {
     console.log(`   ✅ RISK INDICATOR: ${finalRiskScore}`);
 
     // ============ HABIT COMPLETION RATE (7-day) ============
+    // ✅ ONLY COUNT GOAL-LINKED HABITS
     const last7Days = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date();
@@ -177,7 +184,7 @@ exports.getDashboardMetrics = async (req, res) => {
 
     let completedDaysCount = 0;
     last7Days.forEach((day) => {
-      const completed = allHabits.some((h) => {
+      const completed = linkedHabits.some((h) => {
         if (!h.tracking || h.tracking.length === 0) return false;
         return h.tracking.some(
           (t) =>
@@ -188,8 +195,10 @@ exports.getDashboardMetrics = async (req, res) => {
       if (completed) completedDaysCount++;
     });
 
-    const habitCompletionRate = Math.round((completedDaysCount / 7) * 100);
-    console.log(`   ✅ HABIT RATE (7-day): ${habitCompletionRate}%`);
+    const habitCompletionRate = linkedHabits.length > 0 
+      ? Math.round((completedDaysCount / 7) * 100)
+      : 0;
+    console.log(`   ✅ HABIT RATE (7-day): ${habitCompletionRate}% (linked habits only)`);
 
     // ============ TREND DATA ============
     const trend = [];
@@ -225,8 +234,9 @@ exports.getDashboardMetrics = async (req, res) => {
           completedGoals: completedGoals.length,
           totalGoals: allGoals.length,
           linkedHabits: linkedHabits.length,
+          standaloneHabits: standaloneHabits.length,
           totalHabits: allHabits.length,
-          completedHabitsToday: completedHabitsToday.length,
+          completedLinkedHabitsToday: completedLinkedHabitsToday.length,
         },
         checks: {
           hasCheckedInToday: !!checkInToday,
@@ -251,14 +261,20 @@ exports.getDashboardStats = async (req, res) => {
     const allGoals = await Goal.find({ userId }).lean();
     const allHabits = await Habit.find({ userId }).lean();
 
+    // ✅ SEPARATE LINKED AND STANDALONE HABITS
+    const linkedHabits = allHabits.filter((h) => h.linkedGoal);
+    const standaloneHabits = allHabits.filter((h) => !h.linkedGoal);
+
     res.json({
       success: true,
       data: {
         totalGoals: allGoals.length,
         activeGoals: allGoals.filter((g) => g.status === "active").length,
         completedGoals: allGoals.filter((g) => g.status === "completed").length,
+        linkedHabits: linkedHabits.length,
+        standaloneHabits: standaloneHabits.length,
         totalHabits: allHabits.length,
-        completedHabits: allHabits.filter((h) => h.status === "Completed")
+        completedLinkedHabits: linkedHabits.filter((h) => h.status === "Completed")
           .length,
       },
     });
