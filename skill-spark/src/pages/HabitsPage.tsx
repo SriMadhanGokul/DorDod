@@ -18,7 +18,7 @@ import {
 
 interface Habit {
   _id: string;
-  name: string;
+  title: string;
   description: string;
   category: string;
   frequency: string;
@@ -51,7 +51,7 @@ function HabitModal({
   onSave: () => void;
 }) {
   const [form, setForm] = useState({
-    name: habit?.name || "",
+    title: habit?.title || "",
     description: habit?.description || "",
     category: habit?.category || "Productivity",
     frequency: habit?.frequency || "Daily",
@@ -96,7 +96,7 @@ function HabitModal({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!form.name.trim()) newErrors.name = "Habit name is required";
+    if (!form.title.trim()) newErrors.title = "Habit title is required";
     if (!form.description.trim())
       newErrors.description = "Description is required";
     if (!form.timeStart) newErrors.timeStart = "Start time is required";
@@ -128,7 +128,7 @@ function HabitModal({
     setLoading(true);
     try {
       const payload = {
-        name: form.name,
+        title: form.title,
         description: form.description,
         category: form.category,
         frequency: form.frequency,
@@ -137,7 +137,7 @@ function HabitModal({
       };
 
       if (habit) {
-        await api.put(`/habits/${habit._id}`, payload);
+        await api.patch(`/habits/${habit._id}`, payload);
         toast.success("Habit updated!");
       } else {
         await api.post("/habits", payload);
@@ -146,6 +146,7 @@ function HabitModal({
       onSave();
       onClose();
     } catch (err: any) {
+      console.error("Error:", err);
       toast.error(err.response?.data?.message || "Failed to save habit");
     } finally {
       setLoading(false);
@@ -170,21 +171,21 @@ function HabitModal({
         <div className="p-5 space-y-4">
           <div>
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-              Habit Name <span className="text-red-500">*</span>
+              Habit Title <span className="text-red-500">*</span>
             </label>
             <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="e.g. Morning Meditation"
               className={`w-full px-3 py-2.5 rounded-xl border ${
-                errors.name
+                errors.title
                   ? "border-red-500 bg-red-50 dark:bg-red-900/20"
                   : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
               } text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
-            {errors.name && (
+            {errors.title && (
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                {errors.name}
+                {errors.title}
               </p>
             )}
           </div>
@@ -483,14 +484,14 @@ const getTimeWindowStatus = (timeStart?: string, timeEnd?: string): string => {
     const minutesLeft = end - currentTime;
     const hours = Math.floor(minutesLeft / 60);
     const mins = minutesLeft % 60;
-    return `Open (${hours}h ${mins}m left)`;
+    return `🟢 Open (${hours}h ${mins}m left)`;
   } else if (currentTime < start) {
     const minutesUntil = start - currentTime;
     const hours = Math.floor(minutesUntil / 60);
     const mins = minutesUntil % 60;
-    return `Starts in ${hours}h ${mins}m`;
+    return `🟡 Starts in ${hours}h ${mins}m`;
   } else {
-    return "Closed";
+    return "🔴 Closed";
   }
 };
 
@@ -534,7 +535,7 @@ function HabitCard({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-              {habit.name}
+              {habit.title}
             </h3>
             {habit.linkedGoal && (
               <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -603,18 +604,18 @@ function HabitCard({
             </div>
           </div>
 
-          {/* Time Window Status */}
+          {/* Time Window Status - PROMINENT */}
           {habit.timeStart && habit.timeEnd && (
             <div
-              className={`mb-3 text-xs font-semibold px-3 py-1.5 rounded-lg ${
+              className={`mb-3 text-xs font-semibold px-3 py-2 rounded-lg border-2 ${
                 withinTimeWindow
-                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                  : timeWindowStatus === "Closed"
-                    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                    : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
+                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
+                  : timeWindowStatus.includes("Closed")
+                    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
+                    : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700"
               }`}
             >
-              <FaClockIcon className="inline mr-1" /> {timeWindowStatus}
+              <FaClockIcon className="inline mr-1.5" /> {timeWindowStatus}
             </div>
           )}
 
@@ -691,15 +692,24 @@ function HabitCard({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1 flex-wrap justify-end">
-          {/* Mark Complete Button - Only during time window & not missed */}
-          {!isMissedToday && !isCompletedToday && withinTimeWindow && (
+        <div className="flex flex-col items-end gap-2">
+          {/* Mark Complete Button - ALWAYS SHOW unless already completed */}
+          {!isCompletedToday && !isMissedToday && (
             <button
               onClick={() => onComplete(habit._id)}
-              className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-              title="Mark today as complete"
+              disabled={!withinTimeWindow}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                withinTimeWindow
+                  ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
+              }`}
+              title={
+                withinTimeWindow
+                  ? "Mark today as complete"
+                  : `Only available from ${habit.timeStart} to ${habit.timeEnd}`
+              }
             >
-              <FaCheck className="text-sm" />
+              <FaCheck className="text-sm" /> Mark Complete
             </button>
           )}
 
@@ -912,7 +922,7 @@ export default function HabitsPage() {
         <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
           <div>
             ⏰ <strong>Time Windows:</strong> Complete habits only during their
-            scheduled time. Button only shows during active window
+            scheduled time. Button shows green during time window, gray outside
           </div>
           <div>
             ❌ <strong>Missed Habits:</strong> If not completed during time

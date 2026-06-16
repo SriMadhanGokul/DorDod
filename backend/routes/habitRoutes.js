@@ -1,54 +1,33 @@
 const express = require("express");
-const {
-  getHabits,
-  getHabitsByGoal,
-  getHabit,
-  createHabit,
-  updateHabit,
-  completeHabit,
-  resetHabit,
-  linkHabitToGoal,
-  unlinkHabitFromGoal,
-  deleteHabit,
-} = require("../controllers/habitController");
-const protect = require("../utils/protect");
-
 const router = express.Router();
+const protect = require("../utils/protect");
+const habitController = require("../controllers/habitController");
 
-// ─── Public Routes ──────────────────────────────────────────────────────────
-// (None)
+// Get all habits
+router.get("/", protect, habitController.getHabits);
 
-// ─── Protected Routes ────────────────────────────────────────────────────────
-router.use(protect);
+// Get single habit
+router.get("/:id", protect, habitController.getHabit);
 
-// GET all habits
-router.get("/", getHabits);
+// Create habit
+router.post("/", protect, habitController.createHabit);
 
-// GET habits by goal
-router.get("/goal/:goalId", getHabitsByGoal);
+// Update habit
+router.put("/:id", protect, habitController.updateHabit);
 
-// GET single habit
-router.get("/:id", getHabit);
+// Delete habit
+router.delete("/:id", protect, habitController.deleteHabit);
 
-// POST create habit
-router.post("/", createHabit);
+// ✅ Mark habit complete (PATCH - frontend sends PATCH)
+router.patch("/:id/complete", protect, habitController.markHabitComplete);
 
-// PUT update habit
-router.put("/:id", updateHabit);
+// Mark habit incomplete
+router.patch("/:id/incomplete", protect, habitController.markHabitIncomplete);
 
-// PATCH complete habit (mark today as complete)
-router.patch("/:id/complete", completeHabit);
+// Link habit to goal
+router.patch("/:id/link", protect, habitController.linkHabitToGoal);
 
-// PATCH reset habit (clear all tracking)
-router.patch("/:id/reset", resetHabit);
-
-// PATCH link habit to goal
-router.patch("/:id/link", linkHabitToGoal);
-
-// PATCH unlink habit from goal ✅ NEW
-router.patch("/:id/unlink", unlinkHabitFromGoal);
-
-// DELETE habit
-router.delete("/:id", deleteHabit);
+// Unlink habit from goal
+router.patch("/:id/unlink", protect, habitController.unlinkHabitFromGoal);
 
 module.exports = router;

@@ -1,35 +1,41 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
-// Protect routes - verify JWT from cookie
 const protect = async (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    let token;
+
+    // Get token from header
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    // Also check localStorage token as fallback
+    if (!token && req.headers["x-auth-token"]) {
+      token = req.headers["x-auth-token"];
+    }
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized. Please log in.",
-      });
+      console.error("❌ No token provided");
+      return res
+        .status(401)
+        .json({ success: false, message: "No token provided" });
     }
 
+    console.log("🔑 Token received, verifying...");
+
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    console.log("✅ Token verified, user:", decoded.id);
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User no longer exists.",
-      });
-    }
-
-    req.user = user;
+    // Set user on request
+    req.user = { id: decoded.id };
     next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or expired token. Please log in again.",
-    });
+    console.error("❌ Token verification failed:", error.message);
+    res.status(401).json({ success: false, message: "Invalid token" });
   }
 };
 

@@ -1,31 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const protect = require("../utils/protect");
-const {
-  getTodayReflection,
-  createReflection,
-  getReflectionHistory,
-  getReflection,
-  deleteReflection,
-  getReflectionStats,
-} = require("../controllers/dailyReflectionController");
+const dailyReflectionController = require("../controllers/dailyReflectionController");
 
-// ✅ GET today's reflection
-router.get("/today", protect, getTodayReflection);
+// Get all reflections
+router.get("/", protect, dailyReflectionController.getReflections);
 
-// ✅ GET reflection history (last 30 days)
-router.get("/history", protect, getReflectionHistory);
+// ✅ Get TODAY'S reflection
+router.get("/today", protect, dailyReflectionController.getReflectionToday);
 
-// ✅ GET reflection stats
-router.get("/stats", protect, getReflectionStats);
+// Get single reflection
+router.get("/:id", protect, dailyReflectionController.getReflection);
 
-// ✅ GET single reflection
-router.get("/:id", protect, getReflection);
+// Create reflection
+router.post("/", protect, dailyReflectionController.createReflection);
 
-// ✅ CREATE/UPDATE reflection
-router.post("/", protect, createReflection);
+// Update reflection
+router.put("/:id", protect, dailyReflectionController.updateReflection);
 
-// ✅ DELETE reflection
-router.delete("/:id", protect, deleteReflection);
+// Delete reflection
+router.delete("/:id", protect, dailyReflectionController.deleteReflection);
 
 module.exports = router;

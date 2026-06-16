@@ -1,25 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const {
-  getTodayCheckIn,
-  getDashboardInsights,
-  createCheckIn,
-  saveRealization,
-  postGuidanceUpdate,
-  getRealizations,
-  getScoreHistory,
-  getSlotStatus,
-} = require("../controllers/dailyCheckInController");
 const protect = require("../utils/protect");
-router.use(protect);
+const dailyCheckInController = require("../controllers/dailyCheckInController");
 
-router.get("/today", getTodayCheckIn);
-router.get("/dashboard", getDashboardInsights);
-router.get("/realizations", getRealizations);
-router.get("/history", getScoreHistory);
-router.get("/slot-status", getSlotStatus);
-router.post("/", createCheckIn);
-router.patch("/realization", saveRealization);
-router.post("/guidance-update", postGuidanceUpdate);
+// Get all check-ins
+router.get("/", protect, dailyCheckInController.getCheckIns);
+
+// ✅ Get TODAY'S check-in
+router.get("/today", protect, dailyCheckInController.getCheckInToday);
+
+// Get single check-in
+router.get("/:id", protect, dailyCheckInController.getCheckIn);
+
+// Create check-in
+router.post("/", protect, dailyCheckInController.createCheckIn);
+
+// Update check-in
+router.put("/:id", protect, dailyCheckInController.updateCheckIn);
+
+// Delete check-in
+router.delete("/:id", protect, dailyCheckInController.deleteCheckIn);
 
 module.exports = router;

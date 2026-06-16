@@ -1,136 +1,93 @@
 const Habit = require("../models/Habit");
-const Goal = require("../models/Goal");
 
-// ─── Get All Habits ──────────────────────────────────────────────────────────
-exports.getHabits = async (req, res) => {
-  try {
-    const habits = await Habit.find({ userId: req.user._id })
-      .populate("linkedGoal", "title")
-      .lean();
-
-    const habitsWithGoalTitle = habits.map((habit) => ({
-      ...habit,
-      linkedGoalTitle: habit.linkedGoal?.title || null,
-    }));
-
-    res.json({
-      success: true,
-      data: habitsWithGoalTitle,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch habits" });
-  }
-};
-
-// ─── Get Habits by Goal ──────────────────────────────────────────────────────
-exports.getHabitsByGoal = async (req, res) => {
-  try {
-    const habits = await Habit.find({
-      userId: req.user._id,
-      linkedGoal: req.params.goalId,
-    }).lean();
-
-    res.json({
-      success: true,
-      data: habits,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch habits" });
-  }
-};
-
-// ─── Get Single Habit ────────────────────────────────────────────────────────
-exports.getHabit = async (req, res) => {
-  try {
-    const habit = await Habit.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    })
-      .populate("linkedGoal", "title")
-      .lean();
-
-    if (!habit) return res.status(404).json({ message: "Habit not found" });
-
-    res.json({
-      success: true,
-      data: habit,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch habit" });
-  }
-};
-
-// ─── Check Time Slot Overlap ─────────────────────────────────────────────────
-const checkTimeOverlap = async (
-  userId,
-  timeStart,
-  timeEnd,
-  excludeHabitId = null,
+// ✅ Helper: Check time overlap
+const checkTimeOverlap = (
+  newStart,
+  newEnd,
+  existingHabits,
+  excludeId = null,
 ) => {
-  const [startHour, startMin] = timeStart.split(":").map(Number);
-  const [endHour, endMin] = timeEnd.split(":").map(Number);
-  const formStart = startHour * 60 + startMin;
-  const formEnd = endHour * 60 + endMin;
+  if (!newStart || !newEnd) return null;
 
-  const query = { userId };
-  if (excludeHabitId) {
-    query._id = { $ne: excludeHabitId };
-  }
+  const [startHour, startMin] = newStart.split(":").map(Number);
+  const [endHour, endMin] = newEnd.split(":").map(Number);
+  const newStartMin = startHour * 60 + startMin;
+  const newEndMin = endHour * 60 + endMin;
 
-  const existingHabits = await Habit.find(query).lean();
+  const habitsToCheck = existingHabits.filter(
+    (h) => h._id.toString() !== excludeId,
+  );
 
-  for (const habit of existingHabits) {
-    if (!habit.timeStart || !habit.timeEnd) continue;
+  for (const existing of habitsToCheck) {
+    if (!existing.timeStart || !existing.timeEnd) continue;
 
-    const [eStartHour, eStartMin] = habit.timeStart.split(":").map(Number);
-    const [eEndHour, eEndMin] = habit.timeEnd.split(":").map(Number);
-    const existingStart = eStartHour * 60 + eStartMin;
-    const existingEnd = eEndHour * 60 + eEndMin;
+    const [eStartHour, eStartMin] = existing.timeStart.split(":").map(Number);
+    const [eEndHour, eEndMin] = existing.timeEnd.split(":").map(Number);
+    const existingStartMin = eStartHour * 60 + eStartMin;
+    const existingEndMin = eEndHour * 60 + eEndMin;
 
     if (
-      (formStart < existingEnd && formEnd > existingStart) ||
-      (formStart === existingStart && formEnd === existingEnd)
+      (newStartMin < existingEndMin && newEndMin > existingStartMin) ||
+      (newStartMin === existingStartMin && newEndMin === existingEndMin)
     ) {
-      return true;
+      return {
+        overlaps: true,
+        conflictingHabit: existing.title,
+        conflictTime: `${existing.timeStart} - ${existing.timeEnd}`,
+      };
     }
   }
 
-  return false;
+  return null;
 };
 
-// ─── Check if within time window ─────────────────────────────────────────────
-const isWithinTimeWindow = (timeStart, timeEnd) => {
-  const now = new Date();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
-  const [startHour, startMin] = timeStart.split(":").map(Number);
-  const [endHour, endMin] = timeEnd.split(":").map(Number);
-  const start = startHour * 60 + startMin;
-  const end = endHour * 60 + endMin;
-
-  return currentTime >= start && currentTime < end;
+exports.getHabits = async (req, res) => {
+  try {
+    const habits = await Habit.find({ userId: req.user.id }).sort({
+      createdAt: -1,
+    });
+    res.json({ success: true, data: habits });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
-// ─── Create Habit ───────────────────────────────────────────────────────────
+exports.getHabit = async (req, res) => {
+  try {
+    const habit = await Habit.findById(req.params.id);
+    if (!habit) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Habit not found" });
+    }
+    res.json({ success: true, data: habit });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.createHabit = async (req, res) => {
   try {
     const {
-      name,
+      title,
       description,
       category,
       frequency,
       timeStart,
       timeEnd,
-      linkedGoal,
+      goalId,
     } = req.body;
 
-    if (!name || !description || !timeStart || !timeEnd) {
+    if (!title || !description || !timeStart || !timeEnd) {
       return res.status(400).json({
-        message: "Name, description, start time, and end time are required",
+        success: false,
+        message: "Title, description, and times are required",
       });
     }
 
     if (!/^\d{2}:\d{2}$/.test(timeStart) || !/^\d{2}:\d{2}$/.test(timeEnd)) {
       return res.status(400).json({
+        success: false,
         message: "Invalid time format. Use HH:MM",
       });
     }
@@ -142,59 +99,58 @@ exports.createHabit = async (req, res) => {
 
     if (startMinutes >= endMinutes) {
       return res.status(400).json({
+        success: false,
         message: "End time must be after start time",
       });
     }
 
-    const hasOverlap = await checkTimeOverlap(req.user._id, timeStart, timeEnd);
-    if (hasOverlap) {
+    const existingHabits = await Habit.find({ userId: req.user.id });
+    const overlapCheck = checkTimeOverlap(timeStart, timeEnd, existingHabits);
+
+    if (overlapCheck?.overlaps) {
       return res.status(400).json({
-        message:
-          "This time slot overlaps with an existing habit. Please choose a different time.",
+        success: false,
+        message: `Time slot conflicts with "${overlapCheck.conflictingHabit}" (${overlapCheck.conflictTime})`,
       });
     }
 
-    const habit = new Habit({
-      userId: req.user._id,
-      name,
+    const habit = await Habit.create({
+      userId: req.user.id,
+      title,
       description,
-      category: category || "Productivity",
-      frequency: frequency || "Daily",
+      category,
+      frequency,
       timeStart,
       timeEnd,
-      linkedGoal: linkedGoal || null,
+      linkedGoal: goalId || null,
+      status: "Active",
       tracking: [],
     });
 
-    await habit.save();
+    console.log(`✅ Habit created: ${habit._id}`);
+    console.log(`   Title: ${habit.title}`);
+    console.log(`   Time: ${habit.timeStart} - ${habit.timeEnd}`);
 
-    res.status(201).json({
-      success: true,
-      message: "Habit created successfully",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error creating habit:", err);
-    res.status(500).json({ message: "Failed to create habit" });
+    res.status(201).json({ success: true, data: habit });
+  } catch (error) {
+    console.error("Create habit error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Update Habit ───────────────────────────────────────────────────────────
 exports.updateHabit = async (req, res) => {
   try {
-    const { name, description, category, frequency, timeStart, timeEnd } =
+    const { title, description, category, frequency, timeStart, timeEnd } =
       req.body;
 
-    const habit = await Habit.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
-    }
-
     if (timeStart && timeEnd) {
+      if (!/^\d{2}:\d{2}$/.test(timeStart) || !/^\d{2}:\d{2}$/.test(timeEnd)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid time format. Use HH:MM",
+        });
+      }
+
       const [startHour, startMin] = timeStart.split(":").map(Number);
       const [endHour, endMin] = timeEnd.split(":").map(Number);
       const startMinutes = startHour * 60 + startMin;
@@ -202,232 +158,168 @@ exports.updateHabit = async (req, res) => {
 
       if (startMinutes >= endMinutes) {
         return res.status(400).json({
+          success: false,
           message: "End time must be after start time",
         });
       }
 
-      if (timeStart !== habit.timeStart || timeEnd !== habit.timeEnd) {
-        const hasOverlap = await checkTimeOverlap(
-          req.user._id,
-          timeStart,
-          timeEnd,
-          habit._id,
-        );
+      const existingHabits = await Habit.find({ userId: req.user.id });
+      const overlapCheck = checkTimeOverlap(
+        timeStart,
+        timeEnd,
+        existingHabits,
+        req.params.id,
+      );
 
-        if (hasOverlap) {
-          return res.status(400).json({
-            message:
-              "This time slot overlaps with an existing habit. Please choose a different time.",
-          });
-        }
+      if (overlapCheck?.overlaps) {
+        return res.status(400).json({
+          success: false,
+          message: `Time slot conflicts with "${overlapCheck.conflictingHabit}" (${overlapCheck.conflictTime})`,
+        });
       }
-
-      habit.timeStart = timeStart;
-      habit.timeEnd = timeEnd;
     }
 
-    if (name) habit.name = name;
-    if (description) habit.description = description;
-    if (category) habit.category = category;
-    if (frequency) habit.frequency = frequency;
+    const habit = await Habit.findByIdAndUpdate(
+      req.params.id,
+      {
+        title,
+        description,
+        category,
+        frequency,
+        ...(timeStart && { timeStart }),
+        ...(timeEnd && { timeEnd }),
+      },
+      { new: true },
+    );
 
-    await habit.save();
+    console.log(`✅ Habit updated: ${habit._id}`);
 
-    res.json({
-      success: true,
-      message: "Habit updated successfully",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error updating habit:", err);
-    res.status(500).json({ message: "Failed to update habit" });
+    res.json({ success: true, data: habit });
+  } catch (error) {
+    console.error("Update habit error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Complete Habit ──────────────────────────────────────────────────────────
-exports.completeHabit = async (req, res) => {
+exports.deleteHabit = async (req, res) => {
+  try {
+    await Habit.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "Habit deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ Mark habit complete - Uses TRACKING field
+exports.markHabitComplete = async (req, res) => {
   try {
     const habitId = req.params.id;
+    const today = new Date().toISOString().split("T")[0];
 
-    if (!habitId) {
-      return res.status(400).json({ message: "Habit ID is required" });
+    const habit = await Habit.findById(habitId);
+    if (!habit) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Habit not found" });
     }
 
-    const habit = await Habit.findOne({
-      _id: habitId,
-      userId: req.user._id,
+    // Initialize tracking if it doesn't exist
+    if (!habit.tracking) {
+      habit.tracking = [];
+    }
+
+    // Check if already completed today
+    const todayTracking = habit.tracking.find((t) => {
+      const trackDate = new Date(t.date).toISOString().split("T")[0];
+      return trackDate === today;
     });
 
+    if (todayTracking?.status === "completed") {
+      return res.json({
+        success: true,
+        message: "Already completed today",
+        data: habit,
+      });
+    }
+
+    // Remove old record for today if exists
+    habit.tracking = habit.tracking.filter((t) => {
+      const trackDate = new Date(t.date).toISOString().split("T")[0];
+      return trackDate !== today;
+    });
+
+    // Add new completed record
+    habit.tracking.push({
+      date: new Date(),
+      status: "completed",
+      completedAt: new Date(),
+      markedAt: new Date(),
+    });
+
+    habit.status = "Active";
+
+    await habit.save();
+
+    console.log(`✅ Habit completed: ${habitId} on ${today}`);
+    res.json({ success: true, message: "Habit marked complete!", data: habit });
+  } catch (error) {
+    console.error("Mark habit complete error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Mark habit incomplete
+exports.markHabitIncomplete = async (req, res) => {
+  try {
+    const habitId = req.params.id;
+    const today = new Date().toISOString().split("T")[0];
+
+    const habit = await Habit.findById(habitId);
     if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Habit not found" });
     }
 
-    // Check if within time window
-    if (habit.timeStart && habit.timeEnd) {
-      const isWithinWindow = isWithinTimeWindow(habit.timeStart, habit.timeEnd);
-      if (!isWithinWindow) {
-        return res.status(400).json({
-          message:
-            "This habit is not available right now. Complete it during its scheduled time window.",
-        });
-      }
-    }
-
-    const today = new Date();
-    const todayDate = today.toISOString().split("T")[0];
-
-    // Find or create tracking entry for today
-    let existingEntry = habit.tracking.find((t) => t.date === todayDate);
-
-    if (existingEntry) {
-      if (existingEntry.status === "completed") {
-        return res.status(400).json({
-          message: "This habit is already marked as completed for today",
-        });
-      }
-      existingEntry.status = "completed";
-      existingEntry.completedAt = new Date();
-    } else {
-      habit.tracking.push({
-        date: todayDate,
-        status: "completed",
-        completedAt: new Date(),
+    if (habit.tracking) {
+      habit.tracking = habit.tracking.filter((t) => {
+        const trackDate = new Date(t.date).toISOString().split("T")[0];
+        return trackDate !== today;
       });
     }
 
     await habit.save();
-
-    res.json({
-      success: true,
-      message: "Habit marked as complete",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error completing habit:", err);
-    res.status(500).json({ message: "Failed to complete habit" });
+    res.json({ success: true, data: habit });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Reset Habit ────────────────────────────────────────────────────────────
-exports.resetHabit = async (req, res) => {
-  try {
-    const habit = await Habit.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
-    }
-
-    habit.tracking = [];
-    await habit.save();
-
-    res.json({
-      success: true,
-      message: "Habit tracking reset",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error resetting habit:", err);
-    res.status(500).json({ message: "Failed to reset habit" });
-  }
-};
-
-// ─── Link Habit to Goal ──────────────────────────────────────────────────────
+// Link habit to goal
 exports.linkHabitToGoal = async (req, res) => {
   try {
     const { goalId } = req.body;
-
-    if (!goalId) {
-      return res.status(400).json({ message: "Goal ID is required" });
-    }
-
-    const habit = await Habit.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
-    }
-
-    const goal = await Goal.findOne({
-      _id: goalId,
-      userId: req.user._id,
-      status: "active",
-    });
-
-    if (!goal) {
-      return res.status(404).json({ message: "Active goal not found" });
-    }
-
-    habit.linkedGoal = goalId;
-    await habit.save();
-
-    res.json({
-      success: true,
-      message: "Habit linked to goal",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error linking habit:", err);
-    res.status(500).json({ message: "Failed to link habit" });
+    const habit = await Habit.findByIdAndUpdate(
+      req.params.id,
+      { linkedGoal: goalId },
+      { new: true },
+    );
+    res.json({ success: true, data: habit });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// ─── Unlink Habit from Goal ─────────────────────────────────────────────────
+// Unlink habit from goal
 exports.unlinkHabitFromGoal = async (req, res) => {
   try {
-    const habit = await Habit.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
-    }
-
-    if (!habit.linkedGoal) {
-      return res.status(400).json({
-        message: "This habit is not linked to any goal",
-      });
-    }
-
-    habit.linkedGoal = null;
-    await habit.save();
-
-    res.json({
-      success: true,
-      message: "Habit unlinked from goal",
-      data: habit,
-    });
-  } catch (err) {
-    console.error("Error unlinking habit:", err);
-    res.status(500).json({ message: "Failed to unlink habit" });
+    const habit = await Habit.findByIdAndUpdate(
+      req.params.id,
+      { linkedGoal: null },
+      { new: true },
+    );
+    res.json({ success: true, data: habit });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// ─── Delete Habit ───────────────────────────────────────────────────────────
-exports.deleteHabit = async (req, res) => {
-  try {
-    const habit = await Habit.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
-
-    if (!habit) {
-      return res.status(404).json({ message: "Habit not found" });
-    }
-
-    res.json({
-      success: true,
-      message: "Habit deleted",
-    });
-  } catch (err) {
-    console.error("Error deleting habit:", err);
-    res.status(500).json({ message: "Failed to delete habit" });
-  }
-};
-
-module.exports = exports;

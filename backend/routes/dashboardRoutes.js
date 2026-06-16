@@ -1,14 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const dashboardController = require("../controllers/dashboardController");
 const protect = require("../utils/protect");
 
-// ─── Dashboard Routes ────────────────────────────────────────────────────────
+// Import controller functions
+const dashboardController = require("../controllers/dashboardController");
 
-// GET /api/dashboard/metrics - Get all dashboard metrics
+console.log(
+  "📌 Dashboard Routes - Controller exports:",
+  Object.keys(dashboardController),
+);
+
+// Routes
 router.get("/metrics", protect, dashboardController.getDashboardMetrics);
-
-// GET /api/dashboard/stats - Get quick stats
-router.get("/stats", protect, dashboardController.getQuickStats);
+router.get("/stats", protect, dashboardController.getDashboardStats);
 
 module.exports = router;

@@ -46,10 +46,26 @@ const COLORS: Record<string, string> = {
   Other: "#6b7280",
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+// ✅ FIXED: UTC-based date functions (no timezone issues)
+const getDateString = () => new Date().toISOString().split("T")[0];
+
+const getDayDueDate = (goal: Goal, dayNumber: number) => {
+  if (!goal.createdAt) return null;
+
+  const start = new Date(goal.createdAt);
+  const startUTC = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()),
+  );
+
+  const dueDate = new Date(startUTC);
+  dueDate.setUTCDate(dueDate.getUTCDate() + dayNumber - 1);
+
+  return dueDate.toISOString().split("T")[0];
+};
+
 const fmtDate = (d?: string) =>
   d
-    ? new Date(d).toLocaleDateString("en-US", {
+    ? new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
       })
@@ -107,9 +123,10 @@ export default function ExecutionPage() {
   const [loading, setLoading] = useState(true);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [planView, setPlanView] = useState<"list" | "grid" | "calendar">(
-    "grid"
+    "grid",
   );
   const [calMonth, setCalMonth] = useState(new Date());
+  const [isRequestPending, setIsRequestPending] = useState(false); // ✅ GLOBAL REQUEST LOCK
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -135,11 +152,14 @@ export default function ExecutionPage() {
 
   // Calculate day number based on creation date and duration
   const calculateDayInfo = (goal: Goal) => {
-    if (!goal.createdAt) return { currentDay: 1, completed: 0, total: goal.duration || 21 };
+    if (!goal.createdAt)
+      return { currentDay: 1, completed: 0, total: goal.duration || 21 };
 
     const start = new Date(goal.createdAt);
     const now = new Date();
-    const diffTime = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const diffTime = Math.floor(
+      (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
     const currentDay = Math.min(diffTime + 1, goal.duration || 21);
     const completed = Math.round((goal.progress / 100) * (goal.duration || 21));
     const total = goal.duration || 21;
@@ -147,21 +167,12 @@ export default function ExecutionPage() {
     return { currentDay, completed, total };
   };
 
-  // Calculate due dates for each day
-  const getDayDueDate = (goal: Goal, dayNumber: number) => {
-    if (!goal.createdAt) return null;
-    const start = new Date(goal.createdAt);
-    const dueDate = new Date(start);
-    dueDate.setDate(dueDate.getDate() + dayNumber - 1);
-    return dueDate.toISOString().slice(0, 10);
-  };
-
   // Get status of a day
   const getDayStatus = (goal: Goal, dayNumber: number) => {
     const dueDate = getDayDueDate(goal, dayNumber);
     if (!dueDate) return "upcoming";
 
-    const todayStr = today();
+    const todayStr = getDateString();
     const completed = Math.round((goal.progress / 100) * (goal.duration || 21));
 
     if (dayNumber <= completed) return "completed";
@@ -170,18 +181,28 @@ export default function ExecutionPage() {
     return "upcoming";
   };
 
+  // ✅ FIXED: Add request lock to prevent multiple simultaneous calls
   const completeDay = async (goalId: string, dayNumber: number) => {
+    // ✅ CRITICAL: Prevent multiple simultaneous requests
+    if (isRequestPending) {
+      console.warn("⚠️ Request already pending, ignoring click");
+      return;
+    }
+
     const goal = goals.find((g) => g._id === goalId);
     if (!goal) return;
 
     const status = getDayStatus(goal, dayNumber);
 
-    // Only allow marking today's day
+    // Only allow marking today's day or past days that haven't been marked
     if (status === "upcoming") {
       const dueDate = getDayDueDate(goal, dayNumber);
-      toast("⏳ This day isn't due yet. Come back on " + fmtDate(dueDate) + "!", {
-        icon: "📅",
-      });
+      toast(
+        "⏳ This day isn't due yet. Come back on " + fmtDate(dueDate) + "!",
+        {
+          icon: "📅",
+        },
+      );
       return;
     }
 
@@ -192,24 +213,47 @@ export default function ExecutionPage() {
       return;
     }
 
+    if (status === "completed") {
+      toast("✅ Already completed", { icon: "✓" });
+      return;
+    }
+
     try {
+      // ✅ Lock all requests
+      setIsRequestPending(true);
+
+      console.log(
+        `📍 Marking day ${dayNumber} for goal ${goalId} on ${getDateString()}`,
+      );
       const res = await api.patch(`/goals/${goalId}/day/${dayNumber}/complete`);
+
+      // Update goals with response data
       setGoals((p) =>
-        p.map((g) => (g._id === goalId ? { ...g, progress: res.data.data.progress } : g))
+        p.map((g) =>
+          g._id === goalId ? { ...g, progress: res.data.data.progress } : g,
+        ),
       );
       if (selectedGoal?._id === goalId) {
         setSelectedGoal((prev) =>
-          prev ? { ...prev, progress: res.data.data.progress } : null
+          prev ? { ...prev, progress: res.data.data.progress } : null,
         );
       }
       toast.success(res.data.message || "✅ Day marked complete!");
     } catch (e: any) {
+      console.error("❌ Error:", e);
       toast.error(e.response?.data?.message || "Could not mark this day");
+    } finally {
+      // ✅ Unlock
+      setIsRequestPending(false);
     }
   };
 
   // Today's focus
-  const { currentDay: selectedCurrentDay, completed: selectedCompleted, total: selectedTotal } = selectedGoal
+  const {
+    currentDay: selectedCurrentDay,
+    completed: selectedCompleted,
+    total: selectedTotal,
+  } = selectedGoal
     ? calculateDayInfo(selectedGoal)
     : { currentDay: 1, completed: 0, total: 21 };
 
@@ -240,7 +284,9 @@ export default function ExecutionPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Execution
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track your daily actions</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Track your daily actions
+          </p>
         </div>
         <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded-full">
           <FaFire className="text-orange-500 w-3.5 h-3.5" />
@@ -262,7 +308,9 @@ export default function ExecutionPage() {
                 <h2 className="font-bold text-gray-900 dark:text-white text-sm">
                   Today's Focus
                 </h2>
-                <p className="text-xs text-gray-400">One action per active goal</p>
+                <p className="text-xs text-gray-400">
+                  One action per active goal
+                </p>
               </div>
             </div>
           </div>
@@ -304,11 +352,16 @@ export default function ExecutionPage() {
                   </div>
                   <button
                     onClick={() => completeDay(goal._id, currentDay)}
-                    disabled={isDone || status === "missed" || status === "upcoming"}
+                    disabled={
+                      isDone ||
+                      status === "missed" ||
+                      status === "upcoming" ||
+                      isRequestPending
+                    } // ✅ ADD isRequestPending
                     className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                       isDone
                         ? "bg-green-500 border-green-500 cursor-default"
-                        : "border-gray-300 hover:border-green-400 disabled:cursor-not-allowed"
+                        : "border-gray-300 hover:border-green-400 disabled:cursor-not-allowed disabled:opacity-50"
                     }`}
                   >
                     {isDone ? (
@@ -354,7 +407,7 @@ export default function ExecutionPage() {
                   }`}
                   onClick={() =>
                     setSelectedGoal(
-                      selectedGoal?._id === goal._id ? null : goal
+                      selectedGoal?._id === goal._id ? null : goal,
                     )
                   }
                 >
@@ -367,7 +420,11 @@ export default function ExecutionPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <CircleProgress completed={completed} total={total} color={color} />
+                    <CircleProgress
+                      completed={completed}
+                      total={total}
+                      color={color}
+                    />
                     <div>
                       <p className="text-xl font-black" style={{ color }}>
                         {pct}%
@@ -484,7 +541,7 @@ export default function ExecutionPage() {
                               ? `Day ${dayNumber} — Due today!`
                               : `Day ${dayNumber}`
                     }
-                    disabled={isMissed || isFuture}
+                    disabled={isMissed || isFuture || isRequestPending} // ✅ ADD isRequestPending
                     className={`w-full h-9 rounded-lg flex items-center justify-center text-xs font-bold relative transition-all border disabled:cursor-not-allowed ${
                       isDone
                         ? "bg-green-500 border-green-500 text-white"
@@ -494,15 +551,13 @@ export default function ExecutionPage() {
                             ? `border-2 text-white transition-all hover:scale-105`
                             : isFuture
                               ? "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-300"
-                              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300 hover:scale-105"
+                              : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:border-indigo-300 hover:scale-105 disabled:opacity-50"
                     }`}
-                    style={isToday ? { background: color, borderColor: color } : {}}
+                    style={
+                      isToday ? { background: color, borderColor: color } : {}
+                    }
                   >
-                    {isDone ? (
-                      <FaCheck className="w-2.5 h-2.5" />
-                    ) : (
-                      dayNumber
-                    )}
+                    {isDone ? <FaCheck className="w-2.5 h-2.5" /> : dayNumber}
                     {dayNumber === selectedTotal && (
                       <span className="absolute -top-1 -right-1 text-xs">
                         🏁
@@ -543,8 +598,10 @@ export default function ExecutionPage() {
                   >
                     <button
                       onClick={() => completeDay(selectedGoal._id, dayNumber)}
-                      disabled={isMissed || status === "upcoming"}
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed ${
+                      disabled={
+                        isMissed || status === "upcoming" || isRequestPending
+                      } // ✅ ADD isRequestPending
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                         isDone
                           ? "bg-green-500 border-green-500"
                           : isMissed
@@ -552,9 +609,7 @@ export default function ExecutionPage() {
                             : "border-gray-300 hover:border-green-400"
                       }`}
                     >
-                      {isDone && (
-                        <FaCheck className="text-white w-2.5 h-2.5" />
-                      )}
+                      {isDone && <FaCheck className="text-white w-2.5 h-2.5" />}
                       {isMissed && (
                         <FaTimes className="text-red-500 w-2.5 h-2.5" />
                       )}
@@ -573,9 +628,13 @@ export default function ExecutionPage() {
                             Today
                           </span>
                         )}
-                        {dayNumber === selectedTotal && <span className="ml-1">🏁</span>}
+                        {dayNumber === selectedTotal && (
+                          <span className="ml-1">🏁</span>
+                        )}
                       </p>
-                      <p className="text-xs text-gray-400">{fmtDate(dueDate)}</p>
+                      <p className="text-xs text-gray-400">
+                        {fmtDate(dueDate)}
+                      </p>
                     </div>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
@@ -613,8 +672,8 @@ export default function ExecutionPage() {
                       new Date(
                         calMonth.getFullYear(),
                         calMonth.getMonth() - 1,
-                        1
-                      )
+                        1,
+                      ),
                     )
                   }
                   className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -633,8 +692,8 @@ export default function ExecutionPage() {
                       new Date(
                         calMonth.getFullYear(),
                         calMonth.getMonth() + 1,
-                        1
-                      )
+                        1,
+                      ),
                     )
                   }
                   className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -660,8 +719,8 @@ export default function ExecutionPage() {
                 {calDays().map((date, i) => {
                   if (!date) return <div key={i} className="h-8" />;
 
-                  const dateStr = date.toISOString().slice(0, 10);
-                  const isT = dateStr === today();
+                  const dateStr = date.toISOString().split("T")[0];
+                  const isT = dateStr === getDateString();
 
                   // Find which day number matches this date
                   let status = null;

@@ -2,21 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaChartLine,
-  FaTrophy,
-  FaExclamationTriangle,
-  FaCheckCircle,
   FaFire,
   FaPen,
   FaClipboardList,
-  FaCheck,
-  FaTimes,
   FaRedo,
 } from "react-icons/fa";
 import { api } from "@/utils/api";
 import toast from "react-hot-toast";
+import AlignmentScoreCard from "@/components/AlignmentScoreCard";
+import AlignmentTrendCard from "@/components/AlignmentTrendCard";
+import GrowthScoreCard from "@/components/GrowthScoreCard";
+import RiskIndicatorCard from "@/components/RiskIndicatorCard";
 
 interface DashboardMetrics {
   alignmentScore: number;
+  alignmentStatus?: string;
   alignmentTrend: number;
   growthScore: number;
   riskIndicator: number;
@@ -38,6 +38,7 @@ interface DashboardMetrics {
     hasCheckedInToday: boolean;
     hasReflectedToday: boolean;
   };
+  trend?: Array<{ date: string; score: number }>;
 }
 
 interface DailyCheckIn {
@@ -65,7 +66,6 @@ export default function DashboardPage() {
   const [dailyReflection, setDailyReflection] =
     useState<DailyReflection | null>(null);
 
-  // Check-in form states
   const [showCheckInForm, setShowCheckInForm] = useState(false);
   const [checkInForm, setCheckInForm] = useState({
     mood: "neutral",
@@ -73,7 +73,6 @@ export default function DashboardPage() {
     focus: 5,
   });
 
-  // Reflection form states
   const [showReflectionForm, setShowReflectionForm] = useState(false);
   const [reflectionForm, setReflectionForm] = useState({
     title: "",
@@ -128,11 +127,11 @@ export default function DashboardPage() {
         energy: checkInForm.energy,
         focus: checkInForm.focus,
       };
-      console.log("Submitting check-in:", payload);
       const res = await api.post("/daily-check-in", payload);
       if (res.data.success || res.data.data) {
         setDailyCheckIn(res.data.data);
         setShowCheckInForm(false);
+        await loadDashboardData();
         toast.success("Check-in saved! 📊");
       }
     } catch (err: any) {
@@ -157,9 +156,7 @@ export default function DashboardPage() {
         title: reflectionForm.title,
         content: reflectionForm.content,
       };
-      console.log("Submitting reflection:", payload);
       const res = await api.post("/daily-reflection", payload);
-      console.log("Reflection response:", res.data);
       if (res.data.success || res.data.data) {
         setDailyReflection(res.data.data);
         setShowReflectionForm(false);
@@ -167,37 +164,10 @@ export default function DashboardPage() {
         toast.success("Reflection saved! 📝");
       }
     } catch (err: any) {
-      console.error("Reflection error details:", err.response?.data);
       toast.error(err.response?.data?.message || "Failed to save reflection");
     } finally {
       setSubmittingReflection(false);
     }
-  };
-
-  const getRiskLevel = (risk: number) => {
-    if (risk >= 70)
-      return { text: "High Risk ⚠️", color: "text-red-600", bg: "bg-red-50" };
-    if (risk >= 40)
-      return {
-        text: "Medium Risk",
-        color: "text-yellow-600",
-        bg: "bg-yellow-50",
-      };
-    return { text: "Low Risk ✅", color: "text-green-600", bg: "bg-green-50" };
-  };
-
-  const getAlignmentStatus = (score: number) => {
-    if (score >= 80)
-      return { text: "Aligned", color: "text-green-600", bg: "bg-green-50" };
-    if (score >= 60)
-      return { text: "Progressing", color: "text-blue-600", bg: "bg-blue-50" };
-    if (score >= 40)
-      return {
-        text: "Developing",
-        color: "text-yellow-600",
-        bg: "bg-yellow-50",
-      };
-    return { text: "Unaligned", color: "text-red-600", bg: "bg-red-50" };
   };
 
   const getMoodEmoji = (mood: string) => {
@@ -224,8 +194,12 @@ export default function DashboardPage() {
     );
   }
 
-  const alignmentStatus = getAlignmentStatus(metrics?.alignmentScore || 0);
-  const riskLevel = getRiskLevel(metrics?.riskIndicator || 0);
+  const goalProgressPts =
+    (metrics?.goalProgress.completed || 0) *
+    (70 / Math.max(metrics?.goalProgress.total || 1, 1));
+  const habitCompletionPts =
+    (metrics?.habitCompletion.completed || 0) *
+    (20 / Math.max(metrics?.habitCompletion.total || 1, 1));
 
   return (
     <div className="space-y-6 pb-10">
@@ -278,7 +252,6 @@ export default function DashboardPage() {
             </button>
           ) : showCheckInForm ? (
             <div className="space-y-4">
-              {/* Mood */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   How's your mood today? {getMoodEmoji(checkInForm.mood)}
@@ -298,7 +271,6 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* Energy */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -323,7 +295,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Focus */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -348,7 +319,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={submitCheckIn}
@@ -515,73 +485,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Alignment Score */}
-        <div
-          className={`rounded-2xl p-4 border ${alignmentStatus.bg} border-opacity-40`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Alignment Score
-            </p>
-            <span className="text-lg">🎯</span>
-          </div>
-          <p className={`text-3xl font-black ${alignmentStatus.color}`}>
-            {metrics?.alignmentScore || 0}
-          </p>
-          <p className={`text-xs mt-2 ${alignmentStatus.color}`}>
-            {alignmentStatus.text}
-          </p>
-        </div>
+      {/* 4-COLUMN METRIC CARDS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Alignment Score Card */}
+        <AlignmentScoreCard
+          score={metrics?.alignmentScore || 0}
+          goalProgress={Math.round(goalProgressPts)}
+          habitCompletion={Math.round(habitCompletionPts)}
+          hasCheckedInToday={metrics?.checks.hasCheckedInToday || false}
+        />
 
-        {/* Alignment Trend */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Alignment Trend
-            </p>
-            <FaChartLine className="text-blue-600" />
-          </div>
-          <p className="text-3xl font-black text-blue-600 dark:text-blue-400">
-            {metrics?.alignmentTrend || 0}
-          </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-            30-day avg
-          </p>
-        </div>
+        {/* Alignment Trend Card */}
+        <AlignmentTrendCard
+          score={metrics?.alignmentTrend || 0}
+          trendData={metrics?.trend || []}
+        />
 
-        {/* Growth Score */}
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl p-4 border border-yellow-200 dark:border-yellow-800">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Growth Score
-            </p>
-            <FaTrophy className="text-yellow-600" />
-          </div>
-          <p className="text-3xl font-black text-yellow-600 dark:text-yellow-400">
-            {metrics?.growthScore || 0}
-          </p>
-          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-            Cumulative
-          </p>
-        </div>
+        {/* Growth Score Card */}
+        <GrowthScoreCard
+          score={metrics?.growthScore || 0}
+          capabilities={metrics?.capabilities.completed || 0}
+          achievements={metrics?.achievements.completed || 0}
+        />
 
-        {/* Risk Indicator */}
-        <div
-          className={`rounded-2xl p-4 border ${riskLevel.bg} border-opacity-40`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              Risk Level
-            </p>
-            <FaExclamationTriangle className={riskLevel.color} />
-          </div>
-          <p className={`text-3xl font-black ${riskLevel.color}`}>
-            {metrics?.riskIndicator || 0}
-          </p>
-          <p className={`text-xs mt-2 ${riskLevel.color}`}>{riskLevel.text}</p>
-        </div>
+        {/* Risk Indicator Card */}
+        <RiskIndicatorCard riskScore={metrics?.riskIndicator || 0} />
       </div>
 
       {/* Score Breakdown */}
@@ -733,7 +661,6 @@ export default function DashboardPage() {
 
       {/* Quick Access Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Goals Card */}
         <button
           onClick={() => navigate("/goals")}
           className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all text-left hover:scale-105"
@@ -752,7 +679,6 @@ export default function DashboardPage() {
           </p>
         </button>
 
-        {/* Habits Card */}
         <button
           onClick={() => navigate("/habits")}
           className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 border border-green-200 dark:border-green-800 hover:shadow-lg transition-all text-left hover:scale-105"
@@ -771,7 +697,6 @@ export default function DashboardPage() {
           </p>
         </button>
 
-        {/* Execution Card */}
         <button
           onClick={() => navigate("/execution")}
           className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-200 dark:border-amber-800 hover:shadow-lg transition-all text-left hover:scale-105"
@@ -790,7 +715,6 @@ export default function DashboardPage() {
           </p>
         </button>
 
-        {/* Analytics Card */}
         <button
           onClick={() => navigate("/analytics")}
           className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all text-left hover:scale-105"
@@ -813,19 +737,24 @@ export default function DashboardPage() {
       {/* Info Box */}
       <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-2xl p-6 border border-blue-100 dark:border-blue-900/50">
         <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">
-          📈 Dashboard Metrics Explained
+          📈 Understanding Your Metrics
         </h3>
         <div className="space-y-2 text-xs text-gray-700 dark:text-gray-300">
           <div>
-            <strong>Alignment Score:</strong> Your overall goal progress (0-100)
+            <strong>Alignment Score:</strong> Daily execution quality combining
+            goals, habits, and check-in
           </div>
           <div>
-            <strong>Growth Score:</strong> Cumulative growth from completed
-            goals and habits
+            <strong>Alignment Trend:</strong> Your 30-day consistency pattern
+            showing daily progress
           </div>
           <div>
-            <strong>Risk Indicator:</strong> Flags if goals are inactive or
-            habits incomplete
+            <strong>Growth Score:</strong> Cumulative long-term development from
+            capabilities and achievements
+          </div>
+          <div>
+            <strong>Risk Indicator:</strong> Early warning system flagging
+            misalignment before it's critical
           </div>
         </div>
       </div>
