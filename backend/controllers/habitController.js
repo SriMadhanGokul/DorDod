@@ -1,5 +1,10 @@
 const Habit = require("../models/Habit");
 
+// ✅ Helper: Get today's date as string (YYYY-MM-DD)
+const getTodayString = () => {
+  return new Date().toISOString().split("T")[0];
+};
+
 // ✅ Helper: Check time overlap
 const checkTimeOverlap = (
   newStart,
@@ -210,11 +215,12 @@ exports.deleteHabit = async (req, res) => {
   }
 };
 
-// ✅ Mark habit complete - Uses TRACKING field
+// ✅ FIXED: Mark habit complete with PROPER DATE HANDLING
 exports.markHabitComplete = async (req, res) => {
   try {
     const habitId = req.params.id;
-    const today = new Date().toISOString().split("T")[0];
+    // ✅ Get today as string (YYYY-MM-DD) for date comparison
+    const today = getTodayString();
 
     const habit = await Habit.findById(habitId);
     if (!habit) {
@@ -228,29 +234,39 @@ exports.markHabitComplete = async (req, res) => {
       habit.tracking = [];
     }
 
-    // Check if already completed today
+    // ✅ CHECK IF ALREADY COMPLETED TODAY
+    // Safely handle both string and Date formats for backward compatibility
     const todayTracking = habit.tracking.find((t) => {
-      const trackDate = new Date(t.date).toISOString().split("T")[0];
-      return trackDate === today;
+      // Ensure we're comparing strings
+      const trackDate =
+        typeof t.date === "string"
+          ? t.date
+          : new Date(t.date).toISOString().split("T")[0];
+      return trackDate === today && t.status === "completed";
     });
 
-    if (todayTracking?.status === "completed") {
-      return res.json({
-        success: true,
-        message: "Already completed today",
-        data: habit,
+    // ✅ IF ALREADY COMPLETED, RETURN ERROR
+    if (todayTracking) {
+      console.log(`⚠️ Habit already completed today: ${habitId}`);
+      return res.status(400).json({
+        success: false,
+        message: "Habit already completed today. Cannot complete twice.",
+        isAlreadyCompleted: true,
       });
     }
 
-    // Remove old record for today if exists
+    // ✅ Remove old record for today if exists (pending/missed)
     habit.tracking = habit.tracking.filter((t) => {
-      const trackDate = new Date(t.date).toISOString().split("T")[0];
+      const trackDate =
+        typeof t.date === "string"
+          ? t.date
+          : new Date(t.date).toISOString().split("T")[0];
       return trackDate !== today;
     });
 
-    // Add new completed record
+    // ✅ Add new completed record with DATE AS STRING
     habit.tracking.push({
-      date: new Date(),
+      date: today, // ✅ SAVE AS STRING "YYYY-MM-DD"
       status: "completed",
       completedAt: new Date(),
       markedAt: new Date(),
@@ -261,18 +277,24 @@ exports.markHabitComplete = async (req, res) => {
     await habit.save();
 
     console.log(`✅ Habit completed: ${habitId} on ${today}`);
-    res.json({ success: true, message: "Habit marked complete!", data: habit });
+    console.log(`   Tracking saved: { date: "${today}", status: "completed" }`);
+
+    res.json({
+      success: true,
+      message: "Habit marked complete!",
+      data: habit,
+    });
   } catch (error) {
     console.error("Mark habit complete error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Mark habit incomplete
+// ✅ FIXED: Mark habit incomplete with proper date handling
 exports.markHabitIncomplete = async (req, res) => {
   try {
     const habitId = req.params.id;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayString();
 
     const habit = await Habit.findById(habitId);
     if (!habit) {
@@ -282,13 +304,18 @@ exports.markHabitIncomplete = async (req, res) => {
     }
 
     if (habit.tracking) {
+      // ✅ Handle both string and Date formats
       habit.tracking = habit.tracking.filter((t) => {
-        const trackDate = new Date(t.date).toISOString().split("T")[0];
+        const trackDate =
+          typeof t.date === "string"
+            ? t.date
+            : new Date(t.date).toISOString().split("T")[0];
         return trackDate !== today;
       });
     }
 
     await habit.save();
+    console.log(`✅ Habit incomplete: ${habitId} on ${today}`);
     res.json({ success: true, data: habit });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

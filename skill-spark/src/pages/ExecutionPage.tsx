@@ -26,6 +26,7 @@ interface Goal {
   targetDate?: string;
   linkedHabits: any[];
   createdAt?: string;
+  dayCompletion?: Record<string, any>;
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -46,21 +47,33 @@ const COLORS: Record<string, string> = {
   Other: "#6b7280",
 };
 
-// ✅ FIXED: UTC-based date functions (no timezone issues)
-const getDateString = () => new Date().toISOString().split("T")[0];
+// ✅ Get today's date in YYYY-MM-DD format
+const getTodayString = (): string => {
+  return new Date().toISOString().split("T")[0];
+};
 
-const getDayDueDate = (goal: Goal, dayNumber: number) => {
+// ✅ Calculate due date for a specific day number
+const getDayDueDate = (goal: Goal, dayNumber: number): string | null => {
   if (!goal.createdAt) return null;
 
-  const start = new Date(goal.createdAt);
-  const startUTC = new Date(
-    Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()),
-  );
+  try {
+    const createdDate = new Date(goal.createdAt);
+    const createdUTC = new Date(
+      Date.UTC(
+        createdDate.getUTCFullYear(),
+        createdDate.getUTCMonth(),
+        createdDate.getUTCDate(),
+      ),
+    );
 
-  const dueDate = new Date(startUTC);
-  dueDate.setUTCDate(dueDate.getUTCDate() + dayNumber - 1);
+    const targetDate = new Date(createdUTC.getTime());
+    targetDate.setUTCDate(targetDate.getUTCDate() + (dayNumber - 1));
 
-  return dueDate.toISOString().split("T")[0];
+    return targetDate.toISOString().split("T")[0];
+  } catch (e) {
+    console.error("Error calculating due date:", e);
+    return null;
+  }
 };
 
 const fmtDate = (d?: string) =>
@@ -126,7 +139,7 @@ export default function ExecutionPage() {
     "grid",
   );
   const [calMonth, setCalMonth] = useState(new Date());
-  const [isRequestPending, setIsRequestPending] = useState(false); // ✅ GLOBAL REQUEST LOCK
+  const [isRequestPending, setIsRequestPending] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -150,7 +163,14 @@ export default function ExecutionPage() {
     load();
   }, []);
 
-  // Calculate day number based on creation date and duration
+  // ✅ Count actual completed days from dayCompletion map
+  const getCompletedDaysCount = (goal: Goal): number => {
+    if (!goal.dayCompletion) return 0;
+    return Object.keys(goal.dayCompletion).filter((key) => !key.startsWith("$"))
+      .length;
+  };
+
+  // Calculate day info based on creation date
   const calculateDayInfo = (goal: Goal) => {
     if (!goal.createdAt)
       return { currentDay: 1, completed: 0, total: goal.duration || 21 };
@@ -161,94 +181,157 @@ export default function ExecutionPage() {
       (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
     );
     const currentDay = Math.min(diffTime + 1, goal.duration || 21);
-    const completed = Math.round((goal.progress / 100) * (goal.duration || 21));
+    const completed = getCompletedDaysCount(goal);
     const total = goal.duration || 21;
 
     return { currentDay, completed, total };
   };
 
-  // Get status of a day
+  // ✅ Get day status based on dayCompletion data
   const getDayStatus = (goal: Goal, dayNumber: number) => {
     const dueDate = getDayDueDate(goal, dayNumber);
     if (!dueDate) return "upcoming";
 
-    const todayStr = getDateString();
-    const completed = Math.round((goal.progress / 100) * (goal.duration || 21));
+    const today = getTodayString();
+    const isDayCompleted =
+      goal.dayCompletion?.[dueDate]?.status === "completed";
 
-    if (dayNumber <= completed) return "completed";
-    if (dueDate < todayStr) return "missed";
-    if (dueDate === todayStr) return "today";
+    if (isDayCompleted) return "completed";
+    if (dueDate < today) return "missed";
+    if (dueDate === today) return "today";
     return "upcoming";
   };
 
-  // ✅ FIXED: Add request lock to prevent multiple simultaneous calls
+  // ✅ Mark a day as complete
   const completeDay = async (goalId: string, dayNumber: number) => {
-    // ✅ CRITICAL: Prevent multiple simultaneous requests
     if (isRequestPending) {
       console.warn("⚠️ Request already pending, ignoring click");
       return;
     }
 
     const goal = goals.find((g) => g._id === goalId);
-    if (!goal) return;
+    if (!goal) {
+      console.error("Goal not found!");
+      return;
+    }
 
+    const dueDate = getDayDueDate(goal, dayNumber);
     const status = getDayStatus(goal, dayNumber);
 
-    // Only allow marking today's day or past days that haven't been marked
+    console.log(
+      `\n🎯 Attempting to mark Day ${dayNumber}:\n` +
+        `   Due Date: ${dueDate}\n` +
+        `   Status: ${status}\n` +
+        `   Current Date: ${getTodayString()}`,
+    );
+
+    // Validation checks
     if (status === "upcoming") {
-      const dueDate = getDayDueDate(goal, dayNumber);
-      toast(
-        "⏳ This day isn't due yet. Come back on " + fmtDate(dueDate) + "!",
-        {
-          icon: "📅",
-        },
-      );
+      const msg = `⏳ This day isn't due yet. Come back on ${fmtDate(dueDate)}!`;
+      console.warn(msg);
+      toast(msg, { icon: "📅" });
       return;
     }
 
     if (status === "missed") {
-      toast("🔒 This day has already passed and cannot be marked.", {
-        icon: "⚠️",
-      });
+      const msg = `🔒 This day has already passed and cannot be marked.`;
+      console.warn(msg);
+      toast(msg, { icon: "⚠️" });
       return;
     }
 
     if (status === "completed") {
-      toast("✅ Already completed", { icon: "✓" });
+      const msg = `✅ Already completed on ${fmtDate(dueDate)}`;
+      console.log(msg);
+      toast(msg, { icon: "✓" });
       return;
     }
 
     try {
-      // ✅ Lock all requests
       setIsRequestPending(true);
 
       console.log(
-        `📍 Marking day ${dayNumber} for goal ${goalId} on ${getDateString()}`,
+        `\n📍 SENDING REQUEST to mark day ${dayNumber}:\n` +
+          `   Goal ID: ${goalId}\n` +
+          `   Due Date: ${dueDate}\n` +
+          `   Today: ${getTodayString()}`,
       );
+
       const res = await api.patch(`/goals/${goalId}/day/${dayNumber}/complete`);
 
-      // Update goals with response data
-      setGoals((p) =>
-        p.map((g) =>
-          g._id === goalId ? { ...g, progress: res.data.data.progress } : g,
-        ),
+      console.log(`📦 API RESPONSE:`, res.data);
+
+      if (!res.data.success) {
+        const msg = res.data.message || "Failed to mark day";
+        console.error(`❌ API returned success: false - ${msg}`);
+        toast.error(msg);
+        return;
+      }
+
+      const updatedGoal = res.data.data;
+
+      if (!updatedGoal) {
+        console.error("❌ No goal data in response!");
+        toast.error("No goal data returned from server");
+        return;
+      }
+
+      console.log(
+        `✅ API SUCCESS. Updated goal:`,
+        JSON.stringify(updatedGoal, null, 2),
       );
+
+      // ✅ Update goals with response data
+      setGoals((prev) => {
+        const updated = prev.map((g) =>
+          g._id === goalId
+            ? {
+                ...g,
+                progress: updatedGoal.progress,
+                dayCompletion: updatedGoal.dayCompletion,
+                status: updatedGoal.status,
+              }
+            : g,
+        );
+
+        console.log(`🔄 State updated. New goal:`, {
+          dayCompletion: updated.find((g) => g._id === goalId)?.dayCompletion,
+          progress: updated.find((g) => g._id === goalId)?.progress,
+        });
+
+        return updated;
+      });
+
+      // Update selected goal too
       if (selectedGoal?._id === goalId) {
         setSelectedGoal((prev) =>
-          prev ? { ...prev, progress: res.data.data.progress } : null,
+          prev
+            ? {
+                ...prev,
+                progress: updatedGoal.progress,
+                dayCompletion: updatedGoal.dayCompletion,
+                status: updatedGoal.status,
+              }
+            : null,
         );
       }
-      toast.success(res.data.message || "✅ Day marked complete!");
+
+      toast.success(`✅ Day ${dayNumber} marked complete!`);
     } catch (e: any) {
-      console.error("❌ Error:", e);
-      toast.error(e.response?.data?.message || "Could not mark this day");
+      console.error("❌ ERROR:", e);
+      const errorMsg =
+        e.response?.data?.message || e.message || "Could not mark this day";
+      console.error("Error details:", {
+        status: e.response?.status,
+        data: e.response?.data,
+        message: errorMsg,
+      });
+      toast.error(errorMsg);
     } finally {
-      // ✅ Unlock
       setIsRequestPending(false);
     }
   };
 
-  // Today's focus
   const {
     currentDay: selectedCurrentDay,
     completed: selectedCompleted,
@@ -257,7 +340,6 @@ export default function ExecutionPage() {
     ? calculateDayInfo(selectedGoal)
     : { currentDay: 1, completed: 0, total: 21 };
 
-  // Calendar days
   const calDays = () => {
     const yr = calMonth.getFullYear(),
       mo = calMonth.getMonth();
@@ -357,7 +439,7 @@ export default function ExecutionPage() {
                       status === "missed" ||
                       status === "upcoming" ||
                       isRequestPending
-                    } // ✅ ADD isRequestPending
+                    }
                     className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                       isDone
                         ? "bg-green-500 border-green-500 cursor-default"
@@ -450,7 +532,6 @@ export default function ExecutionPage() {
       {/* 21-Day Plan */}
       {selectedGoal && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
-          {/* Plan header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
               <span className="text-xl">
@@ -473,7 +554,6 @@ export default function ExecutionPage() {
             </div>
           </div>
 
-          {/* View switcher */}
           <div className="flex items-center gap-2 mb-4 flex-wrap">
             <span className="text-xs text-gray-400 font-medium">View:</span>
             <div className="flex gap-1">
@@ -497,7 +577,6 @@ export default function ExecutionPage() {
                 </button>
               ))}
             </div>
-            {/* Legend */}
             <div className="ml-auto flex gap-3 text-xs text-gray-400">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full inline-block" />
@@ -541,7 +620,7 @@ export default function ExecutionPage() {
                               ? `Day ${dayNumber} — Due today!`
                               : `Day ${dayNumber}`
                     }
-                    disabled={isMissed || isFuture || isRequestPending} // ✅ ADD isRequestPending
+                    disabled={isMissed || isFuture || isRequestPending}
                     className={`w-full h-9 rounded-lg flex items-center justify-center text-xs font-bold relative transition-all border disabled:cursor-not-allowed ${
                       isDone
                         ? "bg-green-500 border-green-500 text-white"
@@ -600,7 +679,7 @@ export default function ExecutionPage() {
                       onClick={() => completeDay(selectedGoal._id, dayNumber)}
                       disabled={
                         isMissed || status === "upcoming" || isRequestPending
-                      } // ✅ ADD isRequestPending
+                      }
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                         isDone
                           ? "bg-green-500 border-green-500"
@@ -664,7 +743,6 @@ export default function ExecutionPage() {
           {/* CALENDAR VIEW */}
           {planView === "calendar" && (
             <div>
-              {/* Month nav */}
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() =>
@@ -702,7 +780,6 @@ export default function ExecutionPage() {
                 </button>
               </div>
 
-              {/* Day headers */}
               <div className="grid grid-cols-7 mb-1">
                 {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
                   <div
@@ -714,15 +791,13 @@ export default function ExecutionPage() {
                 ))}
               </div>
 
-              {/* Calendar grid */}
               <div className="grid grid-cols-7 gap-1">
                 {calDays().map((date, i) => {
                   if (!date) return <div key={i} className="h-8" />;
 
                   const dateStr = date.toISOString().split("T")[0];
-                  const isT = dateStr === getDateString();
+                  const isT = dateStr === getTodayString();
 
-                  // Find which day number matches this date
                   let status = null;
                   for (let dn = 1; dn <= selectedTotal; dn++) {
                     if (getDayDueDate(selectedGoal, dn) === dateStr) {

@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 // ─── User Pages ───────────────────────────────────────────────────────────────
 import DashboardPage from "./pages/DashboardPage";
 import SkillsPage from "./pages/SkillsPage";
+import SkillDetailsPage from "@/pages/SkillDetailsPage";
 import GoalsPage from "./pages/GoalsPage";
 import DevPlanPage from "./pages/DevPlanPage";
 import HabitsPage from "./pages/HabitsPage";
@@ -152,6 +153,14 @@ const App = () => (
               element={
                 <ProtectedWithLayout>
                   <SkillsPage />
+                </ProtectedWithLayout>
+              }
+            />
+            <Route
+              path="/skills/:skillId"
+              element={
+                <ProtectedWithLayout>
+                  <SkillDetailsPage />
                 </ProtectedWithLayout>
               }
             />

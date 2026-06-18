@@ -1,29 +1,42 @@
 const mongoose = require("mongoose");
 
-// Each "want to learn" tag can be individually added as a goal
-const wantsToLearnItemSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true },
-    addedToGoal: { type: Boolean, default: false },
-  },
-  { _id: true },
-);
-
 const customSkillSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    skillName: { type: String, required: true, trim: true },
-    alreadyKnows: { type: [String], default: [] }, // array of tag strings
-    wantsToLearn: { type: [wantsToLearnItemSchema], default: [] }, // array with addedToGoal per item
-    description: { type: String, default: "" },
-    category: { type: String, default: "Technical" },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      // Removed unique: true - users should be able to create multiple custom skills
+    },
+    skillName: {
+      type: String,
+      required: true,
+    },
+    alreadyKnows: {
+      type: [String],
+      default: [],
+    },
+    wantsToLearn: {
+      type: [String],
+      default: [],
+    },
+    description: {
+      type: String,
+      default: "",
+    },
+    category: {
+      type: String,
+      default: "Technical",
+      enum: ["Technical", "Leadership", "Soft Skills", "Creative", "Language", "Other"],
+    },
+    // ✅ UNIFIED STATUS - same as existing skills
     status: {
       type: String,
-      enum: ["current", "completed", "planned"],
-      default: "current",
+      enum: ["to-learn", "learning", "learned"],
+      default: "to-learn",
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("CustomSkill", customSkillSchema);

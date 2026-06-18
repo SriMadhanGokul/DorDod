@@ -31,7 +31,7 @@ import {
 } from "react-icons/fa";
 
 const navItems = [
-  { to: "/dashboard", icon: FaChartBar, label: "Growth Score" }, // combined Overview + Growth Score
+  { to: "/dashboard", icon: FaChartBar, label: "Dashboard" }, // combined Overview + Growth Score
   { to: "/goals", icon: FaBullseye, label: "Intent" },
   { to: "/skills", icon: FaLightbulb, label: "Capabilities" },
   { to: "/scop", icon: FaCompass, label: "SCOP" },
@@ -45,7 +45,7 @@ const navItems = [
   { to: "/network", icon: FaUsers, label: "Network" },
   { to: "/profile", icon: FaUserCircle, label: "Profile" },
   { to: "/resources", icon: FaFileAlt, label: "Resources" },
-  { to: "/financial", icon: FaMoneyBill, label: "Finance" },
+  { to: "/financial", icon: FaMoneyBill, label: "Finance Agility" },
   // { to: "/leaderboard", icon: FaMedal, label: "Leaderboard" }, // hidden for now
   // { to: "/frame-of-mind", icon: FaSmile, label: "Mind State" }, // hidden — handled in Growth Score
 ];

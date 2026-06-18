@@ -79,18 +79,34 @@ exports.markDayComplete = async (req, res) => {
     const goalId = req.params.id;
     const dayNumber = parseInt(req.params.day);
 
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📍 MARK DAY COMPLETE REQUEST`);
+    console.log(`   Goal ID: ${goalId}`);
+    console.log(`   Day Number: ${dayNumber}`);
+    console.log(`${"=".repeat(60)}\n`);
+
     const goal = await Goal.findById(goalId);
     if (!goal) {
+      console.error(`❌ Goal not found: ${goalId}`);
       return res
         .status(404)
         .json({ success: false, message: "Goal not found" });
     }
 
+    console.log(`✅ Goal found: ${goal.title}`);
+    console.log(`   Created: ${goal.createdAt}`);
+    console.log(`   Current dayCompletion:`, goal.dayCompletion);
+
     fixDayCompletion(goal);
 
+    // ✅ CRITICAL: Get today's date in string format "YYYY-MM-DD"
     const today = new Date().toISOString().split("T")[0];
+    console.log(`   Today: ${today}`);
 
+    // Calculate the due date for this day number
     const createdDate = new Date(goal.createdAt);
+    console.log(`   Created Date object:`, createdDate.toISOString());
+
     const createdUTC = new Date(
       Date.UTC(
         createdDate.getUTCFullYear(),
@@ -98,27 +114,53 @@ exports.markDayComplete = async (req, res) => {
         createdDate.getUTCDate(),
       ),
     );
+    console.log(`   Created UTC (midnight):`, createdUTC.toISOString());
 
     const targetDate = new Date(createdUTC);
     targetDate.setUTCDate(targetDate.getUTCDate() + dayNumber - 1);
     const completionDate = targetDate.toISOString().split("T")[0];
 
+    console.log(`\n📅 DATE CALCULATION:`);
+    console.log(`   Day Number: ${dayNumber}`);
+    console.log(`   Created UTC Date: ${createdUTC.getUTCDate()}`);
+    console.log(
+      `   Target Date Calc: ${createdUTC.getUTCDate()} + (${dayNumber} - 1) = ${createdUTC.getUTCDate() + dayNumber - 1}`,
+    );
+    console.log(`   Target Date: ${targetDate.toISOString()}`);
+    console.log(`   Completion Date String: ${completionDate}`);
+
+    // ✅ CALENDAR-DAY-BASED CHECK: Can only mark on or after the due date
     if (completionDate > today) {
+      console.error(
+        `❌ Future date: ${completionDate} > ${today} (cannot mark yet)`,
+      );
       return res.status(400).json({
         success: false,
-        message: `Cannot mark future dates`,
+        message: `Cannot mark future dates. This day is due on ${completionDate}`,
       });
     }
 
+    // ✅ CALENDAR-DAY-BASED CHECK: Check if already completed on this specific date
     if (goal.dayCompletion[completionDate]) {
-      return res.status(200).json({
+      console.warn(
+        `⚠️ Already completed on ${completionDate}. Cannot mark again on same calendar day.`,
+      );
+      console.log(
+        `   Current dayCompletion[${completionDate}]:`,
+        goal.dayCompletion[completionDate],
+      );
+      return res.status(400).json({
         success: true,
-        message: "Already completed",
+        message: "Already completed on " + completionDate,
+        alreadyCompleted: true,
         data: goal,
       });
     }
 
-    // Mark only this one date
+    console.log(`\n✅ MARKING DAY AS COMPLETE`);
+
+    // ✅ Mark this specific calendar day as complete
+    // Explicitly set the values to ensure Map type saves correctly
     goal.dayCompletion[completionDate] = {
       date: completionDate,
       dayNumber: dayNumber,
@@ -126,34 +168,63 @@ exports.markDayComplete = async (req, res) => {
       status: "completed",
     };
 
-    // ✅ COUNT ONLY REAL DATES (not Mongoose properties)
+    console.log(`   Marked: dayCompletion[${completionDate}] = ...`);
+    console.log(`   dayCompletion after marking:`, goal.dayCompletion);
+
+    // ✅ CRITICAL: Mark Map as modified so Mongoose saves it
+    goal.markModified("dayCompletion");
+
+    // ✅ Recalculate progress from actual completion count
     const completedCount = getCompletedCount(goal.dayCompletion);
-    goal.progress = Math.min(
+    const newProgress = Math.min(
       100,
       Math.round((completedCount / goal.duration) * 100),
     );
 
-    console.log(
-      `\n📊 Progress: ${completedCount}/${goal.duration} = ${goal.progress}%`,
-    );
+    console.log(`\n📊 PROGRESS CALCULATION:`);
+    console.log(`   Completed Days: ${completedCount}`);
+    console.log(`   Total Days: ${goal.duration}`);
+    console.log(`   Old Progress: ${goal.progress}%`);
+    console.log(`   New Progress: ${newProgress}%`);
+
+    goal.progress = newProgress;
 
     // Auto-complete if done
     if (completedCount >= goal.duration) {
       goal.status = "completed";
       goal.completedAt = new Date();
-      console.log(`🎉 GOAL COMPLETED`);
+      console.log(`\n🎉 GOAL COMPLETED!`);
     }
 
-    await goal.save();
-    console.log(`✅ SAVED\n`);
+    console.log(`\n💾 SAVING GOAL...`);
+
+    try {
+      await goal.save();
+      console.log(`✅ GOAL SAVED SUCCESSFULLY`);
+    } catch (saveError) {
+      console.error(`❌ SAVE ERROR:`, saveError);
+      throw saveError;
+    }
+
+    // ✅ Fix dayCompletion before sending response
+    fixDayCompletion(goal);
+
+    console.log(`\n📦 SENDING RESPONSE:`);
+    console.log(`   Success: true`);
+    console.log(`   dayCompletion in response:`, goal.dayCompletion);
+    console.log(`   progress in response:`, goal.progress);
+    console.log(`${"=".repeat(60)}\n`);
 
     res.json({
       success: true,
-      message: `Day ${dayNumber} marked!`,
-      data: goal,
+      message: `Day ${dayNumber} marked complete!`,
+      data: goal, // ✅ INCLUDE FULL GOAL DATA WITH dayCompletion
     });
   } catch (error) {
-    console.error(`❌ ERROR: ${error.message}\n`);
+    console.error(`\n❌ ERROR IN MARK_DAY_COMPLETE:`, error);
+    console.error(`   Error message: ${error.message}`);
+    console.error(`   Stack: ${error.stack}`);
+    console.error(`${"=".repeat(60)}\n`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -183,6 +254,7 @@ exports.markGoalIncomplete = async (req, res) => {
     }
 
     await goal.save();
+    fixDayCompletion(goal);
     res.json({ success: true, data: goal });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -274,6 +346,7 @@ exports.markGoalComplete = async (req, res) => {
     }
 
     await goal.save();
+    fixDayCompletion(goal);
     res.json({ success: true, data: goal });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

@@ -26,7 +26,7 @@ exports.getCheckInToday = async (req, res) => {
 
     const checkIn = await DailyCheckIn.findOne({
       userId: req.user.id,
-      date: today, // ✅ Now properly matches String dates
+      date: today,
     });
 
     if (!checkIn) {
@@ -58,19 +58,19 @@ exports.getCheckIn = async (req, res) => {
   }
 };
 
-// ✅ Create check-in (FIXED with proper date handling)
+// ✅ Create/Update check-in (FIXED)
 exports.createCheckIn = async (req, res) => {
   try {
     const { date, mood, energy, focus } = req.body;
     const today = getToday();
 
-    console.log(`\n📋 CREATE CHECK-IN`);
+    console.log(`\n📋 CREATE/UPDATE CHECK-IN`);
     console.log(`   User: ${req.user.id}`);
-    console.log(`   Date: ${date || today}`);
-    console.log(`   Mood: ${mood}, Energy: ${energy}, Focus: ${focus}`);
+    console.log(`   Input date: ${date}`);
+    console.log(`   Today: ${today}`);
 
     // ✅ Validate required fields
-    if (!mood || !energy || !focus) {
+    if (!mood || energy === undefined || focus === undefined) {
       return res.status(400).json({
         success: false,
         message: "Mood, energy, and focus are required",
@@ -85,39 +85,45 @@ exports.createCheckIn = async (req, res) => {
       });
     }
 
-    // ✅ Use provided date or today's date (ensure YYYY-MM-DD format)
-    const dateToUse = date || today;
+    // ✅ Ensure date is in YYYY-MM-DD format
+    const dateToUse = date && date.match(/^\d{4}-\d{2}-\d{2}$/) ? date : today;
+    console.log(`   Using date: ${dateToUse}`);
 
-    // ✅ Check if check-in already exists for this date
-    const existing = await DailyCheckIn.findOne({
-      userId: req.user.id,
-      date: dateToUse,
-    });
-
-    if (existing) {
-      console.log(`   ℹ️  Check-in already exists, updating...`);
-      // Update existing
-      const updated = await DailyCheckIn.findByIdAndUpdate(
-        existing._id,
-        {
-          mood,
-          energy,
-          focus,
-          completed: true,
-        },
-        { new: true },
-      );
-      return res.json({
-        success: true,
-        data: updated,
-        message: "Check-in updated",
+    // ✅ UPSERT: Try to find and update, else create
+    try {
+      const existing = await DailyCheckIn.findOne({
+        userId: req.user.id,
+        date: dateToUse,
       });
+
+      if (existing) {
+        console.log(`   📝 Check-in exists, updating...`);
+        const updated = await DailyCheckIn.findByIdAndUpdate(
+          existing._id,
+          {
+            mood,
+            energy,
+            focus,
+            completed: true,
+          },
+          { new: true },
+        );
+        console.log(`   ✅ Check-in updated: ${updated._id}\n`);
+        return res.json({
+          success: true,
+          data: updated,
+          message: "Check-in updated",
+        });
+      }
+    } catch (findError) {
+      console.error(`   ⚠️  Find error: ${findError.message}`);
     }
 
-    // ✅ Create new check-in
+    // ✅ Create new check-in with explicit date
+    console.log(`   🆕 Creating new check-in...`);
     const checkIn = await DailyCheckIn.create({
       userId: req.user.id,
-      date: dateToUse, // ✅ String format YYYY-MM-DD
+      date: dateToUse,
       mood,
       energy,
       focus,
@@ -127,7 +133,19 @@ exports.createCheckIn = async (req, res) => {
     console.log(`   ✅ Check-in created: ${checkIn._id}\n`);
     res.status(201).json({ success: true, data: checkIn });
   } catch (error) {
-    console.error("❌ Create check-in error:", error);
+    console.error(`\n❌ CREATE CHECK-IN ERROR:`, error.message);
+    console.error(`   Code: ${error.code}`);
+    console.error(`   Stack: ${error.stack}\n`);
+
+    // ✅ Handle E11000 duplicate key error
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "Check-in already exists for this date. Please refresh and edit instead.",
+      });
+    }
+
     res.status(500).json({ success: false, message: error.message });
   }
 };

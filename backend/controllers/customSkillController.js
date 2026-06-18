@@ -1,23 +1,36 @@
 const CustomSkill = require("../models/CustomSkill");
-const Goal = require("../models/Goal");
 
-// GET /api/custom-skills
+// ✅ HELPER: Normalize array data - convert objects to strings
+const normalizeArray = (data) => {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (typeof item === "object" && item.name) return item.name;
+      if (typeof item === "object" && item.skillName) return item.skillName;
+      return String(item).trim();
+    })
+    .filter((item) => item && item.length > 0);
+};
+
+// ✅ GET ALL CUSTOM SKILLS FOR USER
 const getCustomSkills = async (req, res) => {
   try {
-    const skills = await CustomSkill.find({ user: req.user.id }).sort({
-      createdAt: -1,
+    const skills = await CustomSkill.find({ user: req.user.id });
+    res.json({
+      success: true,
+      data: skills || [],
     });
-    res.status(200).json({ success: true, data: skills });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch custom skills" });
+  } catch (error) {
+    console.error("getCustomSkills error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch custom skills",
+    });
   }
 };
 
-// POST /api/custom-skills
-// alreadyKnows comes as array of strings
-// wantsToLearn comes as array of strings → stored as [{name, addedToGoal:false}]
+// ✅ CREATE CUSTOM SKILL
 const createCustomSkill = async (req, res) => {
   try {
     const {
@@ -28,141 +41,189 @@ const createCustomSkill = async (req, res) => {
       category,
       status,
     } = req.body;
-    if (!skillName?.trim())
-      return res
-        .status(400)
-        .json({ success: false, message: "Skill name is required" });
 
-    // Normalise alreadyKnows — accept string or array
-    let knowsArr = [];
-    if (Array.isArray(alreadyKnows)) knowsArr = alreadyKnows.filter(Boolean);
-    else if (typeof alreadyKnows === "string")
-      knowsArr = alreadyKnows
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+    // Validate required fields
+    if (!skillName || !skillName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Skill name is required",
+      });
+    }
 
-    // Normalise wantsToLearn — each becomes { name, addedToGoal: false }
-    let wantsArr = [];
-    if (Array.isArray(wantsToLearn))
-      wantsArr = wantsToLearn
-        .filter(Boolean)
-        .map((n) => ({ name: n, addedToGoal: false }));
-    else if (typeof wantsToLearn === "string")
-      wantsArr = wantsToLearn
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((n) => ({ name: n, addedToGoal: false }));
+    // Validate status
+    const validStatuses = ["to-learn", "learning", "learned"];
+    const finalStatus = validStatuses.includes(status) ? status : "to-learn";
 
-    const skill = await CustomSkill.create({
+    // Normalize arrays - handle both string and object formats
+    const normalizedAlreadyKnows = normalizeArray(alreadyKnows);
+    const normalizedWantsToLearn = normalizeArray(wantsToLearn);
+
+    const customSkill = new CustomSkill({
       user: req.user.id,
-      skillName,
+      skillName: skillName.trim(),
+      alreadyKnows: normalizedAlreadyKnows,
+      wantsToLearn: normalizedWantsToLearn,
       description: description || "",
-      alreadyKnows: knowsArr,
-      wantsToLearn: wantsArr,
       category: category || "Technical",
-      status: status || "current",
-    });
-    res
-      .status(201)
-      .json({ success: true, message: "Custom skill added!", data: skill });
-  } catch (err) {
-    console.error("createCustomSkill error:", err);
-    res.status(500).json({ success: false, message: "Failed to add skill" });
-  }
-};
-
-// PUT /api/custom-skills/:id
-const updateCustomSkill = async (req, res) => {
-  try {
-    const skill = await CustomSkill.findOneAndUpdate(
-      { _id: req.params.id, user: req.user.id },
-      req.body,
-      { new: true },
-    );
-    if (!skill)
-      return res
-        .status(404)
-        .json({ success: false, message: "Skill not found" });
-    res
-      .status(200)
-      .json({ success: true, message: "Skill updated!", data: skill });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Failed to update skill" });
-  }
-};
-
-// DELETE /api/custom-skills/:id
-const deleteCustomSkill = async (req, res) => {
-  try {
-    const skill = await CustomSkill.findOneAndDelete({
-      _id: req.params.id,
-      user: req.user.id,
-    });
-    if (!skill)
-      return res
-        .status(404)
-        .json({ success: false, message: "Skill not found" });
-    res.status(200).json({ success: true, message: "Skill deleted!" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Failed to delete skill" });
-  }
-};
-
-// POST /api/custom-skills/:skillId/tags/:tagId/add-goal
-// Adds a single "want to learn" tag as a Goal
-const addTagToGoal = async (req, res) => {
-  try {
-    const skill = await CustomSkill.findOne({
-      _id: req.params.skillId,
-      user: req.user.id,
-    });
-    if (!skill)
-      return res
-        .status(404)
-        .json({ success: false, message: "Skill not found" });
-
-    const tag = skill.wantsToLearn.id(req.params.tagId);
-    if (!tag)
-      return res.status(404).json({ success: false, message: "Tag not found" });
-
-    if (tag.addedToGoal)
-      return res
-        .status(400)
-        .json({ success: false, message: "Already added to goals!" });
-
-    // Create Goal for this specific tag
-    await Goal.create({
-      user: req.user.id,
-      title: `Learn ${tag.name}`,
-      description: `Master ${tag.name} as part of learning ${skill.skillName} (${skill.category}).`,
-      category: "Career",
-      goalType: "Professional",
-      priority: "Medium",
-      status: "Not Started",
-      progress: 0,
-      tags: [skill.skillName, skill.category, tag.name],
+      status: finalStatus,
     });
 
-    tag.addedToGoal = true;
-    await skill.save();
+    await customSkill.save();
 
     res.status(201).json({
       success: true,
-      message: `🎯 "Learn ${tag.name}" added to your Goals!`,
-      data: skill,
+      message: "Custom skill created successfully",
+      data: customSkill,
     });
-  } catch (err) {
-    console.error("addTagToGoal error:", err);
-    res.status(500).json({ success: false, message: "Failed to add to goals" });
+  } catch (error) {
+    console.error("createCustomSkill error:", error);
+
+    // Handle unique constraint error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Custom skill with this name already exists",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to create custom skill",
+      error: error.message,
+    });
   }
 };
 
+// ✅ GET SINGLE CUSTOM SKILL
+const getCustomSkill = async (req, res) => {
+  try {
+    const skill = await CustomSkill.findById(req.params.id);
+
+    if (!skill) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom skill not found",
+      });
+    }
+
+    if (skill.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to view this skill",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: skill,
+    });
+  } catch (error) {
+    console.error("getCustomSkill error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch custom skill",
+    });
+  }
+};
+
+// ✅ UPDATE CUSTOM SKILL
+const updateCustomSkill = async (req, res) => {
+  try {
+    const { alreadyKnows, wantsToLearn, description, status, category } =
+      req.body;
+
+    let skill = await CustomSkill.findById(req.params.id);
+
+    if (!skill) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom skill not found",
+      });
+    }
+
+    if (skill.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this skill",
+      });
+    }
+
+    // Update fields with normalization
+    if (alreadyKnows !== undefined) {
+      skill.alreadyKnows = normalizeArray(alreadyKnows);
+    }
+    if (wantsToLearn !== undefined) {
+      skill.wantsToLearn = normalizeArray(wantsToLearn);
+    }
+    if (description !== undefined) {
+      skill.description = description || "";
+    }
+    if (category !== undefined) {
+      skill.category = category || "Technical";
+    }
+    if (status !== undefined) {
+      const validStatuses = ["to-learn", "learning", "learned"];
+      if (validStatuses.includes(status)) {
+        skill.status = status;
+      }
+    }
+
+    await skill.save();
+
+    res.json({
+      success: true,
+      message: "Custom skill updated successfully",
+      data: skill,
+    });
+  } catch (error) {
+    console.error("updateCustomSkill error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update custom skill",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ DELETE CUSTOM SKILL
+const deleteCustomSkill = async (req, res) => {
+  try {
+    const skill = await CustomSkill.findById(req.params.id);
+
+    if (!skill) {
+      return res.status(404).json({
+        success: false,
+        message: "Custom skill not found",
+      });
+    }
+
+    if (skill.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this skill",
+      });
+    }
+
+    await CustomSkill.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: "Custom skill deleted successfully",
+    });
+  } catch (error) {
+    console.error("deleteCustomSkill error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete custom skill",
+    });
+  }
+};
+
+// ✅ EXPORT ALL FUNCTIONS
 module.exports = {
   getCustomSkills,
   createCustomSkill,
+  getCustomSkill,
   updateCustomSkill,
   deleteCustomSkill,
-  addTagToGoal,
 };

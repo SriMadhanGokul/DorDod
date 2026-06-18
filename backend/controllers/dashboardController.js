@@ -20,6 +20,44 @@ const getCompletedCount = (dayCompletion) => {
   return Object.keys(obj).filter((key) => !key.startsWith("$")).length;
 };
 
+// ✅ NEW: Get Capabilities Summary (learned/total skills)
+const getCapabilitiesSummary = async (userId) => {
+  try {
+    const SkillPath = require("../models/SkillPath");
+    const CustomSkill = require("../models/CustomSkill");
+
+    const skillPath = await SkillPath.findOne({ user: userId });
+    const customSkills = await CustomSkill.find({ user: userId });
+
+    let totalSkills = 0;
+    let learnedSkills = 0;
+
+    // Count from career path
+    if (skillPath && skillPath.skills) {
+      totalSkills += skillPath.skills.length;
+      learnedSkills += skillPath.skills.filter(
+        (s) => s.status === "learned",
+      ).length;
+    }
+
+    // Count from custom skills
+    if (customSkills && customSkills.length > 0) {
+      totalSkills += customSkills.length;
+      learnedSkills += customSkills.filter(
+        (s) => s.status === "completed",
+      ).length;
+    }
+
+    return {
+      completed: learnedSkills,
+      total: totalSkills,
+    };
+  } catch (error) {
+    console.error("Error getting capabilities summary:", error);
+    return { completed: 0, total: 0 };
+  }
+};
+
 exports.getDashboardMetrics = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -78,7 +116,9 @@ exports.getDashboardMetrics = async (req, res) => {
       return !!todayTracking;
     });
 
-    console.log(`   Completed Linked Habits Today: ${completedLinkedHabitsToday.length}`);
+    console.log(
+      `   Completed Linked Habits Today: ${completedLinkedHabitsToday.length}`,
+    );
 
     // ============ DAILY CHECK-IN & REFLECTION ============
     const checkInToday = await DailyCheckIn.findOne({
@@ -141,18 +181,17 @@ exports.getDashboardMetrics = async (req, res) => {
     const completedLinkedHabits = linkedHabits.filter(
       (h) => h.status === "Completed",
     ).length;
-    const capabilities = {
-      completed: completedLinkedHabits,
-      total: linkedHabits.length,
-    };
     const achievements = {
       completed: completedGoals.length,
       total: allGoals.length,
     };
 
+    // ============ GET CAPABILITIES DATA ============
+    const capabilitiesSummary = await getCapabilitiesSummary(userId);
+
     const growthScore = Math.min(
       100,
-      Math.round(capabilities.completed * 2 + achievements.completed * 10),
+      Math.round(completedLinkedHabits * 2 + achievements.completed * 10),
     );
     console.log(`   ✅ GROWTH SCORE: ${growthScore}`);
 
@@ -195,10 +234,11 @@ exports.getDashboardMetrics = async (req, res) => {
       if (completed) completedDaysCount++;
     });
 
-    const habitCompletionRate = linkedHabits.length > 0 
-      ? Math.round((completedDaysCount / 7) * 100)
-      : 0;
-    console.log(`   ✅ HABIT RATE (7-day): ${habitCompletionRate}% (linked habits only)`);
+    const habitCompletionRate =
+      linkedHabits.length > 0 ? Math.round((completedDaysCount / 7) * 100) : 0;
+    console.log(
+      `   ✅ HABIT RATE (7-day): ${habitCompletionRate}% (linked habits only)`,
+    );
 
     // ============ TREND DATA ============
     const trend = [];
@@ -227,7 +267,7 @@ exports.getDashboardMetrics = async (req, res) => {
         habitCompletion,
         habitCompletionRate,
         reflectionCount: 0,
-        capabilities,
+        capabilities: capabilitiesSummary,
         achievements,
         stats: {
           activeGoals: activeGoals.length,
@@ -274,8 +314,9 @@ exports.getDashboardStats = async (req, res) => {
         linkedHabits: linkedHabits.length,
         standaloneHabits: standaloneHabits.length,
         totalHabits: allHabits.length,
-        completedLinkedHabits: linkedHabits.filter((h) => h.status === "Completed")
-          .length,
+        completedLinkedHabits: linkedHabits.filter(
+          (h) => h.status === "Completed",
+        ).length,
       },
     });
   } catch (error) {

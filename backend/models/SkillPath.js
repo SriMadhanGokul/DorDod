@@ -14,6 +14,17 @@ const userSkillSchema = new mongoose.Schema(
   { _id: true },
 );
 
+const careerPathEntrySchema = new mongoose.Schema(
+  {
+    _id: mongoose.Schema.Types.ObjectId, // MongoDB will generate this
+    careerPath: { type: String, required: true }, // e.g., "Full Stack Developer"
+    careerId: { type: String, required: true }, // e.g., "full-stack"
+    skills: { type: [userSkillSchema], default: [] },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true },
+);
+
 const skillPathSchema = new mongoose.Schema(
   {
     user: {
@@ -22,8 +33,16 @@ const skillPathSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
-    careerPath: { type: String, default: "" },
-    skills: { type: [userSkillSchema], default: [] },
+    // ✅ Array of all career paths user has selected
+    paths: {
+      type: [careerPathEntrySchema],
+      default: [],
+    },
+    // ✅ Track which path is currently active
+    activePath: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null, // Will be set to a path._id
+    },
   },
   { timestamps: true },
 );

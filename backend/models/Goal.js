@@ -60,22 +60,11 @@ const GoalSchema = new mongoose.Schema(
       },
     ],
 
-    // ✅ Track completion status for each day
+    // ✅ FIXED: Changed from Map with nested schema to Object type
+    // Stores completion data like: {"2026-06-17": {date, dayNumber, completedAt, status}}
     dayCompletion: {
-      type: Map,
-      of: new mongoose.Schema(
-        {
-          dayNumber: Number,
-          completedAt: Date,
-          status: {
-            type: String,
-            enum: ["pending", "completed", "missed"],
-            default: "pending",
-          },
-        },
-        { _id: false },
-      ),
-      default: new Map(),
+      type: Object,
+      default: {},
     },
 
     completedAt: {

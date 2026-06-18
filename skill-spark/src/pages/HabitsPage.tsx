@@ -19,6 +19,30 @@ import {
 // ✅ IMPORT DASHBOARD REFRESH TRIGGER
 import { triggerDashboardRefresh } from "@/pages/DashboardPage";
 
+// ✅ Helper: Get today's date as string (YYYY-MM-DD) - CONSISTENT WITH BACKEND
+const getTodayString = (): string => {
+  return new Date().toISOString().split("T")[0];
+};
+
+// ✅ Helper: Convert tracking date to comparable string
+const getTrackingDateString = (
+  date: string | Date | undefined,
+): string | null => {
+  if (!date) return null;
+
+  if (typeof date === "string") {
+    // Already a string, return it
+    return date;
+  }
+
+  // Convert Date object to string
+  try {
+    return new Date(date).toISOString().split("T")[0];
+  } catch {
+    return null;
+  }
+};
+
 interface Habit {
   _id: string;
   title: string;
@@ -30,9 +54,9 @@ interface Habit {
   linkedGoal?: string;
   linkedGoalTitle?: string;
   tracking?: Array<{
-    date: string;
+    date: string | Date;
     status: "completed" | "missed" | "pending";
-    completedAt?: string;
+    completedAt?: string | Date;
   }>;
 }
 
@@ -307,10 +331,10 @@ function HabitModal({
             </div>
           </div>
 
-          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-            <p className="text-xs text-green-700 dark:text-green-300">
-              ✅ <strong>Time slots are required</strong> to prevent overlaps
-              and track your day efficiently!
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              ✅ <strong>Time slots for scheduling:</strong> Choose a time
+              window to organize your day. You can complete the habit anytime!
             </p>
           </div>
         </div>
@@ -458,19 +482,7 @@ function LinkGoalModal({
   );
 }
 
-const isWithinTimeWindow = (timeStart?: string, timeEnd?: string): boolean => {
-  if (!timeStart || !timeEnd) return true;
-
-  const now = new Date();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
-  const [startHour, startMin] = timeStart.split(":").map(Number);
-  const [endHour, endMin] = timeEnd.split(":").map(Number);
-  const start = startHour * 60 + startMin;
-  const end = endHour * 60 + endMin;
-
-  return currentTime >= start && currentTime < end;
-};
-
+// ✅ Helper: Get time window status (informational only)
 const getTimeWindowStatus = (timeStart?: string, timeEnd?: string): string => {
   if (!timeStart || !timeEnd) return "";
 
@@ -485,14 +497,14 @@ const getTimeWindowStatus = (timeStart?: string, timeEnd?: string): string => {
     const minutesLeft = end - currentTime;
     const hours = Math.floor(minutesLeft / 60);
     const mins = minutesLeft % 60;
-    return `🟢 Open (${hours}h ${mins}m left)`;
+    return `Open now (${hours}h ${mins}m left)`;
   } else if (currentTime < start) {
     const minutesUntil = start - currentTime;
     const hours = Math.floor(minutesUntil / 60);
     const mins = minutesUntil % 60;
-    return `🟡 Starts in ${hours}h ${mins}m`;
+    return `Starts in ${hours}h ${mins}m`;
   } else {
-    return "🔴 Closed";
+    return "Finished for today";
   }
 };
 
@@ -512,17 +524,31 @@ function HabitCard({
   onLinkGoal: (h: Habit) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const today = new Date().toISOString().split("T")[0];
-  const todayTracking = habit.tracking?.find((t) => t.date === today);
-  const isCompletedToday = todayTracking?.status === "completed";
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [localCompletedToday, setLocalCompletedToday] = useState(false);
+
+  // ✅ FIXED: Get today's date string - CONSISTENT WITH BACKEND
+  const today = getTodayString();
+
+  // ✅ FIXED: Safely find today's tracking with proper date comparison
+  const todayTracking = habit.tracking?.find((t) => {
+    const trackingDateStr = getTrackingDateString(t.date);
+    return trackingDateStr === today;
+  });
+
+  // ✅ Use local state OR server state (whichever is completed)
+  const isCompletedToday =
+    localCompletedToday || todayTracking?.status === "completed";
   const isMissedToday = todayTracking?.status === "missed";
-  const withinTimeWindow = isWithinTimeWindow(habit.timeStart, habit.timeEnd);
+
   const timeWindowStatus = getTimeWindowStatus(habit.timeStart, habit.timeEnd);
 
   const sortedTracking = habit.tracking
-    ? [...habit.tracking].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-      )
+    ? [...habit.tracking].sort((a, b) => {
+        const aDate = new Date(a.date).getTime();
+        const bDate = new Date(b.date).getTime();
+        return bDate - aDate;
+      })
     : [];
 
   const completedCount =
@@ -530,246 +556,228 @@ function HabitCard({
   const missedCount =
     habit.tracking?.filter((t) => t.status === "missed").length || 0;
 
+  // ✅ Handle completion with optimistic UI update
+  const handleCompleteClick = async () => {
+    // Guard clause: Already completing or completed
+    if (isCompleting || isCompletedToday) {
+      return;
+    }
+
+    // Set local state immediately (optimistic update)
+    setIsCompleting(true);
+    setLocalCompletedToday(true);
+
+    try {
+      await onComplete(habit._id);
+      // Success - UI already updated optimistically
+    } catch (error) {
+      // Revert optimistic update on error
+      console.error("Error marking habit complete:", error);
+      setLocalCompletedToday(false);
+      setIsCompleting(false);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 hover:shadow-md transition-all">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-              {habit.title}
-            </h3>
-            {habit.linkedGoal ? (
-              <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <FaLink className="text-xs" />
-                Goal Linked
-              </span>
-            ) : (
-              <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full">
-                Standalone
-              </span>
-            )}
-          </div>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            {habit.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full">
-              {habit.category}
-            </span>
-            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-full">
-              {habit.frequency}
-            </span>
-            {habit.timeStart && habit.timeEnd && (
-              <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full flex items-center gap-1">
-                <FaClock className="text-xs" />
-                {habit.timeStart} - {habit.timeEnd}
-              </span>
-            )}
-          </div>
-
-          {habit.linkedGoal && habit.linkedGoalTitle && (
-            <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                <strong>📌 Linked to Goal:</strong> {habit.linkedGoalTitle}
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                ✅ This habit contributes to your alignment score
-              </p>
-            </div>
-          )}
-
-          {!habit.linkedGoal && (
-            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                <strong>📌 Standalone Habit:</strong> Tracked independently, not
-                connected to a goal
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                💡 Link to a goal anytime to boost your alignment score
-              </p>
-            </div>
-          )}
-
-          {/* Today's Status & Quick Stats */}
-          <div className="flex items-center gap-3 mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 font-semibold">
-                Today's Status
-              </p>
-              {isMissedToday ? (
-                <p className="text-sm font-bold text-red-600 dark:text-red-400">
+    <div
+      className={`rounded-2xl border transition-all ${
+        isCompletedToday
+          ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800 shadow-md"
+          : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:shadow-md"
+      }`}
+    >
+      {/* Header Section */}
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            {/* Title + Status Badge */}
+            <div className="flex items-center gap-3 mb-2">
+              <h3
+                className={`font-bold text-base ${
+                  isCompletedToday
+                    ? "text-green-700 dark:text-green-400"
+                    : "text-gray-900 dark:text-white"
+                }`}
+              >
+                {habit.title}
+              </h3>
+              {isCompletedToday && (
+                <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+                  <FaCheck className="text-xs" /> Done Today
+                </span>
+              )}
+              {isMissedToday && (
+                <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2.5 py-1 rounded-full font-semibold">
                   ❌ Missed
-                </p>
-              ) : isCompletedToday ? (
-                <p className="text-sm font-bold text-green-600 dark:text-green-400">
-                  ✅ Completed
-                </p>
-              ) : (
-                <p className="text-sm font-bold text-gray-600 dark:text-gray-400">
-                  ⏳ Pending
-                </p>
+                </span>
               )}
             </div>
-            <div className="flex-1 text-right">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Completed:{" "}
-                <span className="font-bold text-green-600">
-                  {completedCount}
-                </span>{" "}
-                | Missed:{" "}
-                <span className="font-bold text-red-600">{missedCount}</span>
+
+            {/* Category & Frequency Badges */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2.5 py-1 rounded-full font-medium">
+                {habit.category}
+              </span>
+              <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2.5 py-1 rounded-full font-medium">
+                {habit.frequency}
+              </span>
+              {habit.linkedGoal && (
+                <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full flex items-center gap-1 font-medium">
+                  <FaLink className="text-xs" /> Linked Goal
+                </span>
+              )}
+            </div>
+
+            {/* Description - Better Layout */}
+            <div className="mb-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                {habit.description}
               </p>
             </div>
           </div>
 
-          {/* Time Window Status - PROMINENT */}
-          {habit.timeStart && habit.timeEnd && (
-            <div
-              className={`mb-3 text-xs font-semibold px-3 py-2 rounded-lg border-2 ${
-                withinTimeWindow
-                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700"
-                  : timeWindowStatus.includes("Closed")
-                    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
-                    : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700"
-              }`}
-            >
-              <FaClockIcon className="inline mr-1.5" /> {timeWindowStatus}
-            </div>
-          )}
-
-          {/* History Toggle */}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200"
-          >
-            <FaHistory className="text-xs" />
-            {expanded ? (
-              <>
-                <FaChevronUp className="text-xs" /> Hide History
-              </>
-            ) : (
-              <>
-                <FaChevronDown className="text-xs" /> View Full History (
-                {sortedTracking.length} records)
-              </>
+          {/* Action Buttons - Vertical Stack */}
+          <div className="flex flex-col gap-2">
+            {!isCompletedToday && !isMissedToday && (
+              <button
+                onClick={handleCompleteClick}
+                disabled={isCompleting || isCompletedToday}
+                className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all bg-green-600 hover:bg-green-700 text-white shadow-sm hover:shadow-md"
+              >
+                <FaCheck className="text-sm" />
+                {isCompleting ? "..." : "Mark"}
+              </button>
             )}
-          </button>
 
-          {/* History Section */}
-          {expanded && (
-            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-3">
-                📋 All Tracking History
-              </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {sortedTracking.length === 0 ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    No tracking history yet
-                  </p>
-                ) : (
-                  sortedTracking.map((record, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between p-2 rounded-lg text-xs ${
-                        record.status === "completed"
-                          ? "bg-green-100 dark:bg-green-900/30"
-                          : record.status === "missed"
-                            ? "bg-red-100 dark:bg-red-900/30"
-                            : "bg-gray-200 dark:bg-gray-700"
-                      }`}
-                    >
-                      <span className="font-medium">
-                        {new Date(record.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          weekday: "short",
-                        })}
-                      </span>
-                      <span
-                        className={`font-bold px-2 py-0.5 rounded ${
-                          record.status === "completed"
-                            ? "bg-green-200 dark:bg-green-900 text-green-700 dark:text-green-300"
-                            : record.status === "missed"
-                              ? "bg-red-200 dark:bg-red-900 text-red-700 dark:text-red-300"
-                              : "bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
-                        }`}
-                      >
-                        {record.status === "completed"
-                          ? "✅ Completed"
-                          : record.status === "missed"
-                            ? "❌ Missed"
-                            : "⏳ Pending"}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+            {!habit.linkedGoal && (
+              <button
+                onClick={() => onLinkGoal(habit)}
+                className="px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                title="Link to goal"
+              >
+                <FaLink className="text-sm" />
+              </button>
+            )}
 
-        {/* Action Buttons */}
-        <div className="flex flex-col items-end gap-2">
-          {/* Mark Complete Button - ALWAYS SHOW unless already completed */}
-          {!isCompletedToday && !isMissedToday && (
+            {habit.linkedGoal && (
+              <button
+                onClick={() => onUnlink(habit._id)}
+                className="px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                title="Unlink from goal"
+              >
+                <FaUnlink className="text-sm" />
+              </button>
+            )}
+
             <button
-              onClick={() => onComplete(habit._id)}
-              disabled={!withinTimeWindow}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
-                withinTimeWindow
-                  ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed opacity-50"
-              }`}
-              title={
-                withinTimeWindow
-                  ? "Mark today as complete"
-                  : `Only available from ${habit.timeStart} to ${habit.timeEnd}`
-              }
+              onClick={() => onEdit(habit)}
+              className="px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
             >
-              <FaCheck className="text-sm" /> Mark Complete
+              <FaEdit className="text-sm" />
             </button>
-          )}
 
-          {/* Link to Goal Button - Only if not already linked */}
-          {!habit.linkedGoal && (
             <button
-              onClick={() => onLinkGoal(habit)}
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-              title="Link this habit to a goal"
+              onClick={() => onDelete(habit._id)}
+              className="px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             >
-              <FaLink className="text-sm" />
+              <FaTrash className="text-sm" />
             </button>
-          )}
-
-          {/* Unlink Button */}
-          {habit.linkedGoal && (
-            <button
-              onClick={() => onUnlink(habit._id)}
-              className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 p-1.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-              title="Unlink from goal"
-            >
-              <FaUnlink className="text-sm" />
-            </button>
-          )}
-
-          <button
-            onClick={() => onEdit(habit)}
-            className="text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-          >
-            <FaEdit className="text-sm" />
-          </button>
-
-          <button
-            onClick={() => onDelete(habit._id)}
-            className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-          >
-            <FaTrash className="text-sm" />
-          </button>
+          </div>
         </div>
       </div>
+
+      {/* Schedule Section */}
+     
+
+      {/* Stats Section */}
+      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="text-xs">
+          <p className="text-gray-600 dark:text-gray-400">
+            <span className="font-bold text-green-600 dark:text-green-400">
+              {completedCount}
+            </span>{" "}
+            completed •{" "}
+            <span className="font-bold text-red-600 dark:text-red-400">
+              {missedCount}
+            </span>{" "}
+            missed
+          </p>
+        </div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1 transition-colors"
+        >
+          <FaHistory className="text-xs" />
+          {expanded ? "Hide" : "View"} History
+        </button>
+      </div>
+
+      {/* Link Goal Info */}
+      {habit.linkedGoal && habit.linkedGoalTitle && (
+        <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/30">
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            <strong>📌 Linked to:</strong> {habit.linkedGoalTitle}
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            ✨ Completing this habit boosts your alignment score
+          </p>
+        </div>
+      )}
+
+      {/* History Section */}
+      {expanded && (
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+          <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-3">
+            📋 All Tracking History
+          </h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {sortedTracking.length === 0 ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                No tracking history yet
+              </p>
+            ) : (
+              sortedTracking.map((record, idx) => {
+                const recordDateStr = getTrackingDateString(record.date);
+                const displayDate = recordDateStr
+                  ? new Date(recordDateStr + "T00:00:00").toLocaleDateString(
+                      "en-US",
+                      {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        weekday: "short",
+                      },
+                    )
+                  : "Unknown date";
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium ${
+                      record.status === "completed"
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                        : record.status === "missed"
+                          ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    <span>{displayDate}</span>
+                    <span>
+                      {record.status === "completed"
+                        ? "✅"
+                        : record.status === "missed"
+                          ? "❌"
+                          : "⏳"}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -822,16 +830,32 @@ export default function HabitsPage() {
     }
   };
 
+  // ✅ UPDATED: handleComplete with IMMEDIATE state update
   const handleComplete = async (habitId: string) => {
     try {
-      await api.patch(`/habits/${habitId}/complete`);
+      const res = await api.patch(`/habits/${habitId}/complete`);
+
+      if (!res.data.success) {
+        if (res.data.isAlreadyCompleted) {
+          toast.error("Habit already completed today!");
+        } else {
+          toast.error(res.data.message || "Failed to mark habit complete");
+        }
+        return;
+      }
+
+      // ✅ IMMEDIATELY update local state
+      setHabits((prevHabits) =>
+        prevHabits.map((h) =>
+          h._id === habitId ? { ...h, ...res.data.data } : h,
+        ),
+      );
+
       toast.success("✅ Habit marked complete for today!");
-
-      // ✅ TRIGGER INSTANT DASHBOARD REFRESH
       triggerDashboardRefresh();
-
       load();
     } catch (err: any) {
+      console.error("Completion error:", err);
       toast.error(
         err.response?.data?.message || "Failed to mark habit complete",
       );
@@ -846,7 +870,6 @@ export default function HabitsPage() {
     );
   }
 
-  // ✅ SEPARATE LINKED vs STANDALONE HABITS
   const linkedHabits = habits.filter((h) => h.linkedGoal);
   const standaloneHabits = habits.filter((h) => !h.linkedGoal);
   const totalHabits = habits.length;
@@ -925,7 +948,7 @@ export default function HabitsPage() {
               daily alignment!
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {linkedHabits.map((habit) => (
               <HabitCard
                 key={habit._id}
@@ -959,7 +982,7 @@ export default function HabitsPage() {
               goal. Perfect for habits you want to maintain separately!
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {standaloneHabits.map((habit) => (
               <HabitCard
                 key={habit._id}
@@ -997,6 +1020,11 @@ export default function HabitsPage() {
         </h3>
         <div className="text-xs text-gray-700 dark:text-gray-300 space-y-2">
           <div>
+            <strong>✅ Anytime Completion:</strong> Mark habits as complete
+            anytime during the day. Time windows are just for scheduling
+            reference!
+          </div>
+          <div>
             <strong>🎯 Goal-Linked Habits:</strong> Link habits to active goals
             to track progress and boost your alignment score. These show on your
             dashboard!
@@ -1007,8 +1035,8 @@ export default function HabitsPage() {
             goals.
           </div>
           <div>
-            <strong>⏰ Time Windows:</strong> Complete habits only during their
-            scheduled time. Button shows green during time window.
+            <strong>⏰ Time Windows:</strong> Choose a time to organize your
+            day. Complete the habit anytime works for you!
           </div>
           <div>
             <strong>📊 Tracking:</strong> View full history by expanding any
@@ -1016,7 +1044,7 @@ export default function HabitsPage() {
           </div>
           <div>
             <strong>⚡ Real-Time Sync:</strong> Dashboard updates instantly when
-            you complete habits!
+            you complete habits! Completion persists across page refreshes.
           </div>
         </div>
       </div>

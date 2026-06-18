@@ -1,19 +1,31 @@
-const express = require('express');
-const router  = express.Router();
+const express = require("express");
 const {
-  getCustomSkills, createCustomSkill, updateCustomSkill,
-  deleteCustomSkill, addTagToGoal,
-} = require('../controllers/customSkillController');
-const protect = require('../utils/protect');
+  getCustomSkills,
+  createCustomSkill,
+  getCustomSkill,
+  updateCustomSkill,
+  deleteCustomSkill,
+} = require("../controllers/customSkillController");
+const protect = require("../utils/protect");
 
+const router = express.Router();
+
+// Protect all routes
 router.use(protect);
 
-router.get('/',    getCustomSkills);
-router.post('/',   createCustomSkill);
-router.put('/:id', updateCustomSkill);
-router.delete('/:id', deleteCustomSkill);
+// ✅ GET ALL CUSTOM SKILLS
+router.get("/", getCustomSkills);
 
-// Add a specific "want to learn" tag as a goal
-router.post('/:skillId/tags/:tagId/add-goal', addTagToGoal);
+// ✅ CREATE CUSTOM SKILL
+router.post("/", createCustomSkill);
+
+// ✅ GET SINGLE CUSTOM SKILL (must come before /:id route)
+router.get("/:id", getCustomSkill);
+
+// ✅ UPDATE CUSTOM SKILL
+router.put("/:id", updateCustomSkill);
+
+// ✅ DELETE CUSTOM SKILL
+router.delete("/:id", deleteCustomSkill);
 
 module.exports = router;

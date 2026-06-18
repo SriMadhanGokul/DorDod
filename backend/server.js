@@ -14,6 +14,7 @@ const goalRoutes = require("./routes/goalRoutes");
 const habitRoutes = require("./routes/habitRoutes");
 const skillRoutes = require("./routes/skillRoutes");
 const skillPathRoutes = require("./routes/skillPathRoutes");
+const capabilityRoutes = require("./routes/capabilityRoutes");
 const devPlanRoutes = require("./routes/devPlanRoutes");
 const learningRoutes = require("./routes/learningRoutes");
 const profileRoutes = require("./routes/profileRoutes");
@@ -95,6 +96,7 @@ app.use("/api/goals", goalRoutes);
 app.use("/api/habits", habitRoutes);
 app.use("/api/skills", skillRoutes);
 app.use("/api/skill-path", skillPathRoutes);
+app.use("/api/capabilities", capabilityRoutes);
 app.use("/api/devplan", devPlanRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/custom-skills", customSkillRoutes);
@@ -176,6 +178,7 @@ mongoose
       console.log("📈 Metrics routes loaded: /api/metrics");
       console.log("📋 Daily Check-In routes loaded: /api/daily-check-in");
       console.log("📝 Daily Reflection routes loaded: /api/daily-reflection");
+      console.log("🎯 Capability routes loaded: /api/capabilities");
     });
   })
   .catch((err) => {

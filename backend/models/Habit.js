@@ -22,7 +22,7 @@ const HabitSchema = new mongoose.Schema(
       enum: ["Daily", "Weekly", "Monthly"],
       default: "Daily",
     },
-    // ✅ NEW: Time slot fields
+    // ✅ Time slot fields
     timeStart: {
       type: String, // HH:MM format
       default: "05:00",
@@ -53,11 +53,13 @@ const HabitSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    // ✅ NEW: Tracking history (last 7-30 days)
+    // ✅ FIXED: Tracking history with STRING dates (YYYY-MM-DD)
+    // This ensures date comparisons work correctly across timezones
     tracking: [
       {
+        // ✅ CRITICAL FIX: Store date as String "YYYY-MM-DD", NOT Date object
         date: {
-          type: Date,
+          type: String, // Format: "2026-06-17"
           required: true,
         },
         status: {
@@ -66,10 +68,10 @@ const HabitSchema = new mongoose.Schema(
           default: "pending",
         },
         completedAt: {
-          type: Date, // When it was marked as completed
+          type: Date, // Timestamp of when it was marked complete
         },
         markedAt: {
-          type: Date, // When user marked it
+          type: Date, // Timestamp of when user marked it
         },
       },
     ],
