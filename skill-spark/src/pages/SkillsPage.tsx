@@ -46,11 +46,10 @@ interface Career {
 interface CustomSkill {
   _id: string;
   skillName: string;
-  alreadyKnows: string[];
-  wantsToLearn: string[];
   description: string;
   category: string;
   status: "to-learn" | "learning" | "learned";
+  linkedGoal?: string;
   isCustom: true;
 }
 
@@ -72,21 +71,71 @@ export default function SkillsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [savingCustom, setSavingCustom] = useState(false);
 
-  // Custom Form with Tag Arrays
+  // ✅ NEW FORM - Multiple skill names + mandatory fields
   const [customForm, setCustomForm] = useState({
-    skillName: "",
-    alreadyKnows: [] as string[],
-    wantsToLearn: [] as string[],
+    skillNames: [] as string[],
+    skillNameInput: "", // Temporary input for adding skill names
     description: "",
     category: "Technical",
     status: "to-learn" as const,
   });
 
-  // Tag Input Fields
-  const [tagInputs, setTagInputs] = useState({
-    alreadyKnows: "",
-    wantsToLearn: "",
-  });
+  // ✅ GOAL SELECTOR STATE (for auto-creating goal)
+  const [linkingSkill, setLinkingSkill] = useState(false);
+
+  // ✅ ADD TO GOAL - CREATE GOAL FROM SKILL (NO LINKING)
+  const handleAddToGoal = async (skillId: string) => {
+    try {
+      // Find skill in CUSTOM skills first
+      let skill: any = customSkills.find((s) => s._id === skillId);
+      let skillName = skill?.skillName || "";
+      let skillCategory = skill?.category || "";
+
+      // If not found in custom skills, search in existing skills (skill path)
+      if (!skillName && skillPath?.skills) {
+        skill = skillPath.skills.find((s: any) => s._id === skillId);
+        skillName = skill?.name || "";
+        skillCategory = skill?.category || "";
+      }
+
+      if (!skillName) {
+        toast.error("Skill name is required");
+        return;
+      }
+
+      setLinkingSkill(true);
+
+      // Map skill category to valid goal category
+      let goalCategory = "Learning"; // Default
+      if (skillCategory.toLowerCase().includes("leadership"))
+        goalCategory = "Career";
+      else if (skillCategory.toLowerCase().includes("health"))
+        goalCategory = "Health";
+      else if (skillCategory.toLowerCase().includes("finance"))
+        goalCategory = "Finance";
+      else if (skillCategory.toLowerCase().includes("personal"))
+        goalCategory = "Personal";
+
+      // Create new goal with the skill name (NO LINKING)
+      const goalRes = await api.post("/goals", {
+        title: skillName,
+        description: `Goal to master ${skillName}`,
+        category: goalCategory,
+        priority: "Medium",
+        duration: 30,
+      });
+
+      if (goalRes.data.success) {
+        toast.success(`✅ New goal "${skillName}" created!`);
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to create goal from skill",
+      );
+    } finally {
+      setLinkingSkill(false);
+    }
+  };
 
   // ✅ LOAD DATA ON MOUNT
   useEffect(() => {
@@ -102,21 +151,13 @@ export default function SkillsPage() {
         setCareers(careersRes.data.data || []);
         const customSkillsData = (customSkillsRes.data.data || []).map(
           (skill: any) => ({
-            ...skill,
+            _id: skill._id,
+            skillName: skill.skillName,
+            description: skill.description || "",
+            category: skill.category || "Technical",
+            status: skill.status || "to-learn",
+            linkedGoal: skill.linkedGoal || null,
             isCustom: true,
-            status:
-              skill.status === "planned"
-                ? "to-learn"
-                : skill.status === "current"
-                  ? "learning"
-                  : skill.status === "completed"
-                    ? "learned"
-                    : skill.status,
-            wantsToLearn: Array.isArray(skill.wantsToLearn)
-              ? skill.wantsToLearn.map((item: any) =>
-                  typeof item === "string" ? item : item.name,
-                )
-              : [],
           }),
         );
         setCustomSkills(customSkillsData);
@@ -144,96 +185,95 @@ export default function SkillsPage() {
   const closeAddModal = () => {
     setShowAddModal(false);
     setCustomForm({
-      skillName: "",
-      alreadyKnows: [],
-      wantsToLearn: [],
+      skillNames: [],
+      skillNameInput: "",
       description: "",
       category: "Technical",
       status: "to-learn",
     });
-    setTagInputs({
-      alreadyKnows: "",
-      wantsToLearn: "",
-    });
   };
 
-  // ✅ ADD TAG
-  const handleAddTag = (field: "alreadyKnows" | "wantsToLearn") => {
-    const value = tagInputs[field].trim();
-    if (!value) return;
+  // ✅ ADD SKILL NAME TO LIST
+  const handleAddSkillName = () => {
+    const name = customForm.skillNameInput.trim();
+    if (!name) {
+      toast.error("Skill name cannot be empty");
+      return;
+    }
 
-    if (customForm[field].includes(value)) {
-      toast.error("This item already exists");
+    if (customForm.skillNames.includes(name)) {
+      toast.error("This skill name already added");
       return;
     }
 
     setCustomForm((prev) => ({
       ...prev,
-      [field]: [...prev[field], value],
-    }));
-
-    setTagInputs((prev) => ({
-      ...prev,
-      [field]: "",
+      skillNames: [...prev.skillNames, name],
+      skillNameInput: "",
     }));
   };
 
-  // ✅ REMOVE TAG
-  const handleRemoveTag = (
-    field: "alreadyKnows" | "wantsToLearn",
-    index: number,
-  ) => {
+  // ✅ REMOVE SKILL NAME
+  const handleRemoveSkillName = (index: number) => {
     setCustomForm((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index),
+      skillNames: prev.skillNames.filter((_, i) => i !== index),
     }));
   };
 
-  // ✅ HANDLE TAG INPUT KEY DOWN
-  const handleTagInputKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    field: "alreadyKnows" | "wantsToLearn",
-  ) => {
-    if (e.key === "Enter" || e.key === ",") {
+  // ✅ HANDLE SKILL NAME INPUT KEY DOWN
+  const handleSkillNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
       e.preventDefault();
-      handleAddTag(field);
+      handleAddSkillName();
     }
   };
 
-  // ✅ SUBMIT CUSTOM SKILL
+  // ✅ SUBMIT MULTIPLE CUSTOM SKILLS
   const handleAddCustomSkill = async () => {
-    if (!customForm.skillName.trim()) {
-      toast.error("Skill name is required");
+    // ✅ VALIDATE ALL MANDATORY FIELDS
+    if (customForm.skillNames.length === 0) {
+      toast.error("Add at least one skill name");
+      return;
+    }
+
+    if (!customForm.description.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+
+    if (!customForm.category) {
+      toast.error("Category is required");
       return;
     }
 
     setSavingCustom(true);
     try {
       const res = await api.post("/custom-skills", {
-        skillName: customForm.skillName,
-        alreadyKnows: customForm.alreadyKnows,
-        wantsToLearn: customForm.wantsToLearn,
+        skillNames: customForm.skillNames,
         description: customForm.description,
         category: customForm.category,
         status: customForm.status,
       });
 
       if (res.data.success) {
-        const newSkill = {
-          ...res.data.data,
+        const newSkills = res.data.data.map((skill: any) => ({
+          _id: skill._id,
+          skillName: skill.skillName,
+          description: skill.description,
+          category: skill.category,
+          status: skill.status,
+          linkedGoal: skill.linkedGoal || null,
           isCustom: true,
-          wantsToLearn: Array.isArray(res.data.data.wantsToLearn)
-            ? res.data.data.wantsToLearn.map((item: any) =>
-                typeof item === "string" ? item : item.name,
-              )
-            : [],
-        };
-        setCustomSkills((prev) => [newSkill, ...prev]);
-        toast.success("✅ Custom skill added!");
+        }));
+        setCustomSkills((prev) => [...newSkills, ...prev]);
+        toast.success(`✅ ${newSkills.length} skill(s) added!`);
         closeAddModal();
       }
-    } catch (error) {
-      toast.error("Failed to add custom skill");
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to add custom skills",
+      );
     } finally {
       setSavingCustom(false);
     }
@@ -271,17 +311,10 @@ export default function SkillsPage() {
       });
 
       if (res.data.success) {
-        const updatedSkill = {
-          ...res.data.data,
-          isCustom: true,
-          wantsToLearn: Array.isArray(res.data.data.wantsToLearn)
-            ? res.data.data.wantsToLearn.map((item: any) =>
-                typeof item === "string" ? item : item.name,
-              )
-            : [],
-        };
         setCustomSkills((prev) =>
-          prev.map((s) => (s._id === skillId ? updatedSkill : s)),
+          prev.map((s) =>
+            s._id === skillId ? { ...s, status: newStatus as any } : s,
+          ),
         );
         toast.success("Skill updated!");
       }
@@ -723,6 +756,15 @@ export default function SkillsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            handleAddToGoal(skill._id);
+                          }}
+                          className="flex-1 px-2.5 py-1.5 text-xs bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-800 transition-colors font-semibold"
+                        >
+                          + Add to Goal
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
                             openSkillDetails(skill._id);
                           }}
                           className="flex-1 px-2.5 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
@@ -754,7 +796,7 @@ export default function SkillsPage() {
     <>
       {view === "select" ? selectViewContent : trackViewContent}
 
-      {/* ADD SKILL MODAL - For creating new custom skills only */}
+      {/* ADD SKILL MODAL - Multiple skill names */}
       {showAddModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] overflow-y-auto">
@@ -762,10 +804,10 @@ export default function SkillsPage() {
             <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900">
               <div>
                 <h2 className="font-bold text-gray-900 dark:text-white">
-                  Add New Skill
+                  Add New Skills
                 </h2>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Create a skill to track
+                  Add one or more skills to track
                 </p>
               </div>
               <button
@@ -778,90 +820,40 @@ export default function SkillsPage() {
 
             {/* Form */}
             <div className="p-5 space-y-4">
+              {/* SKILL NAMES INPUT */}
               <div>
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                  Skill Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Advanced Python"
-                  value={customForm.skillName}
-                  onChange={(e) =>
-                    setCustomForm({ ...customForm, skillName: e.target.value })
-                  }
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* ALREADY KNOWS - TAG INPUT */}
-              <div>
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                  What you already know
+                  Skill Names <span className="text-red-500">*</span>
                 </label>
                 <div className="space-y-2">
                   <input
                     type="text"
-                    placeholder="Type and press Enter..."
-                    value={tagInputs.alreadyKnows}
+                    placeholder="e.g. React, Next.js, Tailwind"
+                    value={customForm.skillNameInput}
                     onChange={(e) =>
-                      setTagInputs({
-                        ...tagInputs,
-                        alreadyKnows: e.target.value,
+                      setCustomForm({
+                        ...customForm,
+                        skillNameInput: e.target.value,
                       })
                     }
-                    onKeyDown={(e) => handleTagInputKeyDown(e, "alreadyKnows")}
+                    onKeyDown={handleSkillNameKeyDown}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  {customForm.alreadyKnows.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {customForm.alreadyKnows.map((skill, idx) => (
-                        <div
-                          key={`tag-know-${idx}-${skill}`}
-                          className="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1.5 rounded-full text-xs font-medium"
-                        >
-                          <span>✓ {skill}</span>
-                          <button
-                            onClick={() => handleRemoveTag("alreadyKnows", idx)}
-                            className="hover:text-green-900 dark:hover:text-green-200 transition-colors font-bold"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  <p className="text-xs text-gray-500">
+                    Press Enter to add each skill
+                  </p>
 
-              {/* WANTS TO LEARN - TAG INPUT */}
-              <div>
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                  What you want to learn
-                </label>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Type and press Enter..."
-                    value={tagInputs.wantsToLearn}
-                    onChange={(e) =>
-                      setTagInputs({
-                        ...tagInputs,
-                        wantsToLearn: e.target.value,
-                      })
-                    }
-                    onKeyDown={(e) => handleTagInputKeyDown(e, "wantsToLearn")}
-                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {customForm.wantsToLearn.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {customForm.wantsToLearn.map((skill, idx) => (
+                  {/* Display added skills */}
+                  {customForm.skillNames.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {customForm.skillNames.map((name, idx) => (
                         <div
-                          key={`tag-learn-${idx}-${skill}`}
+                          key={`skill-${idx}-${name}`}
                           className="flex items-center gap-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full text-xs font-medium"
                         >
-                          <span>→ {skill}</span>
+                          <span>{name}</span>
                           <button
-                            onClick={() => handleRemoveTag("wantsToLearn", idx)}
+                            onClick={() => handleRemoveSkillName(idx)}
                             className="hover:text-blue-900 dark:hover:text-blue-200 transition-colors font-bold"
                           >
                             ×
@@ -873,13 +865,13 @@ export default function SkillsPage() {
                 </div>
               </div>
 
-              {/* DESCRIPTION */}
+              {/* DESCRIPTION - MANDATORY */}
               <div>
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                  Description (optional)
+                  Description <span className="text-red-500">*</span>
                 </label>
                 <textarea
-                  placeholder="Add notes..."
+                  placeholder="Describe these skills (applies to all)..."
                   value={customForm.description}
                   onChange={(e) =>
                     setCustomForm({
@@ -887,15 +879,15 @@ export default function SkillsPage() {
                       description: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-16"
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none h-20"
                 />
               </div>
 
-              {/* CATEGORY & STATUS */}
+              {/* CATEGORY & STATUS - BOTH MANDATORY */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                    Category
+                    Category <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={customForm.category}
@@ -954,7 +946,7 @@ export default function SkillsPage() {
                 disabled={savingCustom}
                 className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {savingCustom ? "Adding..." : "Add Skill"}
+                {savingCustom ? "Adding..." : "Add Skills"}
               </button>
             </div>
           </div>

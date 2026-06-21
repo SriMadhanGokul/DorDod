@@ -37,6 +37,7 @@ const growthScoreRoutes = require("./routes/growthScoreRoutes");
 const financialRoutes = require("./routes/financialRoutes");
 const scopeRoutes = require("./routes/scopeRoutes");
 const metricsRoutes = require("./routes/metricsRoutes");
+const alignmentRoutes = require("./routes/alignmentRoutes");
 
 // ✅ NEW: Daily Check-In & Reflection Routes
 const dailyCheckInRoutes = require("./routes/checkInRoutes");
@@ -104,6 +105,7 @@ app.use("/api/custom-skills", customSkillRoutes);
 // Analytics & Growth
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/growth-score", growthScoreRoutes);
+app.use("/api/alignment", alignmentRoutes);
 app.use("/api/achievements", achievementRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/scorecard", scoreCardRoutes);

@@ -79,17 +79,19 @@ exports.getDashboardMetrics = async (req, res) => {
     console.log(`   Active Goals: ${activeGoals.length}`);
     console.log(`   Completed Goals: ${completedGoals.length}`);
 
-    // Calculate goal progress
+    // ✅ FIX: Calculate goal progress based on TODAY'S completion ONLY
     const goalsWithProgress = activeGoals.map((goal) => {
       const dayCompletion = ensurePlainObject(goal.dayCompletion);
-      const completedDays = getCompletedCount(dayCompletion);
-      const progress = completedDays > 0 ? 1 : 0;
+
+      // ✅ CHECK IF TODAY IS MARKED COMPLETE
+      const todayIsComplete = dayCompletion[today]?.status === "completed";
+      const progress = todayIsComplete ? 1 : 0;
 
       console.log(
-        `     - ${goal.title}: ${completedDays} days completed (progress: ${progress})`,
+        `     - ${goal.title}: Today Complete=${todayIsComplete} (progress: ${progress})`,
       );
 
-      return { goal, completedDays, progress };
+      return { goal, progress, todayIsComplete };
     });
 
     // ============ HABITS ============
@@ -136,15 +138,16 @@ exports.getDashboardMetrics = async (req, res) => {
     // ============ CALCULATE ALIGNMENT SCORE ============
     let alignmentScore = 0;
 
-    // Goal contribution (70%)
+    // ✅ FIX: Goal contribution (70%) - COUNT ONLY TODAY'S COMPLETIONS
     if (activeGoals.length > 0) {
-      const goalsProgress = goalsWithProgress.reduce(
-        (sum, g) => sum + g.progress,
-        0,
-      );
-      const goalPts = (goalsProgress / activeGoals.length) * 70;
+      const goalsCompletedToday = goalsWithProgress.filter(
+        (g) => g.todayIsComplete,
+      ).length;
+      const goalPts = (goalsCompletedToday / activeGoals.length) * 70;
       alignmentScore += goalPts;
-      console.log(`   Goal Points: ${Math.round(goalPts)}/70`);
+      console.log(
+        `   Goal Points: ${Math.round(goalPts)}/70 (${goalsCompletedToday}/${activeGoals.length} completed TODAY)`,
+      );
     } else {
       console.log(`   Goal Points: 0/70 (no active goals)`);
     }
@@ -159,7 +162,7 @@ exports.getDashboardMetrics = async (req, res) => {
       const habitPts = (habitCompletion.completed / habitCompletion.total) * 20;
       alignmentScore += habitPts;
       console.log(
-        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total} linked habits)`,
+        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total} linked habits completed TODAY)`,
       );
     } else {
       console.log(`   Habit Points: 0/20 (no linked habits)`);
@@ -202,10 +205,10 @@ exports.getDashboardMetrics = async (req, res) => {
     if (completedLinkedHabitsToday.length === 0 && linkedHabits.length > 0)
       riskScore += 5;
 
+    // ✅ FIX: Only penalize for TODAY's missed goals
     const missedGoalsCount = activeGoals.filter((g) => {
       const dayCompletion = ensurePlainObject(g.dayCompletion);
-      const completed = getCompletedCount(dayCompletion);
-      return completed === 0;
+      return dayCompletion[today]?.status !== "completed";
     }).length;
     riskScore += missedGoalsCount * 5;
 
@@ -261,7 +264,7 @@ exports.getDashboardMetrics = async (req, res) => {
         growthScore,
         riskIndicator: finalRiskScore,
         goalProgress: {
-          completed: goalsWithProgress.filter((g) => g.progress > 0).length,
+          completed: goalsWithProgress.filter((g) => g.todayIsComplete).length,
           total: activeGoals.length,
         },
         habitCompletion,

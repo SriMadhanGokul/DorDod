@@ -6,37 +6,41 @@ const customSkillSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      // Removed unique: true - users should be able to create multiple custom skills
     },
     skillName: {
       type: String,
       required: true,
     },
-    alreadyKnows: {
-      type: [String],
-      default: [],
-    },
-    wantsToLearn: {
-      type: [String],
-      default: [],
-    },
     description: {
       type: String,
-      default: "",
+      required: true, // ✅ MANDATORY
     },
     category: {
       type: String,
-      default: "Technical",
-      enum: ["Technical", "Leadership", "Soft Skills", "Creative", "Language", "Other"],
+      required: true, // ✅ MANDATORY
+      enum: [
+        "Technical",
+        "Leadership",
+        "Soft Skills",
+        "Creative",
+        "Language",
+        "Other",
+      ],
     },
-    // ✅ UNIFIED STATUS - same as existing skills
     status: {
       type: String,
       enum: ["to-learn", "learning", "learned"],
       default: "to-learn",
+      required: true,
+    },
+    // ✅ NEW - Link to goal (for goal integration)
+    linkedGoal: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Goal",
+      default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("CustomSkill", customSkillSchema);

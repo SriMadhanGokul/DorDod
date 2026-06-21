@@ -41,6 +41,11 @@ interface DashboardMetrics {
   trend?: Array<{ date: string; score: number }>;
 }
 
+interface AlignmentData {
+  alignmentTrendScore: number;
+  trend?: Array<{ date: string; score: number }>;
+}
+
 interface DailyCheckIn {
   _id?: string;
   date: string;
@@ -68,6 +73,9 @@ export const triggerDashboardRefresh = () => {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [alignmentData, setAlignmentData] = useState<AlignmentData | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [dailyCheckIn, setDailyCheckIn] = useState<DailyCheckIn | null>(null);
   const [dailyReflection, setDailyReflection] =
@@ -92,7 +100,7 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
 
-    // ✅ 10-second auto-refresh (faster than before)
+    // ✅ 10-second auto-refresh
     const interval = setInterval(loadDashboardData, 10000);
 
     // ✅ LISTEN FOR HABIT COMPLETION EVENTS
@@ -112,17 +120,25 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setIsRefreshing(true);
-      const [metricsRes, checkInRes, reflectionRes] = await Promise.all([
-        api
-          .get("/dashboard/metrics")
-          .catch(() => ({ data: { success: false, data: null } })),
-        api
-          .get("/daily-check-in/today")
-          .catch(() => ({ data: { success: false, data: null } })),
-        api
-          .get("/daily-reflection/today")
-          .catch(() => ({ data: { success: false, data: null } })),
-      ]);
+      const [metricsRes, checkInRes, reflectionRes, alignmentRes, historyRes] =
+        await Promise.all([
+          api
+            .get("/dashboard/metrics")
+            .catch(() => ({ data: { success: false, data: null } })),
+          api
+            .get("/daily-check-in/today")
+            .catch(() => ({ data: { success: false, data: null } })),
+          api
+            .get("/daily-reflection/today")
+            .catch(() => ({ data: { success: false, data: null } })),
+          // ✅ FETCH NEW ALIGNMENT DATA
+          api
+            .patch("/alignment/today")
+            .catch(() => ({ data: { success: false, data: null } })),
+          api
+            .get("/alignment/history")
+            .catch(() => ({ data: { success: false, data: [] } })),
+        ]);
 
       if (metricsRes?.data?.data) {
         setMetrics(metricsRes.data.data);
@@ -132,6 +148,15 @@ export default function DashboardPage() {
       }
       if (reflectionRes?.data?.data) {
         setDailyReflection(reflectionRes.data.data);
+      }
+
+      // ✅ SET ALIGNMENT DATA WITH HISTORY
+      if (alignmentRes?.data?.data || historyRes?.data?.data) {
+        setAlignmentData({
+          alignmentTrendScore:
+            alignmentRes?.data?.data?.alignmentTrendScore || 0,
+          trend: historyRes?.data?.data || [],
+        });
       }
     } catch (err: any) {
       console.error("Dashboard error:", err);
@@ -532,10 +557,10 @@ export default function DashboardPage() {
           hasCheckedInToday={metrics?.checks.hasCheckedInToday || false}
         />
 
-        {/* Alignment Trend Card */}
+        {/* ✅ Alignment Trend Card - NOW RECEIVES ALIGNMENT DATA */}
         <AlignmentTrendCard
-          score={metrics?.alignmentTrend || 0}
-          trendData={metrics?.trend || []}
+          score={alignmentData?.alignmentTrendScore || 0}
+          trendData={alignmentData?.trend || []}
         />
 
         {/* Growth Score Card */}
@@ -785,8 +810,9 @@ export default function DashboardPage() {
             goals, habits, and check-in (only goal-linked habits count)
           </div>
           <div>
-            <strong>Alignment Trend:</strong> Your 30-day consistency pattern
-            showing daily progress
+            <strong>Alignment Trend (ATS):</strong> 30-day momentum score
+            combining daily alignment with yesterday's trend for trend-based
+            measurement
           </div>
           <div>
             <strong>Growth Score:</strong> Cumulative long-term development from

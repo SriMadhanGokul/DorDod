@@ -5,6 +5,8 @@ const {
   getCustomSkill,
   updateCustomSkill,
   deleteCustomSkill,
+  linkSkillToGoal,
+  unlinkSkillFromGoal,
 } = require("../controllers/customSkillController");
 const protect = require("../utils/protect");
 
@@ -16,10 +18,10 @@ router.use(protect);
 // ✅ GET ALL CUSTOM SKILLS
 router.get("/", getCustomSkills);
 
-// ✅ CREATE CUSTOM SKILL
+// ✅ CREATE CUSTOM SKILL(S)
 router.post("/", createCustomSkill);
 
-// ✅ GET SINGLE CUSTOM SKILL (must come before /:id route)
+// ✅ GET SINGLE CUSTOM SKILL
 router.get("/:id", getCustomSkill);
 
 // ✅ UPDATE CUSTOM SKILL
@@ -27,5 +29,11 @@ router.put("/:id", updateCustomSkill);
 
 // ✅ DELETE CUSTOM SKILL
 router.delete("/:id", deleteCustomSkill);
+
+// ✅ LINK SKILL TO GOAL
+router.post("/:id/link-goal", linkSkillToGoal);
+
+// ✅ UNLINK SKILL FROM GOAL
+router.post("/:id/unlink-goal", unlinkSkillFromGoal);
 
 module.exports = router;

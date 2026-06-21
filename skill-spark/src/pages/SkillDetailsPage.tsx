@@ -2,22 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "@/utils/api";
 import { toast } from "react-hot-toast";
-import {
-  FaArrowLeft,
-  FaTrash,
-  FaEdit,
-  FaCheckCircle,
-  FaTimes,
-} from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaLink, FaTimes } from "react-icons/fa";
 
 interface CustomSkill {
   _id: string;
   skillName: string;
-  alreadyKnows: string[];
-  wantsToLearn: string[];
   description: string;
   category: string;
   status: "to-learn" | "learning" | "learned";
+  linkedGoal?: string;
   isCustom: true;
 }
 
@@ -26,8 +19,14 @@ interface UserSkill {
   name: string;
   status: "to-learn" | "learning" | "learned";
   category: string;
-  addedToGoal?: boolean;
   isCustom?: false;
+}
+
+interface Goal {
+  _id: string;
+  title: string;
+  status: string;
+  category?: string;
 }
 
 type DisplaySkill = UserSkill | CustomSkill;
@@ -37,16 +36,6 @@ export default function SkillDetailsPage() {
   const { skillId } = useParams<{ skillId: string }>();
   const [skill, setSkill] = useState<DisplaySkill | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    alreadyKnows: [] as string[],
-    wantsToLearn: [] as string[],
-    description: "",
-  });
-  const [tagInputs, setTagInputs] = useState({
-    alreadyKnows: "",
-    wantsToLearn: "",
-  });
   const [saving, setSaving] = useState(false);
 
   // ✅ LOAD SKILL DATA
@@ -59,25 +48,9 @@ export default function SkillDetailsPage() {
         try {
           const customRes = await api.get(`/custom-skills/${skillId}`);
           if (customRes.data.data) {
-            const skill = customRes.data.data;
             setSkill({
-              ...skill,
+              ...customRes.data.data,
               isCustom: true,
-              // Normalize wantsToLearn
-              wantsToLearn: Array.isArray(skill.wantsToLearn)
-                ? skill.wantsToLearn.map((item: any) =>
-                    typeof item === "string" ? item : item.name,
-                  )
-                : [],
-            });
-            setEditForm({
-              alreadyKnows: skill.alreadyKnows || [],
-              wantsToLearn: Array.isArray(skill.wantsToLearn)
-                ? skill.wantsToLearn.map((item: any) =>
-                    typeof item === "string" ? item : item.name,
-                  )
-                : [],
-              description: skill.description || "",
             });
             return;
           }
@@ -112,49 +85,6 @@ export default function SkillDetailsPage() {
     }
   }, [skillId, navigate]);
 
-  // ✅ ADD TAG
-  const handleAddTag = (field: "alreadyKnows" | "wantsToLearn") => {
-    const value = tagInputs[field].trim();
-    if (!value) return;
-
-    if (editForm[field].includes(value)) {
-      toast.error("This item already exists");
-      return;
-    }
-
-    setEditForm((prev) => ({
-      ...prev,
-      [field]: [...prev[field], value],
-    }));
-
-    setTagInputs((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-  };
-
-  // ✅ REMOVE TAG
-  const handleRemoveTag = (
-    field: "alreadyKnows" | "wantsToLearn",
-    index: number,
-  ) => {
-    setEditForm((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index),
-    }));
-  };
-
-  // ✅ HANDLE TAG INPUT KEY DOWN
-  const handleTagInputKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    field: "alreadyKnows" | "wantsToLearn",
-  ) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      handleAddTag(field);
-    }
-  };
-
   // ✅ UPDATE SKILL STATUS
   const handleUpdateStatus = async (newStatus: string) => {
     if (!skill) return;
@@ -166,16 +96,10 @@ export default function SkillDetailsPage() {
           status: newStatus,
         });
         if (res.data.success) {
-          const updated = {
+          setSkill({
             ...res.data.data,
             isCustom: true,
-            wantsToLearn: Array.isArray(res.data.data.wantsToLearn)
-              ? res.data.data.wantsToLearn.map((item: any) =>
-                  typeof item === "string" ? item : item.name,
-                )
-              : [],
-          };
-          setSkill(updated);
+          });
           toast.success("Status updated!");
         }
       } else {
@@ -199,40 +123,7 @@ export default function SkillDetailsPage() {
     }
   };
 
-  // ✅ SAVE CUSTOM SKILL EDITS
-  const handleSaveEdits = async () => {
-    if (!skill || !(skill as CustomSkill).isCustom) return;
-
-    try {
-      setSaving(true);
-      const res = await api.put(`/custom-skills/${skill._id}`, {
-        alreadyKnows: editForm.alreadyKnows,
-        wantsToLearn: editForm.wantsToLearn,
-        description: editForm.description,
-      });
-
-      if (res.data.success) {
-        const updated = {
-          ...res.data.data,
-          isCustom: true,
-          wantsToLearn: Array.isArray(res.data.data.wantsToLearn)
-            ? res.data.data.wantsToLearn.map((item: any) =>
-                typeof item === "string" ? item : item.name,
-              )
-            : [],
-        };
-        setSkill(updated);
-        setIsEditing(false);
-        toast.success("Skill updated!");
-      }
-    } catch (error) {
-      toast.error("Failed to save edits");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ✅ DELETE SKILL
+  // ✅ DELETE SKILL (custom only)
   const handleDeleteSkill = async () => {
     if (!skill || !window.confirm("Delete this skill?")) return;
 
@@ -240,9 +131,9 @@ export default function SkillDetailsPage() {
       setSaving(true);
       if ((skill as CustomSkill).isCustom) {
         await api.delete(`/custom-skills/${skill._id}`);
+        toast.success("Skill deleted!");
+        navigate("/skills");
       }
-      toast.success("Skill deleted!");
-      navigate("/skills");
     } catch (error) {
       toast.error("Failed to delete skill");
     } finally {
@@ -250,23 +141,51 @@ export default function SkillDetailsPage() {
     }
   };
 
-  // ✅ ADD TO GOAL
-  const handleAddGoal = async () => {
+  // ✅ ADD TO GOAL - CREATE GOAL FROM SKILL (NO LINKING)
+  const handleAddToGoal = async () => {
     if (!skill) return;
 
     try {
-      if ((skill as CustomSkill).isCustom) {
-        toast.info("Create a new goal and add this skill to track it");
-        navigate("/goals");
-      } else {
-        const res = await api.post(`/skill-path/skills/${skill._id}/add-goal`);
-        if (res.data.success) {
-          toast.success(res.data.message);
-          navigate("/goals");
-        }
+      setSaving(true);
+
+      // Get skill name - works for both custom and existing skills
+      let skillName = (skill as any).skillName || (skill as any).name || "";
+      let skillCategory = (skill as any).category || "";
+
+      if (!skillName) {
+        toast.error("Skill name is required");
+        return;
       }
-    } catch (error) {
-      toast.error("Failed to create goal");
+
+      // Map skill category to valid goal category
+      let goalCategory = "Learning"; // Default
+      if (skillCategory.toLowerCase().includes("leadership"))
+        goalCategory = "Career";
+      else if (skillCategory.toLowerCase().includes("health"))
+        goalCategory = "Health";
+      else if (skillCategory.toLowerCase().includes("finance"))
+        goalCategory = "Finance";
+      else if (skillCategory.toLowerCase().includes("personal"))
+        goalCategory = "Personal";
+
+      // Create new goal with skill name (NO LINKING)
+      const goalRes = await api.post("/goals", {
+        title: skillName,
+        description: `Goal to master ${skillName}`,
+        category: goalCategory,
+        priority: "Medium",
+        duration: 30,
+      });
+
+      if (goalRes.data.success) {
+        toast.success(`✅ New goal "${skillName}" created!`);
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to create goal from skill",
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -326,147 +245,39 @@ export default function SkillDetailsPage() {
               </span>
             </div>
           </div>
-
-          {isCustom && (
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-            >
-              <FaEdit /> {isEditing ? "Cancel" : "Edit"}
-            </button>
-          )}
         </div>
       </div>
 
       {/* CONTENT */}
       <div className="space-y-6">
         {/* DESCRIPTION */}
-        {isCustom && (skill as CustomSkill).description && (
+        {(skill as CustomSkill).description && (
           <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-200 dark:border-gray-800">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
               Description
             </h2>
-            {isEditing ? (
-              <textarea
-                value={editForm.description}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, description: e.target.value })
-                }
-                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none h-24"
-              />
-            ) : (
-              <p className="text-gray-700 dark:text-gray-300">
-                {(skill as CustomSkill).description}
-              </p>
-            )}
+            <p className="text-gray-700 dark:text-gray-300">
+              {(skill as CustomSkill).description}
+            </p>
           </div>
         )}
 
-        {/* ALREADY KNOWS */}
-        {isCustom && (skill as CustomSkill).alreadyKnows.length > 0 && (
-          <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl border border-green-200 dark:border-green-800">
-            <h2 className="text-lg font-bold text-green-900 dark:text-green-200 mb-4">
-              ✓ Already Know
+        {/* ADD TO GOAL SECTION (custom only) */}
+        {isCustom && (
+          <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-2xl border border-purple-200 dark:border-purple-800">
+            <h2 className="text-lg font-bold text-purple-900 dark:text-purple-200 mb-4">
+              <FaLink className="inline mr-2" /> Create Goal from Skill
             </h2>
-
-            {isEditing ? (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Add new item and press Enter..."
-                  value={tagInputs.alreadyKnows}
-                  onChange={(e) =>
-                    setTagInputs({
-                      ...tagInputs,
-                      alreadyKnows: e.target.value,
-                    })
-                  }
-                  onKeyDown={(e) => handleTagInputKeyDown(e, "alreadyKnows")}
-                  className="w-full px-4 py-2 border border-green-200 dark:border-green-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-                />
-                <div className="flex flex-wrap gap-2">
-                  {editForm.alreadyKnows.map((item, idx) => (
-                    <div
-                      key={`edit-know-${idx}`}
-                      className="flex items-center gap-1.5 bg-green-200 dark:bg-green-900/50 text-green-800 dark:text-green-200 px-3 py-1.5 rounded-full text-sm font-medium"
-                    >
-                      {item}
-                      <button
-                        onClick={() => handleRemoveTag("alreadyKnows", idx)}
-                        className="hover:text-green-900 dark:hover:text-green-100 font-bold"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {(skill as CustomSkill).alreadyKnows.map((item, idx) => (
-                  <span
-                    key={`know-${idx}`}
-                    className="bg-green-200 dark:bg-green-900/50 text-green-800 dark:text-green-200 px-4 py-2 rounded-full text-sm font-medium"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* WANTS TO LEARN */}
-        {isCustom && (skill as CustomSkill).wantsToLearn.length > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border border-blue-200 dark:border-blue-800">
-            <h2 className="text-lg font-bold text-blue-900 dark:text-blue-200 mb-4">
-              → Want to Learn
-            </h2>
-
-            {isEditing ? (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Add new item and press Enter..."
-                  value={tagInputs.wantsToLearn}
-                  onChange={(e) =>
-                    setTagInputs({
-                      ...tagInputs,
-                      wantsToLearn: e.target.value,
-                    })
-                  }
-                  onKeyDown={(e) => handleTagInputKeyDown(e, "wantsToLearn")}
-                  className="w-full px-4 py-2 border border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <div className="flex flex-wrap gap-2">
-                  {editForm.wantsToLearn.map((item, idx) => (
-                    <div
-                      key={`edit-learn-${idx}`}
-                      className="flex items-center gap-1.5 bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-3 py-1.5 rounded-full text-sm font-medium"
-                    >
-                      {item}
-                      <button
-                        onClick={() => handleRemoveTag("wantsToLearn", idx)}
-                        className="hover:text-blue-900 dark:hover:text-blue-100 font-bold"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {(skill as CustomSkill).wantsToLearn.map((item, idx) => (
-                  <span
-                    key={`learn-${idx}`}
-                    className="bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-full text-sm font-medium"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
+            <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
+              Create a new goal with the same name as this skill
+            </p>
+            <button
+              onClick={handleAddToGoal}
+              disabled={saving}
+              className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
+            >
+              + Add to Goal
+            </button>
           </div>
         )}
 
@@ -503,27 +314,8 @@ export default function SkillDetailsPage() {
             </button>
           )}
 
-          {/* Add Goal Button */}
-          <button
-            onClick={handleAddGoal}
-            disabled={saving}
-            className="px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60"
-          >
-            + Add Goal
-          </button>
-
-          {/* Save/Delete Actions */}
-          {isEditing && isCustom && (
-            <button
-              onClick={handleSaveEdits}
-              disabled={saving}
-              className="px-4 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-60 col-span-2"
-            >
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          )}
-
-          {isCustom && !isEditing && (
+          {/* Delete Button (custom only) */}
+          {isCustom && (
             <button
               onClick={handleDeleteSkill}
               disabled={saving}
