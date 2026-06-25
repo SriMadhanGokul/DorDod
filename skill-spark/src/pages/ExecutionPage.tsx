@@ -47,29 +47,36 @@ const COLORS: Record<string, string> = {
   Other: "#6b7280",
 };
 
-// ✅ Get today's date in YYYY-MM-DD format
+// ✅ FIXED: Get today's date in LOCAL timezone (not UTC)
 const getTodayString = (): string => {
-  return new Date().toISOString().split("T")[0];
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 };
 
-// ✅ Calculate due date for a specific day number
+// ✅ FIXED: Calculate due date for a specific day number using LOCAL timezone
 const getDayDueDate = (goal: Goal, dayNumber: number): string | null => {
   if (!goal.createdAt) return null;
 
   try {
     const createdDate = new Date(goal.createdAt);
-    const createdUTC = new Date(
-      Date.UTC(
-        createdDate.getUTCFullYear(),
-        createdDate.getUTCMonth(),
-        createdDate.getUTCDate(),
-      ),
-    );
 
-    const targetDate = new Date(createdUTC.getTime());
-    targetDate.setUTCDate(targetDate.getUTCDate() + (dayNumber - 1));
+    // ✅ CRITICAL: Use local timezone, not UTC
+    const yyyy = createdDate.getFullYear();
+    const mm = createdDate.getMonth();
+    const dd = createdDate.getDate();
 
-    return targetDate.toISOString().split("T")[0];
+    const createdLocal = new Date(yyyy, mm, dd);
+    const targetDate = new Date(createdLocal);
+    targetDate.setDate(targetDate.getDate() + (dayNumber - 1));
+
+    const targetYyyy = targetDate.getFullYear();
+    const targetMm = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const targetDd = String(targetDate.getDate()).padStart(2, "0");
+
+    return `${targetYyyy}-${targetMm}-${targetDd}`;
   } catch (e) {
     console.error("Error calculating due date:", e);
     return null;

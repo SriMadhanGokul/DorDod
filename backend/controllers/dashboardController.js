@@ -3,7 +3,14 @@ const Habit = require("../models/Habit");
 const DailyCheckIn = require("../models/DailyCheckIn");
 const DailyReflection = require("../models/DailyReflection");
 
-const getToday = () => new Date().toISOString().split("T")[0];
+// ✅ FIXED: Use local timezone, not UTC
+const getToday = () => {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 // ✅ Helper: Convert Mongoose Map to plain object
 const ensurePlainObject = (field) => {
@@ -79,19 +86,19 @@ exports.getDashboardMetrics = async (req, res) => {
     console.log(`   Active Goals: ${activeGoals.length}`);
     console.log(`   Completed Goals: ${completedGoals.length}`);
 
-    // ✅ FIX: Calculate goal progress based on TODAY'S completion ONLY
+    // ✅ CRITICAL FIX: Calculate goal progress for TODAY ONLY (not all-time)
     const goalsWithProgress = activeGoals.map((goal) => {
       const dayCompletion = ensurePlainObject(goal.dayCompletion);
 
-      // ✅ CHECK IF TODAY IS MARKED COMPLETE
+      // ✅ FIXED: Check ONLY today's completion, not all-time
       const todayIsComplete = dayCompletion[today]?.status === "completed";
       const progress = todayIsComplete ? 1 : 0;
 
       console.log(
-        `     - ${goal.title}: Today Complete=${todayIsComplete} (progress: ${progress})`,
+        `     - ${goal.title}: today complete=${todayIsComplete} (progress: ${progress})`,
       );
 
-      return { goal, progress, todayIsComplete };
+      return { goal, progress };
     });
 
     // ============ HABITS ============
@@ -138,15 +145,16 @@ exports.getDashboardMetrics = async (req, res) => {
     // ============ CALCULATE ALIGNMENT SCORE ============
     let alignmentScore = 0;
 
-    // ✅ FIX: Goal contribution (70%) - COUNT ONLY TODAY'S COMPLETIONS
+    // ✅ Goal contribution (70%) - NOW ONLY TODAY
     if (activeGoals.length > 0) {
-      const goalsCompletedToday = goalsWithProgress.filter(
-        (g) => g.todayIsComplete,
-      ).length;
-      const goalPts = (goalsCompletedToday / activeGoals.length) * 70;
+      const goalsProgress = goalsWithProgress.reduce(
+        (sum, g) => sum + g.progress,
+        0,
+      );
+      const goalPts = (goalsProgress / activeGoals.length) * 70;
       alignmentScore += goalPts;
       console.log(
-        `   Goal Points: ${Math.round(goalPts)}/70 (${goalsCompletedToday}/${activeGoals.length} completed TODAY)`,
+        `   Goal Points: ${Math.round(goalPts)}/70 (${goalsProgress}/${activeGoals.length} completed today)`,
       );
     } else {
       console.log(`   Goal Points: 0/70 (no active goals)`);
@@ -162,7 +170,7 @@ exports.getDashboardMetrics = async (req, res) => {
       const habitPts = (habitCompletion.completed / habitCompletion.total) * 20;
       alignmentScore += habitPts;
       console.log(
-        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total} linked habits completed TODAY)`,
+        `   Habit Points: ${Math.round(habitPts)}/20 (${habitCompletion.completed}/${habitCompletion.total} linked habits)`,
       );
     } else {
       console.log(`   Habit Points: 0/20 (no linked habits)`);
@@ -205,10 +213,11 @@ exports.getDashboardMetrics = async (req, res) => {
     if (completedLinkedHabitsToday.length === 0 && linkedHabits.length > 0)
       riskScore += 5;
 
-    // ✅ FIX: Only penalize for TODAY's missed goals
     const missedGoalsCount = activeGoals.filter((g) => {
       const dayCompletion = ensurePlainObject(g.dayCompletion);
-      return dayCompletion[today]?.status !== "completed";
+      // ✅ CRITICAL: Only penalize if today is NOT completed
+      const todayComplete = dayCompletion[today]?.status === "completed";
+      return !todayComplete;
     }).length;
     riskScore += missedGoalsCount * 5;
 
@@ -216,12 +225,15 @@ exports.getDashboardMetrics = async (req, res) => {
     console.log(`   ✅ RISK INDICATOR: ${finalRiskScore}`);
 
     // ============ HABIT COMPLETION RATE (7-day) ============
-    // ✅ ONLY COUNT GOAL-LINKED HABITS
+    // ✅ ONLY COUNT GOAL-LINKED HABITS + LOCAL TIMEZONE
     const last7Days = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      last7Days.push(d.toISOString().split("T")[0]);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      last7Days.push(`${yyyy}-${mm}-${dd}`);
     }
 
     let completedDaysCount = 0;
@@ -229,9 +241,7 @@ exports.getDashboardMetrics = async (req, res) => {
       const completed = linkedHabits.some((h) => {
         if (!h.tracking || h.tracking.length === 0) return false;
         return h.tracking.some(
-          (t) =>
-            new Date(t.date).toISOString().split("T")[0] === day &&
-            t.status === "completed",
+          (t) => t.date === day && t.status === "completed",
         );
       });
       if (completed) completedDaysCount++;
@@ -248,7 +258,10 @@ exports.getDashboardMetrics = async (req, res) => {
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const dateStr = `${yyyy}-${mm}-${dd}`;
       trend.push({
         date: dateStr,
         score: Math.max(0, alignmentScore + Math.random() * 20 - 10),
@@ -264,7 +277,7 @@ exports.getDashboardMetrics = async (req, res) => {
         growthScore,
         riskIndicator: finalRiskScore,
         goalProgress: {
-          completed: goalsWithProgress.filter((g) => g.todayIsComplete).length,
+          completed: goalsWithProgress.filter((g) => g.progress > 0).length,
           total: activeGoals.length,
         },
         habitCompletion,

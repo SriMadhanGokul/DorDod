@@ -1,5 +1,14 @@
 const Goal = require("../models/Goal");
 
+// ✅ FIXED: Use LOCAL timezone, not UTC
+const getToday = () => {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const fixDayCompletion = (goal) => {
   if (!goal.dayCompletion) goal.dayCompletion = {};
   if (goal.dayCompletion instanceof Map) {
@@ -99,35 +108,34 @@ exports.markDayComplete = async (req, res) => {
 
     fixDayCompletion(goal);
 
-    // ✅ CRITICAL: Get today's date in string format "YYYY-MM-DD"
-    const today = new Date().toISOString().split("T")[0];
-    console.log(`   Today: ${today}`);
+    // ✅ CRITICAL: Get today's date using LOCAL timezone
+    const today = getToday();
+    console.log(`   Today (LOCAL): ${today}`);
 
-    // Calculate the due date for this day number
+    // ✅ FIXED: Calculate the due date for this day number using LOCAL timezone
     const createdDate = new Date(goal.createdAt);
-    console.log(`   Created Date object:`, createdDate.toISOString());
+    const createdYyyy = createdDate.getFullYear();
+    const createdMm = createdDate.getMonth();
+    const createdDd = createdDate.getDate();
 
-    const createdUTC = new Date(
-      Date.UTC(
-        createdDate.getUTCFullYear(),
-        createdDate.getUTCMonth(),
-        createdDate.getUTCDate(),
-      ),
-    );
-    console.log(`   Created UTC (midnight):`, createdUTC.toISOString());
+    // Create local date (midnight on creation date in user's timezone)
+    const createdLocal = new Date(createdYyyy, createdMm, createdDd);
 
-    const targetDate = new Date(createdUTC);
-    targetDate.setUTCDate(targetDate.getUTCDate() + dayNumber - 1);
-    const completionDate = targetDate.toISOString().split("T")[0];
+    const targetDate = new Date(createdLocal);
+    targetDate.setDate(targetDate.getDate() + dayNumber - 1);
 
-    console.log(`\n📅 DATE CALCULATION:`);
-    console.log(`   Day Number: ${dayNumber}`);
-    console.log(`   Created UTC Date: ${createdUTC.getUTCDate()}`);
+    const targetYyyy = targetDate.getFullYear();
+    const targetMm = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const targetDd = String(targetDate.getDate()).padStart(2, "0");
+    const completionDate = `${targetYyyy}-${targetMm}-${targetDd}`;
+
+    console.log(`\n📅 DATE CALCULATION (LOCAL TIMEZONE):`);
     console.log(
-      `   Target Date Calc: ${createdUTC.getUTCDate()} + (${dayNumber} - 1) = ${createdUTC.getUTCDate() + dayNumber - 1}`,
+      `   Created Date (Local): ${createdYyyy}-${String(createdMm + 1).padStart(2, "0")}-${String(createdDd).padStart(2, "0")}`,
     );
-    console.log(`   Target Date: ${targetDate.toISOString()}`);
-    console.log(`   Completion Date String: ${completionDate}`);
+    console.log(`   Day Number: ${dayNumber}`);
+    console.log(`   Completion Date: ${completionDate}`);
+    console.log(`   Today: ${today}`);
 
     // ✅ CALENDAR-DAY-BASED CHECK: Can only mark on or after the due date
     if (completionDate > today) {
@@ -160,7 +168,6 @@ exports.markDayComplete = async (req, res) => {
     console.log(`\n✅ MARKING DAY AS COMPLETE`);
 
     // ✅ Mark this specific calendar day as complete
-    // Explicitly set the values to ensure Map type saves correctly
     goal.dayCompletion[completionDate] = {
       date: completionDate,
       dayNumber: dayNumber,
@@ -218,7 +225,7 @@ exports.markDayComplete = async (req, res) => {
     res.json({
       success: true,
       message: `Day ${dayNumber} marked complete!`,
-      data: goal, // ✅ INCLUDE FULL GOAL DATA WITH dayCompletion
+      data: goal,
     });
   } catch (error) {
     console.error(`\n❌ ERROR IN MARK_DAY_COMPLETE:`, error);
@@ -238,8 +245,7 @@ exports.markGoalIncomplete = async (req, res) => {
         .json({ success: false, message: "Goal not found" });
 
     fixDayCompletion(goal);
-    const dateToRemove =
-      req.body.date || new Date().toISOString().split("T")[0];
+    const dateToRemove = req.body.date || getToday();
 
     if (goal.dayCompletion[dateToRemove]) {
       delete goal.dayCompletion[dateToRemove];
@@ -321,7 +327,7 @@ exports.markGoalComplete = async (req, res) => {
         .json({ success: false, message: "Goal not found" });
 
     fixDayCompletion(goal);
-    const today = new Date().toISOString().split("T")[0];
+    const today = getToday();
 
     if (goal.dayCompletion[today]) {
       return res.json({
